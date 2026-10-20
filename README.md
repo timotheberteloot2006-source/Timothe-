@@ -43,3 +43,35 @@ même nom (sans accents ni majuscules), dans la base ou plus haut dans le fichie
 ```bash
 npm test   # tests du filtrage et de l'import CSV (Vitest)
 ```
+
+## Abonnements (Stripe)
+
+Deux offres : **Gratuite** (50 candidatures au plus, limite imposée par la base) et **Pro**
+(illimitée, abonnement Stripe). Le prix affiché sur la page Tarifs est `PRIX_PRO` dans
+`src/lib/abonnement.ts` ; le prix réellement facturé est celui configuré dans Stripe.
+
+1. Dans Stripe (mode test pour commencer) : créer un produit « Pro » avec un prix récurrent
+   mensuel et noter son identifiant `price_…`.
+2. Dans *Settings > Billing > Customer portal*, activer le portail client (résiliation,
+   changement de carte, factures).
+3. Installer la [CLI Supabase](https://supabase.com/docs/guides/cli), puis :
+   ```bash
+   supabase login
+   supabase link --project-ref <id-du-projet>
+   cp supabase/functions/.env.example supabase/functions/.env   # puis renseigner les valeurs
+   supabase secrets set --env-file supabase/functions/.env
+   supabase functions deploy creer-checkout
+   supabase functions deploy portail-client
+   supabase functions deploy webhook-stripe --no-verify-jwt
+   ```
+4. Dans Stripe, *Developers > Webhooks* : ajouter l'adresse
+   `https://<id-du-projet>.supabase.co/functions/v1/webhook-stripe` avec les événements
+   `customer.subscription.created`, `customer.subscription.updated` et
+   `customer.subscription.deleted`, puis copier le secret de signature (`whsec_…`) dans
+   `STRIPE_WEBHOOK_SECRET` et relancer `supabase secrets set`.
+
+Carte de test Stripe : `4242 4242 4242 4242`, date future, n'importe quel code.
+
+Un compte avec un abonnement actif ne peut pas être supprimé : il faut d'abord résilier
+(bouton « Gérer mon abonnement » dans *Mon compte*).
+

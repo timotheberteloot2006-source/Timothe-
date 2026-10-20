@@ -70,6 +70,12 @@ function erreurSupabase(error: PostgrestError) {
   if (error.code === VIOLATION_UNICITE) {
     return new Error('Une candidature avec cet e-mail existe déjà.')
   }
+  // Levée par le trigger de supabase/migrations/0004_abonnements.sql
+  if (error.message.startsWith('limite_gratuite')) {
+    return new Error(
+      "Limite de l'offre Gratuite atteinte (50 candidatures) : passez à Pro pour en ajouter d'autres.",
+    )
+  }
   return new Error(error.message)
 }
 

@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { useState, type ChangeEvent } from 'react'
 import type { Candidature, NouvelleCandidature } from '@/lib/candidatures'
 import { analyserImport, MODELE_CSV, type ResultatImport } from '@/lib/importCandidatures'
@@ -9,11 +10,13 @@ const s = (n: number) => (n > 1 ? 's' : '')
 interface Props {
   // Candidatures déjà enregistrées, pour écarter les doublons
   existantes: Candidature[]
+  // Infinity avec l'offre Pro
+  placesRestantes: number
   onImporter: (candidatures: NouvelleCandidature[]) => Promise<void>
   onFermer: () => void
 }
 
-export function ImportCsv({ existantes, onImporter, onFermer }: Props) {
+export function ImportCsv({ existantes, placesRestantes, onImporter, onFermer }: Props) {
   const [analyse, setAnalyse] = useState<ResultatImport | null>(null)
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -37,6 +40,7 @@ export function ImportCsv({ existantes, onImporter, onFermer }: Props) {
   }
 
   const nombre = analyse?.candidatures.length ?? 0
+  const depasseQuota = nombre > placesRestantes
 
   return (
     <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
@@ -87,6 +91,17 @@ export function ImportCsv({ existantes, onImporter, onFermer }: Props) {
         </div>
       )}
 
+      {depasseQuota && (
+        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          L'offre Gratuite permet encore {placesRestantes} candidature{s(placesRestantes)} :
+          réduisez le fichier ou{' '}
+          <Link to="/tarifs" className="font-medium underline">
+            passez à Pro
+          </Link>
+          .
+        </p>
+      )}
+
       {erreur && (
         <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {erreur}
@@ -97,7 +112,7 @@ export function ImportCsv({ existantes, onImporter, onFermer }: Props) {
         <button
           type="button"
           onClick={handleImporter}
-          disabled={nombre === 0 || envoi}
+          disabled={nombre === 0 || depasseQuota || envoi}
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {envoi ? 'Import…' : `Importer${nombre > 0 ? ` ${nombre}` : ''}`}

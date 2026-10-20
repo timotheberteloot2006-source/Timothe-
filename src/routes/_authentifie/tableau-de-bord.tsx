@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { BarreFiltres } from '@/components/candidatures/BarreFiltres'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
@@ -15,11 +15,15 @@ import {
   type NouvelleCandidature,
   type Statut,
 } from '@/lib/candidatures'
+import { estPro, LIMITE_GRATUITE, lireAbonnement, placesRestantes } from '@/lib/abonnement'
 import { filtrerCandidatures, lireFiltres, type Filtres } from '@/lib/filtres'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   validateSearch: lireFiltres,
-  loader: listerCandidatures,
+  loader: async () => {
+    const [candidatures, abonnement] = await Promise.all([listerCandidatures(), lireAbonnement()])
+    return { candidatures, abonnement }
+  },
   // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
   shouldReload: false,
   component: TableauDeBord,
@@ -35,7 +39,8 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
 })
 
 function TableauDeBord() {
-  const candidatures = Route.useLoaderData()
+  const { candidatures, abonnement } = Route.useLoaderData()
+  const places = placesRestantes(abonnement, candidatures.length)
   const filtres = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()
@@ -92,15 +97,17 @@ function TableauDeBord() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
+              disabled={places === 0}
               onClick={() => setPanneau('import')}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100"
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
             >
               Importer un CSV
             </button>
             <button
               type="button"
+              disabled={places === 0}
               onClick={() => setPanneau('ajout')}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
             >
               Ajouter une candidature
             </button>
@@ -108,12 +115,15 @@ function TableauDeBord() {
         )}
       </div>
 
+      {!estPro(abonnement) && <BandeauQuota nombre={candidatures.length} />}
+
       {panneau === 'ajout' && (
         <FormulaireCandidature onEnregistrer={handleAjout} onAnnuler={() => setPanneau(null)} />
       )}
       {panneau === 'import' && (
         <ImportCsv
           existantes={candidatures}
+          placesRestantes={places}
           onImporter={handleImport}
           onFermer={() => setPanneau(null)}
         />
@@ -157,5 +167,22 @@ function TableauDeBord() {
         </>
       )}
     </section>
+  )
+}
+
+function BandeauQuota({ nombre }: { nombre: number }) {
+  const atteinte = nombre >= LIMITE_GRATUITE
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 rounded-md px-4 py-3 text-sm ${atteinte ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700'}`}
+    >
+      <span>
+        Offre Gratuite : {Math.min(nombre, LIMITE_GRATUITE)} / {LIMITE_GRATUITE} candidatures
+        {atteinte && ' — limite atteinte'}
+      </span>
+      <Link to="/tarifs" className="font-medium text-indigo-600 hover:underline">
+        Passer à Pro
+      </Link>
+    </div>
   )
 }

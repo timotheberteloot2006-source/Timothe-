@@ -114,6 +114,8 @@ function traduireErreur(message: string) {
     return "Le nouveau mot de passe doit être différent de l'ancien."
   if (message.includes('already been registered'))
     return 'Cette adresse e-mail est déjà utilisée par un autre compte.'
+  if (message.startsWith('abonnement_actif'))
+    return 'Résiliez d’abord votre abonnement Pro (bouton « Gérer mon abonnement ») avant de supprimer votre compte.'
   if (message.includes('rate limit') || message.includes('For security purposes'))
     return 'Trop de tentatives : réessayez dans quelques instants.'
   return message

@@ -1,11 +1,35 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from 'react'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from 'react'
 import { classeChamp } from '@/components/candidatures/styles'
+import {
+  demarrerPaiement,
+  estPro,
+  LIMITE_GRATUITE,
+  lireAbonnement,
+  ouvrirPortail,
+  paiementEnAttente,
+  type Abonnement,
+} from '@/lib/abonnement'
 import { useAuth } from '@/lib/auth'
 
 export const Route = createFileRoute('/_authentifie/compte')({
+  // ?abonnement=ok : retour depuis le paiement Stripe
+  validateSearch: (search: Record<string, unknown>): { abonnement?: 'ok' } =>
+    search.abonnement === 'ok' ? { abonnement: 'ok' } : {},
+  // Sans abonnement lisible (base pas encore à jour…), la page reste utilisable en offre Gratuite
+  loader: () => lireAbonnement().catch(() => null),
   component: Compte,
 })
+
+// Après le paiement, Stripe prévient le serveur en quelques secondes : on relit l'abonnement
+const RELECTURES_MAX = 10
+const DELAI_RELECTURE_MS = 2000
 
 const CONFIRMATION_SUPPRESSION = 'SUPPRIMER'
 
@@ -16,6 +40,8 @@ function Compte() {
   return (
     <section className="mx-auto max-w-2xl space-y-6 px-4 py-12">
       <h1 className="text-2xl font-bold">Mon compte</h1>
+
+      <CarteAbonnement />
 
       <Carte titre="Adresse e-mail">
         <p className="text-sm text-slate-600">
@@ -88,6 +114,95 @@ function Compte() {
         </Formulaire>
       </Carte>
     </section>
+  )
+}
+
+function CarteAbonnement() {
+  const abonnement = Route.useLoaderData()
+  const { abonnement: retourPaiement } = Route.useSearch()
+  const router = useRouter()
+  const [relectures, setRelectures] = useState(0)
+  const pro = estPro(abonnement)
+  const enAttenteActivation = retourPaiement === 'ok' && !pro && relectures < RELECTURES_MAX
+
+  useEffect(() => {
+    if (!enAttenteActivation) return
+    const minuteur = setTimeout(() => {
+      setRelectures((n) => n + 1)
+      router.invalidate()
+    }, DELAI_RELECTURE_MS)
+    return () => clearTimeout(minuteur)
+  }, [enAttenteActivation, relectures, router])
+
+  return (
+    <Carte titre="Abonnement">
+      <p className="text-sm text-slate-600">
+        Offre actuelle : <strong>{pro ? 'Pro' : 'Gratuite'}</strong>
+        {pro ? descriptionPro(abonnement) : ` (${LIMITE_GRATUITE} candidatures au plus)`}
+      </p>
+      {retourPaiement === 'ok' && (
+        <p
+          role="status"
+          className={`rounded-md px-3 py-2 text-sm ${pro ? 'bg-green-50 text-green-800' : 'bg-slate-100 text-slate-700'}`}
+        >
+          {pro
+            ? 'Merci ! Votre offre Pro est active.'
+            : enAttenteActivation
+              ? 'Paiement reçu, activation de l’offre Pro en cours…'
+              : 'Paiement reçu. L’offre Pro sera active d’ici quelques minutes : rechargez la page.'}
+        </p>
+      )}
+      {paiementEnAttente(abonnement) && (
+        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Le dernier paiement a échoué : mettez à jour votre moyen de paiement.
+        </p>
+      )}
+      <BoutonAction
+        libelle={pro || paiementEnAttente(abonnement) ? 'Gérer mon abonnement' : 'Passer à Pro'}
+        action={pro || paiementEnAttente(abonnement) ? ouvrirPortail : demarrerPaiement}
+      />
+    </Carte>
+  )
+}
+
+function descriptionPro(abonnement: Abonnement | null) {
+  if (!abonnement?.fin_periode) return ''
+  const date = new Date(abonnement.fin_periode).toLocaleDateString('fr-FR')
+  return ` — prochain renouvellement le ${date}`
+}
+
+// Bouton qui redirige vers Stripe ; affiche l'erreur si la redirection échoue
+function BoutonAction({ libelle, action }: { libelle: string; action: () => Promise<void> }) {
+  const [envoi, setEnvoi] = useState(false)
+  const [erreur, setErreur] = useState<string | null>(null)
+
+  async function handleClick() {
+    setEnvoi(true)
+    setErreur(null)
+    try {
+      await action()
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : String(e))
+      setEnvoi(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {erreur && (
+        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {erreur}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={envoi}
+        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+      >
+        {envoi ? 'Redirection…' : libelle}
+      </button>
+    </div>
   )
 }
 
