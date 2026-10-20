@@ -9,7 +9,8 @@ import { lireCsv } from './csv'
 
 export const MAX_LIGNES_IMPORT = 1000
 
-type Champ = keyof NouvelleCandidature
+// Colonnes lues dans le fichier (l'offre est choisie dans le panneau d'import)
+type Champ = Exclude<keyof NouvelleCandidature, 'offre_id'>
 
 // En-têtes acceptés (comparés sans accents ni majuscules)
 const ENTETES: Record<Champ, string[]> = {

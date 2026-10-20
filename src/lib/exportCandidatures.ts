@@ -3,9 +3,22 @@ import { LIBELLES_STATUT, type Candidature } from './candidatures'
 const SEPARATEUR = ';'
 
 // Colonnes compatibles avec l'import (analyserImport) ; statut et date sont ignorés à l'import
-const ENTETE = ['nom', 'email', 'poste', 'competences', 'experience', 'statut', 'ajoutee le']
+const ENTETE = [
+  'nom',
+  'email',
+  'poste',
+  'competences',
+  'experience',
+  'statut',
+  'ajoutee le',
+  'offre',
+]
 
-export function genererCsv(candidatures: Candidature[]): string {
+// titresOffres : titre de chaque offre par identifiant, pour la colonne « offre »
+export function genererCsv(
+  candidatures: Candidature[],
+  titresOffres: Map<string, string> = new Map(),
+): string {
   const lignes = candidatures.map((c) =>
     [
       texte(c.nom),
@@ -15,6 +28,7 @@ export function genererCsv(candidatures: Candidature[]): string {
       String(c.experience),
       LIBELLES_STATUT[c.statut],
       new Date(c.created_at).toLocaleDateString('fr-FR'),
+      texte((c.offre_id && titresOffres.get(c.offre_id)) || ''),
     ].map(echapper),
   )
   // Le BOM indique à Excel que le fichier est en UTF-8 ; CRLF est la fin de ligne attendue en CSV

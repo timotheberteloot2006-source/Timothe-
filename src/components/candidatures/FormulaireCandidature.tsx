@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { decouperCompetences, type NouvelleCandidature } from '@/lib/candidatures'
+import type { Offre } from '@/lib/offres'
 import { classeChamp } from './styles'
 
 interface Props {
@@ -7,9 +8,19 @@ interface Props {
   initiale?: NouvelleCandidature
   onEnregistrer: (candidature: NouvelleCandidature) => Promise<void>
   onAnnuler: () => void
+  // Offres proposées ; le champ n'apparaît que s'il en existe
+  offres?: Offre[]
+  // Offre présélectionnée pour un ajout (ex. celle du filtre en cours)
+  offreParDefaut?: string | null
 }
 
-export function FormulaireCandidature({ initiale, onEnregistrer, onAnnuler }: Props) {
+export function FormulaireCandidature({
+  initiale,
+  onEnregistrer,
+  onAnnuler,
+  offres = [],
+  offreParDefaut = null,
+}: Props) {
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
@@ -28,6 +39,8 @@ export function FormulaireCandidature({ initiale, onEnregistrer, onAnnuler }: Pr
         poste: texte('poste') || null,
         competences: decouperCompetences(texte('competences')),
         experience: Number.parseInt(texte('experience'), 10) || 0,
+        // Sans offre proposée, on ne touche pas au rattachement existant
+        ...(offres.length > 0 && { offre_id: texte('offre_id') || null }),
       })
       // En ajout, vider le formulaire pour enchaîner la saisie suivante
       if (!initiale) formulaire.reset()
@@ -70,6 +83,23 @@ export function FormulaireCandidature({ initiale, onEnregistrer, onAnnuler }: Pr
           className={classeChamp}
         />
       </label>
+      {offres.length > 0 && (
+        <label className="block sm:col-span-2">
+          <span className="text-sm font-medium">Offre</span>
+          <select
+            name="offre_id"
+            defaultValue={(initiale ? initiale.offre_id : offreParDefaut) ?? ''}
+            className={classeChamp}
+          >
+            <option value="">Aucune</option>
+            {offres.map((offre) => (
+              <option key={offre.id} value={offre.id}>
+                {offre.titre}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="block sm:col-span-2">
         <span className="text-sm font-medium">Compétences</span>
         <input

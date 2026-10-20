@@ -15,6 +15,7 @@ function candidature(champs: Partial<Candidature>): Candidature {
     statut: 'nouveau',
     created_at: '2026-03-05T10:00:00Z',
     cv_chemin: null,
+    offre_id: null,
     ...champs,
   }
 }
@@ -31,11 +32,11 @@ const alice = candidature({
 describe('genererCsv', () => {
   it('commence par le BOM et utilise ; et CRLF', () => {
     const csv = genererCsv([alice])
-    expect(csv.startsWith('﻿nom;email;poste;competences;experience;statut;ajoutee le\r\n')).toBe(
-      true,
-    )
+    expect(
+      csv.startsWith('\uFEFFnom;email;poste;competences;experience;statut;ajoutee le;offre\r\n'),
+    ).toBe(true)
     expect(csv).toContain(
-      'Alice Martin;alice@exemple.fr;"Développeuse; front";React, TypeScript;5;Retenu;05/03/2026\r\n',
+      'Alice Martin;alice@exemple.fr;"Développeuse; front";React, TypeScript;5;Retenu;05/03/2026;\r\n',
     )
   })
 
@@ -67,6 +68,16 @@ describe('genererCsv', () => {
       erreurs: [],
       doublons: [],
     })
+  })
+})
+
+describe('colonne offre', () => {
+  it('donne le titre de l’offre rattachée', () => {
+    const csv = genererCsv(
+      [alice, candidature({ nom: 'Lié', offre_id: 'o1' })],
+      new Map([['o1', 'Data; BI']]),
+    )
+    expect(lireCsv(csv).map((l) => l[7])).toEqual(['offre', '', 'Data; BI'])
   })
 })
 

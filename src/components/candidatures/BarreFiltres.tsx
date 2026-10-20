@@ -1,13 +1,15 @@
 import { LIBELLES_STATUT, STATUTS, type Statut } from '@/lib/candidatures'
 import { TRIS, type Filtres, type Tri } from '@/lib/filtres'
+import type { Offre } from '@/lib/offres'
 import { classeChamp } from './styles'
 
 interface Props {
   filtres: Filtres
   onChange: (filtres: Filtres) => void
+  offres: Offre[]
 }
 
-export function BarreFiltres({ filtres, onChange }: Props) {
+export function BarreFiltres({ filtres, onChange, offres }: Props) {
   function modifier(champs: Partial<Filtres>) {
     onChange({ ...filtres, ...champs })
   }
@@ -17,7 +19,7 @@ export function BarreFiltres({ filtres, onChange }: Props) {
   const actif = Object.values(criteres).some((v) => v !== undefined)
 
   return (
-    <div className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-2 lg:grid-cols-6">
+    <div className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
       <label className="block lg:col-span-2">
         <span className="text-sm font-medium">Recherche</span>
         <input
@@ -68,6 +70,24 @@ export function BarreFiltres({ filtres, onChange }: Props) {
           ))}
         </select>
       </label>
+      {offres.length > 0 && (
+        <label className="block">
+          <span className="text-sm font-medium">Offre</span>
+          <select
+            value={filtres.offre ?? ''}
+            onChange={(e) => modifier({ offre: e.target.value || undefined })}
+            className={classeChamp}
+          >
+            <option value="">Toutes</option>
+            <option value="aucune">Sans offre</option>
+            {offres.map((offre) => (
+              <option key={offre.id} value={offre.id}>
+                {offre.titre}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="block">
         <span className="text-sm font-medium">Trier par</span>
         <select
@@ -89,7 +109,7 @@ export function BarreFiltres({ filtres, onChange }: Props) {
         <button
           type="button"
           onClick={() => onChange({})}
-          className="justify-self-start text-sm text-accent hover:underline sm:col-span-2 lg:col-span-6"
+          className="justify-self-start text-sm text-accent hover:underline sm:col-span-2 lg:col-span-4"
         >
           Réinitialiser les filtres
         </button>

@@ -20,7 +20,7 @@ npm run dev
    `http://localhost:5173/nouveau-mot-de-passe` pour le lien « mot de passe oublié » et
    `http://localhost:5173/compte` pour la confirmation d'un changement d'e-mail.
 
-4. Créer la base (candidatures, notes, stockage des CV, abonnements, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
+4. Créer la base (candidatures, notes, stockage des CV, abonnements, offres, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
    `supabase/migrations/` (ou `supabase db push` avec la CLI Supabase).
 
 Les pages placées dans `src/routes/_authentifie/` exigent une session :
@@ -56,6 +56,11 @@ même nom (sans accents ni majuscules), dans la base ou plus haut dans le fichie
 ```bash
 npm test   # tests du filtrage, de l'import/export CSV et des règles SQL (Vitest + PGlite)
 ```
+
+La page **Offres** permet de créer des offres d'emploi (postes ouverts) et d'y rattacher les
+candidatures (formulaire, ou d'un coup à l'import CSV) ; le tableau de bord filtre par offre, dont
+« Sans offre ». La base garantit qu'une candidature ne vise qu'une offre du même utilisateur ;
+supprimer une offre conserve ses candidatures, détachées.
 
 La « Vue d'ensemble » en haut du tableau de bord résume toutes les candidatures (nombre par statut,
 expérience moyenne, CV, compétences les plus fréquentes) ; un clic sur un statut ou une compétence
@@ -130,8 +135,8 @@ notes, le stockage des CV et les règles de sécurité (RLS).
 `npm run test:e2e` construit le site en le branchant sur un **faux Supabase**
 (`e2e/fauxSupabase.ts`, qui simule authentification, base, stockage et fonctions de paiement en
 mémoire), puis joue les parcours de `e2e/*.e2e.ts` dans Chromium : connexion, ajout et
-modification, doublons, filtres, tri, pagination, actions groupées, statistiques, import/export
-CSV, fiche
+modification, doublons, filtres, tri, pagination, actions groupées, statistiques, offres,
+import/export CSV, fiche
 (notes, CV) et abonnement. En local, installer le navigateur une fois avec
 `npx playwright install chromium`.
 

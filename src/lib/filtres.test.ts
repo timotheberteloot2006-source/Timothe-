@@ -13,6 +13,7 @@ function candidature(champs: Partial<Candidature>): Candidature {
     statut: 'nouveau',
     created_at: '2026-01-01T00:00:00Z',
     cv_chemin: null,
+    offre_id: null,
     ...champs,
   }
 }
@@ -187,5 +188,25 @@ describe('paginer', () => {
     expect(lireFiltres({ page: '1' })).toEqual({})
     expect(lireFiltres({ page: 'abc' })).toEqual({})
     expect(lireFiltres({ page: '2.5' })).toEqual({})
+  })
+})
+
+describe('filtre par offre', () => {
+  const avecOffre = candidature({ nom: 'Avec', offre_id: 'o1' })
+  const sansOffre = candidature({ nom: 'Sans' })
+  const autre = candidature({ nom: 'Autre', offre_id: 'o2' })
+
+  it('garde l’offre demandée, ou les candidatures sans offre', () => {
+    expect(noms(filtrerCandidatures([avecOffre, sansOffre, autre], { offre: 'o1' }))).toEqual([
+      'Avec',
+    ])
+    expect(noms(filtrerCandidatures([avecOffre, sansOffre, autre], { offre: 'aucune' }))).toEqual([
+      'Sans',
+    ])
+  })
+
+  it('lit l’offre depuis l’adresse', () => {
+    expect(lireFiltres({ offre: '3f1c-ab' })).toEqual({ offre: '3f1c-ab' })
+    expect(lireFiltres({ offre: 'a b' })).toEqual({})
   })
 })

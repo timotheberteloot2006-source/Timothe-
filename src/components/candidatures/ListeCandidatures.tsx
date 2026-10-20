@@ -6,6 +6,7 @@ import {
   type NouvelleCandidature,
   type Statut,
 } from '@/lib/candidatures'
+import type { Offre } from '@/lib/offres'
 import { FormulaireCandidature } from './FormulaireCandidature'
 
 const couleursStatut: Record<Statut, string> = {
@@ -26,6 +27,7 @@ interface Props {
   // Identifiants cochés pour les actions groupées
   selection: Set<string>
   onBasculerSelection: (id: string) => void
+  offres: Offre[]
 }
 
 export function ListeCandidatures({
@@ -38,7 +40,9 @@ export function ListeCandidatures({
   onSupprimer,
   selection,
   onBasculerSelection,
+  offres,
 }: Props) {
+  const titres = new Map(offres.map((o) => [o.id, o.titre]))
   return (
     <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface">
       {candidatures.map((c) =>
@@ -46,6 +50,7 @@ export function ListeCandidatures({
           <li key={c.id} className="bg-slate-50 p-2">
             <FormulaireCandidature
               initiale={c}
+              offres={offres}
               onEnregistrer={(champs) => onEnregistrer(c.id, champs)}
               onAnnuler={onAnnulerEdition}
             />
@@ -85,6 +90,7 @@ export function ListeCandidatures({
                 </p>
                 <p className="text-sm text-slate-600">
                   {[
+                    c.offre_id && titres.has(c.offre_id) && `Offre : ${titres.get(c.offre_id)}`,
                     c.poste,
                     `${c.experience} an${c.experience > 1 ? 's' : ''} d'expérience`,
                     c.email,

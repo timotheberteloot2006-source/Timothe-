@@ -28,12 +28,17 @@ import {
   type Filtres,
 } from '@/lib/filtres'
 import { genererCsv, nomFichierExport, telechargerCsv } from '@/lib/exportCandidatures'
+import { listerOffres, titresParId } from '@/lib/offres'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   validateSearch: lireFiltres,
   loader: async () => {
-    const [candidatures, abonnement] = await Promise.all([listerCandidatures(), lireAbonnement()])
-    return { candidatures, abonnement }
+    const [candidatures, abonnement, offres] = await Promise.all([
+      listerCandidatures(),
+      lireAbonnement(),
+      listerOffres(),
+    ])
+    return { candidatures, abonnement, offres }
   },
   // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
   shouldReload: false,
@@ -50,9 +55,11 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
 })
 
 function TableauDeBord() {
-  const { candidatures, abonnement } = Route.useLoaderData()
+  const { candidatures, abonnement, offres } = Route.useLoaderData()
   const places = placesRestantes(abonnement, candidatures.length)
   const filtres = Route.useSearch()
+  // Offre du filtre en cours, présélectionnée à l'ajout et à l'import
+  const offreFiltree = filtres.offre && filtres.offre !== 'aucune' ? filtres.offre : null
   const navigate = Route.useNavigate()
   const router = useRouter()
   const [panneau, setPanneau] = useState<'ajout' | 'import' | null>(null)
@@ -177,12 +184,19 @@ function TableauDeBord() {
       {!estPro(abonnement) && <BandeauQuota nombre={candidatures.length} />}
 
       {panneau === 'ajout' && (
-        <FormulaireCandidature onEnregistrer={handleAjout} onAnnuler={() => setPanneau(null)} />
+        <FormulaireCandidature
+          offres={offres}
+          offreParDefaut={offreFiltree}
+          onEnregistrer={handleAjout}
+          onAnnuler={() => setPanneau(null)}
+        />
       )}
       {panneau === 'import' && (
         <ImportCsv
           existantes={candidatures}
           placesRestantes={places}
+          offres={offres}
+          offreParDefaut={offreFiltree}
           onImporter={handleImport}
           onFermer={() => setPanneau(null)}
         />
@@ -202,7 +216,7 @@ function TableauDeBord() {
       ) : (
         <>
           <Statistiques candidatures={candidatures} filtres={filtres} onChange={changerFiltres} />
-          <BarreFiltres filtres={filtres} onChange={changerFiltres} />
+          <BarreFiltres filtres={filtres} onChange={changerFiltres} offres={offres} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-slate-600">
               {resultats.length} candidature{resultats.length > 1 ? 's' : ''} sur{' '}
@@ -213,7 +227,9 @@ function TableauDeBord() {
             <button
               type="button"
               disabled={resultats.length === 0}
-              onClick={() => telechargerCsv(genererCsv(resultats), nomFichierExport())}
+              onClick={() =>
+                telechargerCsv(genererCsv(resultats, titresParId(offres)), nomFichierExport())
+              }
               title="Exporte toutes les candidatures filtrées, toutes pages confondues"
               className="rounded-md border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
             >
@@ -232,6 +248,7 @@ function TableauDeBord() {
           )}
           {resultats.length > 0 ? (
             <ListeCandidatures
+              offres={offres}
               selection={idsSelectionnes}
               onBasculerSelection={basculerSelection}
               candidatures={pagination.elements}

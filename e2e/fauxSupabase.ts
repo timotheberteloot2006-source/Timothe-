@@ -17,6 +17,14 @@ export interface CandidatureFaux {
   statut: string
   created_at: string
   cv_chemin: string | null
+  offre_id: string | null
+}
+
+interface OffreFaux {
+  id: string
+  user_id: string
+  titre: string
+  created_at: string
 }
 
 interface NoteFaux {
@@ -48,6 +56,7 @@ export class FauxSupabase {
   utilisateur = UTILISATEUR
   candidatures: CandidatureFaux[] = []
   notes: NoteFaux[] = []
+  offres: OffreFaux[] = []
   fichiers = new Set<string>()
   abonnement: { statut: string; fin_periode: string | null } | null = null
   compteSupprime = false
@@ -70,10 +79,27 @@ export class FauxSupabase {
         statut: 'nouveau',
         created_at: new Date(Date.UTC(2026, 0, 1, 0, this.compteur)).toISOString(),
         cv_chemin: null,
+        offre_id: null,
         ...c,
       })
     }
     return this
+  }
+
+  ajouterOffre(titre: string) {
+    this.compteur++
+    const offre = {
+      id: crypto.randomUUID(),
+      user_id: this.utilisateur.id,
+      titre,
+      created_at: new Date(Date.UTC(2026, 0, 1, 0, this.compteur)).toISOString(),
+    }
+    this.offres.push(offre)
+    return offre
+  }
+
+  offre(titre: string) {
+    return this.offres.find((o) => o.titre === titre)
   }
 
   candidature(nom: string) {
@@ -118,6 +144,7 @@ export class FauxSupabase {
     // Base de données
     if (chemin === '/rest/v1/candidatures') return this.candidaturesRest(route, url, json)
     if (chemin === '/rest/v1/notes') return this.notesRest(route, url, json)
+    if (chemin === '/rest/v1/offres') return this.offresRest(route, url, json)
     if (chemin === '/rest/v1/abonnements') {
       const objet = (requete.headers()['accept'] ?? '').includes('vnd.pgrst.object')
       return json(objet ? this.abonnement : this.abonnement ? [this.abonnement] : [])
@@ -242,6 +269,50 @@ export class FauxSupabase {
     if (methode === 'DELETE') {
       const ids = idsFiltres(url)
       this.notes = this.notes.filter((n) => !ids?.includes(n.id))
+      return json(undefined, 204)
+    }
+    return json({}, 405)
+  }
+
+  private offresRest(route: Route, url: URL, json: Repondre) {
+    const requete = route.request()
+    const methode = requete.method()
+    const ids = idsFiltres(url)
+    // Simule l'index unique (utilisateur, lower(titre))
+    const titrePris = (titre: string, sauf?: string) =>
+      this.offres.some((o) => o.id !== sauf && o.titre.toLowerCase() === titre.toLowerCase())
+    const doublon = {
+      code: '23505',
+      message: 'duplicate key value violates "offres_user_titre_unique"',
+    }
+
+    if (methode === 'GET') {
+      const offres = [...this.offres]
+        .sort((a, b) => a.titre.localeCompare(b.titre))
+        .map((o) => ({
+          ...o,
+          candidatures: [{ count: this.candidatures.filter((c) => c.offre_id === o.id).length }],
+        }))
+      return json(offres)
+    }
+    if (methode === 'POST') {
+      const { titre } = corps(requete) as { titre: string }
+      if (titrePris(titre)) return json(doublon, 409)
+      this.ajouterOffre(titre)
+      return json(undefined, 201)
+    }
+    if (methode === 'PATCH') {
+      const { titre } = corps(requete) as { titre: string }
+      if (titrePris(titre, ids?.[0])) return json(doublon, 409)
+      this.offres.filter((o) => ids?.includes(o.id)).forEach((o) => (o.titre = titre))
+      return json(undefined, 204)
+    }
+    if (methode === 'DELETE') {
+      // on delete set null (offre_id)
+      this.candidatures
+        .filter((c) => ids?.includes(c.offre_id ?? ''))
+        .forEach((c) => (c.offre_id = null))
+      this.offres = this.offres.filter((o) => !ids?.includes(o.id))
       return json(undefined, 204)
     }
     return json({}, 405)

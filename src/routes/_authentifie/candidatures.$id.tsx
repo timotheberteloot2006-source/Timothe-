@@ -15,15 +15,17 @@ import {
 } from '@/lib/candidatures'
 import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
 import { ajouterNote, listerNotes, supprimerNote, type Note } from '@/lib/notes'
+import { listerOffres } from '@/lib/offres'
 
 export const Route = createFileRoute('/_authentifie/candidatures/$id')({
   loader: async ({ params }) => {
-    const [candidature, notes] = await Promise.all([
+    const [candidature, notes, offres] = await Promise.all([
       lireCandidature(params.id),
       listerNotes(params.id),
+      listerOffres(),
     ])
     if (!candidature) throw notFound()
-    return { candidature, notes }
+    return { candidature, notes, offres }
   },
   component: FicheCandidature,
   errorComponent: ({ error }) => (
@@ -37,7 +39,8 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
 })
 
 function FicheCandidature() {
-  const { candidature: c, notes } = Route.useLoaderData()
+  const { candidature: c, notes, offres } = Route.useLoaderData()
+  const offre = offres.find((o) => o.id === c.offre_id)
   const router = useRouter()
   const navigate = useNavigate()
   const [enEdition, setEnEdition] = useState(false)
@@ -84,6 +87,7 @@ function FicheCandidature() {
       {enEdition ? (
         <FormulaireCandidature
           initiale={c}
+          offres={offres}
           onEnregistrer={handleModification}
           onAnnuler={() => setEnEdition(false)}
         />
@@ -92,6 +96,18 @@ function FicheCandidature() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold">{c.nom}</h1>
+              {offre && (
+                <p className="mt-1 text-sm">
+                  Offre :{' '}
+                  <Link
+                    to="/tableau-de-bord"
+                    search={{ offre: offre.id }}
+                    className="text-accent hover:underline"
+                  >
+                    {offre.titre}
+                  </Link>
+                </p>
+              )}
               <p className="mt-1 text-slate-600">
                 {[c.poste, `${c.experience} an${c.experience > 1 ? 's' : ''} d'expérience`]
                   .filter(Boolean)

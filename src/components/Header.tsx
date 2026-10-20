@@ -35,6 +35,15 @@ export function Header() {
           </Link>
           {user && (
             <Link
+              to="/offres"
+              className={navLinkClass}
+              activeProps={{ className: activeNavLinkClass }}
+            >
+              Offres
+            </Link>
+          )}
+          {user && (
+            <Link
               to="/compte"
               className={navLinkClass}
               activeProps={{ className: activeNavLinkClass }}

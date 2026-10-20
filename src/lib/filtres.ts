@@ -7,6 +7,8 @@ export interface Filtres {
   competences?: string
   experienceMin?: number
   statut?: Statut
+  // Identifiant d'offre, ou « aucune » pour les candidatures sans offre
+  offre?: string
   // Absent : plus récentes d'abord
   tri?: Tri
   // Absent : première page
@@ -37,6 +39,8 @@ export function lireFiltres(search: Record<string, unknown>): Filtres {
   if (search.experienceMin !== undefined && Number.isInteger(experience) && experience > 0)
     filtres.experienceMin = experience
   if (STATUTS.includes(search.statut as Statut)) filtres.statut = search.statut as Statut
+  if (typeof search.offre === 'string' && /^[\w-]{1,64}$/.test(search.offre))
+    filtres.offre = search.offre
   // « recent » est l'ordre par défaut : inutile de le garder dans l'adresse
   if (typeof search.tri === 'string' && Object.hasOwn(TRIS, search.tri) && search.tri !== 'recent')
     filtres.tri = search.tri as Tri
@@ -51,6 +55,7 @@ export function filtrerCandidatures(candidatures: Candidature[], filtres: Filtre
 
   return candidatures.filter((c) => {
     if (filtres.statut && c.statut !== filtres.statut) return false
+    if (filtres.offre && (c.offre_id ?? 'aucune') !== filtres.offre) return false
     if (filtres.experienceMin && c.experience < filtres.experienceMin) return false
     if (recherche) {
       const texte = normaliser([c.nom, c.email, c.poste].filter(Boolean).join(' '))

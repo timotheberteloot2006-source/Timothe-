@@ -18,6 +18,7 @@ function candidature(champs: Partial<Candidature>): Candidature {
     statut: 'nouveau',
     created_at: '2026-01-01T00:00:00Z',
     cv_chemin: null,
+    offre_id: null,
     ...champs,
   }
 }

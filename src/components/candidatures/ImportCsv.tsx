@@ -2,6 +2,8 @@ import { Link } from '@tanstack/react-router'
 import { useState, type ChangeEvent } from 'react'
 import type { Candidature, NouvelleCandidature } from '@/lib/candidatures'
 import { analyserImport, MODELE_CSV, type ResultatImport } from '@/lib/importCandidatures'
+import type { Offre } from '@/lib/offres'
+import { classeChamp } from './styles'
 
 const MESSAGES_AFFICHES = 10
 
@@ -12,11 +14,22 @@ interface Props {
   existantes: Candidature[]
   // Infinity avec l'offre Pro
   placesRestantes: number
+  offres: Offre[]
+  // Offre présélectionnée (ex. celle du filtre en cours)
+  offreParDefaut: string | null
   onImporter: (candidatures: NouvelleCandidature[]) => Promise<void>
   onFermer: () => void
 }
 
-export function ImportCsv({ existantes, placesRestantes, onImporter, onFermer }: Props) {
+export function ImportCsv({
+  existantes,
+  placesRestantes,
+  offres,
+  offreParDefaut,
+  onImporter,
+  onFermer,
+}: Props) {
+  const [offreId, setOffreId] = useState(offreParDefaut ?? '')
   const [analyse, setAnalyse] = useState<ResultatImport | null>(null)
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -32,7 +45,7 @@ export function ImportCsv({ existantes, placesRestantes, onImporter, onFermer }:
     setEnvoi(true)
     setErreur(null)
     try {
-      await onImporter(analyse.candidatures)
+      await onImporter(analyse.candidatures.map((c) => ({ ...c, offre_id: offreId || null })))
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e))
       setEnvoi(false)
@@ -66,6 +79,24 @@ export function ImportCsv({ existantes, placesRestantes, onImporter, onFermer }:
         aria-label="Fichier CSV"
         className="block text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
       />
+
+      {offres.length > 0 && (
+        <label className="block max-w-sm">
+          <span className="text-sm font-medium">Rattacher à l’offre</span>
+          <select
+            value={offreId}
+            onChange={(e) => setOffreId(e.target.value)}
+            className={classeChamp}
+          >
+            <option value="">Aucune</option>
+            {offres.map((offre) => (
+              <option key={offre.id} value={offre.id}>
+                {offre.titre}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {analyse && (
         <div className="space-y-2 text-sm">

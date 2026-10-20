@@ -22,6 +22,8 @@ export interface Candidature {
   created_at: string
   // Chemin du PDF dans le bucket « cv » (supabase/migrations/0005_notes_et_cv.sql)
   cv_chemin: string | null
+  // Offre d'emploi rattachée (supabase/migrations/0006_offres.sql)
+  offre_id: string | null
   // Rempli par listerCandidatures uniquement
   nb_notes?: number
 }
@@ -29,7 +31,7 @@ export interface Candidature {
 export type NouvelleCandidature = Pick<
   Candidature,
   'nom' | 'email' | 'poste' | 'competences' | 'experience'
->
+> & { offre_id?: string | null }
 
 // Table créée par supabase/migrations/0001_candidatures.sql
 function table() {

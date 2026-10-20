@@ -277,3 +277,62 @@ describe('notes et CV', () => {
     ])
   })
 })
+
+describe('offres', () => {
+  async function creerOffre(uid: string, titre: string) {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.offres (user_id, titre) values ($1, $2) returning id`,
+      [uid, titre],
+    )
+    return rows[0].id
+  }
+
+  it('rattache une candidature à une offre du même utilisateur', async () => {
+    const offre = await creerOffre(A, 'Développeur front')
+    await db.exec(
+      `insert into public.candidatures (user_id, nom, offre_id) values ('${A}', 'C1', '${offre}')`,
+    )
+    const { rows } = await db.query('select offre_id from public.candidatures')
+    expect(rows).toEqual([{ offre_id: offre }])
+  })
+
+  it('refuse l’offre d’un autre utilisateur', async () => {
+    const offreDeB = await creerOffre(B, 'Poste de B')
+    await expect(
+      db.exec(
+        `insert into public.candidatures (user_id, nom, offre_id) values ('${A}', 'C1', '${offreDeB}')`,
+      ),
+    ).rejects.toThrow(/candidatures_offre_fk/)
+  })
+
+  it('détache les candidatures quand l’offre est supprimée', async () => {
+    const offre = await creerOffre(A, 'Temporaire')
+    await db.exec(
+      `insert into public.candidatures (user_id, nom, offre_id) values ('${A}', 'C1', '${offre}')`,
+    )
+    await db.exec(`delete from public.offres where id = '${offre}'`)
+    const { rows } = await db.query('select nom, user_id, offre_id from public.candidatures')
+    expect(rows).toEqual([{ nom: 'C1', user_id: A, offre_id: null }])
+  })
+
+  it('refuse deux offres de même titre pour un utilisateur', async () => {
+    await creerOffre(A, 'Data analyst')
+    await expect(creerOffre(A, 'DATA ANALYST')).rejects.toThrow(/offres_user_titre_unique/)
+    await creerOffre(B, 'Data analyst')
+  })
+
+  it('ne montre que ses propres offres', async () => {
+    await creerOffre(A, 'Offre de A')
+    await creerOffre(B, 'Offre de B')
+    await db.exec(
+      `grant select, insert on public.offres to authenticated; grant usage on schema public to authenticated;`,
+    )
+    await enTantQue(A)
+    await db.exec('set role authenticated')
+    const { rows } = await db.query('select titre from public.offres')
+    expect(rows).toEqual([{ titre: 'Offre de A' }])
+    await expect(
+      db.exec(`insert into public.offres (user_id, titre) values ('${B}', 'Intrus')`),
+    ).rejects.toThrow(/row-level security/)
+  })
+})
