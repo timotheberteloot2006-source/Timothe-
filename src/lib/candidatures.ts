@@ -1,3 +1,4 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 
 export const STATUTS = ['nouveau', 'retenu', 'ecarte'] as const
@@ -33,33 +34,51 @@ function table() {
 
 export async function listerCandidatures(): Promise<Candidature[]> {
   const { data, error } = await table().select('*').order('created_at', { ascending: false })
-  if (error) throw new Error(error.message)
+  if (error) throw erreurSupabase(error)
   return data
 }
 
 export async function ajouterCandidature(candidature: NouvelleCandidature) {
   const { error } = await table().insert(candidature)
-  if (error) throw new Error(error.message)
+  if (error) throw erreurSupabase(error)
 }
 
 export async function ajouterCandidatures(candidatures: NouvelleCandidature[]) {
   const { error } = await table().insert(candidatures)
-  if (error) throw new Error(error.message)
+  if (error) throw erreurSupabase(error)
 }
 
 export async function modifierCandidature(id: string, champs: NouvelleCandidature) {
   const { error } = await table().update(champs).eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw erreurSupabase(error)
 }
 
 export async function changerStatut(id: string, statut: Statut) {
   const { error } = await table().update({ statut }).eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw erreurSupabase(error)
 }
 
 export async function supprimerCandidature(id: string) {
   const { error } = await table().delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw erreurSupabase(error)
+}
+
+// Violation de l'index unique de supabase/migrations/0002_candidatures_email_unique.sql
+const VIOLATION_UNICITE = '23505'
+
+function erreurSupabase(error: PostgrestError) {
+  if (error.code === VIOLATION_UNICITE) {
+    return new Error('Une candidature avec cet e-mail existe déjà.')
+  }
+  return new Error(error.message)
+}
+
+type Identite = Pick<Candidature, 'nom' | 'email'>
+
+// Même e-mail quand les deux en ont un ; sinon même nom (sans accents ni majuscules)
+export function estDoublon(a: Identite, b: Identite) {
+  if (a.email && b.email) return a.email.trim().toLowerCase() === b.email.trim().toLowerCase()
+  return normaliser(a.nom) === normaliser(b.nom)
 }
 
 // « React, TypeScript ; SQL » → ['React', 'TypeScript', 'SQL']

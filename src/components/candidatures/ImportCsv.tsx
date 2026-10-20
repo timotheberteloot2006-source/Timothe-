@@ -1,15 +1,19 @@
 import { useState, type ChangeEvent } from 'react'
-import type { NouvelleCandidature } from '@/lib/candidatures'
+import type { Candidature, NouvelleCandidature } from '@/lib/candidatures'
 import { analyserImport, MODELE_CSV, type ResultatImport } from '@/lib/importCandidatures'
 
-const ERREURS_AFFICHEES = 10
+const MESSAGES_AFFICHES = 10
+
+const s = (n: number) => (n > 1 ? 's' : '')
 
 interface Props {
+  // Candidatures déjà enregistrées, pour écarter les doublons
+  existantes: Candidature[]
   onImporter: (candidatures: NouvelleCandidature[]) => Promise<void>
   onFermer: () => void
 }
 
-export function ImportCsv({ onImporter, onFermer }: Props) {
+export function ImportCsv({ existantes, onImporter, onFermer }: Props) {
   const [analyse, setAnalyse] = useState<ResultatImport | null>(null)
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -17,7 +21,7 @@ export function ImportCsv({ onImporter, onFermer }: Props) {
   async function handleFichier(event: ChangeEvent<HTMLInputElement>) {
     const fichier = event.target.files?.[0]
     setErreur(null)
-    setAnalyse(fichier ? analyserImport(await lireTexte(fichier)) : null)
+    setAnalyse(fichier ? analyserImport(await lireTexte(fichier), existantes) : null)
   }
 
   async function handleImporter() {
@@ -63,24 +67,22 @@ export function ImportCsv({ onImporter, onFermer }: Props) {
         <div className="space-y-2 text-sm">
           <p>
             {nombre > 0
-              ? `${nombre} candidature${nombre > 1 ? 's' : ''} prête${nombre > 1 ? 's' : ''} à importer.`
-              : 'Aucune candidature valide dans ce fichier.'}
+              ? `${nombre} candidature${s(nombre)} prête${s(nombre)} à importer.`
+              : 'Aucune nouvelle candidature à importer.'}
           </p>
+          {analyse.doublons.length > 0 && (
+            <ListeMessages
+              titre={`${analyse.doublons.length} doublon${s(analyse.doublons.length)} ignoré${s(analyse.doublons.length)} :`}
+              messages={analyse.doublons}
+              className="bg-slate-100 text-slate-700"
+            />
+          )}
           {analyse.erreurs.length > 0 && (
-            <div className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
-              <p className="font-medium">
-                {analyse.erreurs.length} ligne{analyse.erreurs.length > 1 ? 's' : ''} ignorée
-                {analyse.erreurs.length > 1 ? 's' : ''} :
-              </p>
-              <ul className="mt-1 list-inside list-disc">
-                {analyse.erreurs.slice(0, ERREURS_AFFICHEES).map((message) => (
-                  <li key={message}>{message}</li>
-                ))}
-              </ul>
-              {analyse.erreurs.length > ERREURS_AFFICHEES && (
-                <p className="mt-1">… et {analyse.erreurs.length - ERREURS_AFFICHEES} autres.</p>
-              )}
-            </div>
+            <ListeMessages
+              titre={`${analyse.erreurs.length} ligne${s(analyse.erreurs.length)} invalide${s(analyse.erreurs.length)} ignorée${s(analyse.erreurs.length)} :`}
+              messages={analyse.erreurs}
+              className="bg-amber-50 text-amber-800"
+            />
           )}
         </div>
       )}
@@ -108,6 +110,30 @@ export function ImportCsv({ onImporter, onFermer }: Props) {
           Fermer
         </button>
       </div>
+    </div>
+  )
+}
+
+function ListeMessages({
+  titre,
+  messages,
+  className,
+}: {
+  titre: string
+  messages: string[]
+  className: string
+}) {
+  return (
+    <div className={`rounded-md px-3 py-2 ${className}`}>
+      <p className="font-medium">{titre}</p>
+      <ul className="mt-1 list-inside list-disc">
+        {messages.slice(0, MESSAGES_AFFICHES).map((message) => (
+          <li key={message}>{message}</li>
+        ))}
+      </ul>
+      {messages.length > MESSAGES_AFFICHES && (
+        <p className="mt-1">… et {messages.length - MESSAGES_AFFICHES} autres.</p>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { lireCsv } from './csv'
+import type { Candidature } from './candidatures'
 import { analyserImport, MAX_LIGNES_IMPORT, MODELE_CSV } from './importCandidatures'
 
 describe('lireCsv', () => {
@@ -31,6 +32,7 @@ describe('analyserImport', () => {
         },
       ],
       erreurs: [],
+      doublons: [],
     })
   })
 
@@ -60,5 +62,29 @@ describe('analyserImport', () => {
     expect(analyserImport('').erreurs).toEqual(['Le fichier est vide.'])
     const long = 'nom\n' + 'X\n'.repeat(MAX_LIGNES_IMPORT + 1)
     expect(analyserImport(long).erreurs[0]).toContain(`${MAX_LIGNES_IMPORT} lignes`)
+  })
+
+  it('écarte les doublons : même e-mail, ou même nom sans e-mail', () => {
+    const existantes = [
+      { nom: 'Alice Martin', email: 'Alice@Exemple.fr' },
+      { nom: 'Bruno Léger', email: null },
+    ] as Candidature[]
+    const resultat = analyserImport(
+      [
+        'nom;email',
+        'Alice M.;alice@exemple.fr',
+        'BRUNO LEGER;',
+        'Chloé Petit;chloe@exemple.fr',
+        'Chloé P.;CHLOE@exemple.fr',
+        'Alice Martin;autre@exemple.fr',
+      ].join('\n'),
+      existantes,
+    )
+    expect(resultat.candidatures.map((c) => c.nom)).toEqual(['Chloé Petit', 'Alice Martin'])
+    expect(resultat.doublons).toEqual([
+      'Ligne 2 : Alice M. est déjà dans vos candidatures.',
+      'Ligne 3 : BRUNO LEGER est déjà dans vos candidatures.',
+      'Ligne 5 : Chloé P. apparaît plus haut dans le fichier.',
+    ])
   })
 })

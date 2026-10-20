@@ -112,7 +112,11 @@ function TableauDeBord() {
         <FormulaireCandidature onEnregistrer={handleAjout} onAnnuler={() => setPanneau(null)} />
       )}
       {panneau === 'import' && (
-        <ImportCsv onImporter={handleImport} onFermer={() => setPanneau(null)} />
+        <ImportCsv
+          existantes={candidatures}
+          onImporter={handleImport}
+          onFermer={() => setPanneau(null)}
+        />
       )}
 
       {erreur && (
