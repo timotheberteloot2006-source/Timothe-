@@ -1,20 +1,122 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useAuth } from '@/lib/auth'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { useState } from 'react'
+import { BarreFiltres } from '@/components/candidatures/BarreFiltres'
+import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
+import { ListeCandidatures } from '@/components/candidatures/ListeCandidatures'
+import {
+  ajouterCandidature,
+  changerStatut,
+  listerCandidatures,
+  supprimerCandidature,
+  type Candidature,
+  type NouvelleCandidature,
+  type Statut,
+} from '@/lib/candidatures'
+import { filtrerCandidatures, lireFiltres, type Filtres } from '@/lib/filtres'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
+  validateSearch: lireFiltres,
+  loader: listerCandidatures,
+  // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
+  shouldReload: false,
   component: TableauDeBord,
+  errorComponent: ({ error }) => (
+    <section className="mx-auto max-w-6xl px-4 py-16">
+      <h1 className="text-2xl font-bold">Candidatures</h1>
+      <p role="alert" className="mt-6 rounded-md bg-red-50 px-4 py-3 text-red-700">
+        Impossible de charger les candidatures :{' '}
+        {error instanceof Error ? error.message : String(error)}
+      </p>
+    </section>
+  ),
 })
 
 function TableauDeBord() {
-  const { user } = useAuth()
+  const candidatures = Route.useLoaderData()
+  const filtres = Route.useSearch()
+  const navigate = Route.useNavigate()
+  const router = useRouter()
+  const [formulaireOuvert, setFormulaireOuvert] = useState(false)
+  const [erreur, setErreur] = useState<string | null>(null)
+
+  const resultats = filtrerCandidatures(candidatures, filtres)
+
+  function changerFiltres(nouveaux: Filtres) {
+    navigate({ search: nouveaux, replace: true })
+  }
+
+  async function executer(action: () => Promise<void>) {
+    setErreur(null)
+    try {
+      await action()
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : String(e))
+    }
+    await router.invalidate()
+  }
+
+  async function handleAjout(candidature: NouvelleCandidature) {
+    // Les erreurs d'ajout sont affichées dans le formulaire
+    await ajouterCandidature(candidature)
+    await router.invalidate()
+  }
+
+  function handleSupprimer(candidature: Candidature) {
+    if (!window.confirm(`Supprimer la candidature de ${candidature.nom} ?`)) return
+    executer(() => supprimerCandidature(candidature.id))
+  }
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16">
-      <h1 className="text-2xl font-bold">Tableau de bord</h1>
-      <p className="mt-2 text-slate-600">Connecté en tant que {user?.email}</p>
-      <div className="mt-8 rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
-        Rien à afficher pour le moment.
+    <section className="mx-auto max-w-6xl space-y-6 px-4 py-12">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Candidatures</h1>
+        {!formulaireOuvert && (
+          <button
+            type="button"
+            onClick={() => setFormulaireOuvert(true)}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+          >
+            Ajouter une candidature
+          </button>
+        )}
       </div>
+
+      {formulaireOuvert && (
+        <FormulaireCandidature onAjout={handleAjout} onAnnuler={() => setFormulaireOuvert(false)} />
+      )}
+
+      {erreur && (
+        <p role="alert" className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+          {erreur}
+        </p>
+      )}
+
+      {candidatures.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
+          Aucune candidature pour le moment. Ajoutez-en une pour commencer.
+        </div>
+      ) : (
+        <>
+          <BarreFiltres filtres={filtres} onChange={changerFiltres} />
+          <p className="text-sm text-slate-600">
+            {resultats.length} candidature{resultats.length > 1 ? 's' : ''} sur{' '}
+            {candidatures.length}
+          </p>
+          {resultats.length > 0 ? (
+            <ListeCandidatures
+              candidatures={resultats}
+              onChangerStatut={(id: string, statut: Statut) =>
+                executer(() => changerStatut(id, statut))
+              }
+              onSupprimer={handleSupprimer}
+            />
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
+              Aucune candidature ne correspond à ces filtres.
+            </div>
+          )}
+        </>
+      )}
     </section>
   )
 }

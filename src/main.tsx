@@ -1,4 +1,4 @@
-import { StrictMode, useEffect } from 'react'
+import { StrictMode, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import './index.css'
@@ -21,10 +21,18 @@ declare module '@tanstack/react-router' {
 function InnerApp() {
   const auth = useAuth()
 
-  // Relance les beforeLoad (protection des routes) à chaque changement de session
+  const userId = auth.user?.id ?? null
+  const userIdPrecedent = useRef<string | null | undefined>(undefined)
+
+  // Relance les beforeLoad (protection des routes) et les loaders à la connexion / déconnexion,
+  // mais pas au premier affichage ni au simple renouvellement du jeton
   useEffect(() => {
-    if (!auth.chargement) router.invalidate()
-  }, [auth.session, auth.chargement])
+    if (auth.chargement) return
+    if (userIdPrecedent.current !== undefined && userIdPrecedent.current !== userId) {
+      router.invalidate()
+    }
+    userIdPrecedent.current = userId
+  }, [userId, auth.chargement])
 
   // Attendre la session initiale pour ne pas rediriger à tort vers la connexion
   if (auth.chargement) return null
