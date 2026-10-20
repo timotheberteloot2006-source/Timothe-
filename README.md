@@ -84,6 +84,19 @@ Carte de test Stripe : `4242 4242 4242 4242`, date future, n'importe quel code.
 Un compte avec un abonnement actif ne peut pas être supprimé : il faut d'abord résilier
 (bouton « Gérer mon abonnement » dans *Mon compte*).
 
+## Pages légales
+
+`/mentions-legales`, `/confidentialite` et `/conditions` (liens en pied de page et à
+l'inscription) sont des **modèles** décrivant le fonctionnement réel du service. Avant la mise en
+ligne :
+
+- renseigner `src/lib/infosLegales.ts` (éditeur, adresse, SIREN, contact, hébergeur, région
+  Supabase…) : tout champ vide s'affiche « [À compléter : …] » sur le site ;
+- dans le portail client Stripe, régler la résiliation « à la fin de la période de facturation »,
+  comme l'indiquent les conditions ;
+- faire relire les textes par un professionnel (statut, TVA, clientèle professionnelle ou
+  particuliers, médiateur de la consommation…).
+
 ## Vérifications automatiques
 
 À chaque envoi sur GitHub (et sur chaque pull request), `.github/workflows/ci.yml` lance :

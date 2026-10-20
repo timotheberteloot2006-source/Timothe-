@@ -45,6 +45,17 @@ function Inscription() {
       autoCompleteMotDePasse="new-password"
       onSubmit={handleSubmit}
     >
+      <p className="mt-4 text-center text-xs text-slate-500">
+        En créant un compte, vous acceptez les{' '}
+        <Link to="/conditions" className="underline hover:text-slate-700">
+          conditions générales
+        </Link>{' '}
+        et la{' '}
+        <Link to="/confidentialite" className="underline hover:text-slate-700">
+          politique de confidentialité
+        </Link>
+        .
+      </p>
       <p className="mt-6 text-center text-sm text-slate-600">
         Déjà un compte ?{' '}
         <Link to="/connexion" className="text-indigo-600 hover:underline">
