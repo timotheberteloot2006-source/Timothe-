@@ -1,6 +1,8 @@
 import type { Session } from '@supabase/supabase-js'
 import { useEffect, useState, type ReactNode } from 'react'
 import { AuthContext, type ResultatInscription } from '@/lib/auth'
+import { estPro, lireAbonnement } from '@/lib/abonnement'
+import { supprimerTousLesCv } from '@/lib/cv'
 import { SUPABASE_NON_CONFIGURE, supabase } from '@/lib/supabase'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -69,6 +71,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fonction SQL de supabase/migrations/0003_supprimer_mon_compte.sql
   async function supprimerCompte() {
     if (!supabase) return SUPABASE_NON_CONFIGURE
+    // Refusé tant qu'un abonnement est actif : on vérifie avant d'effacer les CV
+    if (estPro(await lireAbonnement().catch(() => null))) {
+      return traduireErreur('abonnement_actif')
+    }
+    try {
+      // Les fichiers ne sont pas effacés avec l'utilisateur : on les supprime d'abord
+      await supprimerTousLesCv()
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e)
+    }
     const { error } = await supabase.rpc('supprimer_mon_compte')
     if (error) return traduireErreur(error.message)
     // Le compte n'existe plus côté serveur : on ne vide que la session locale

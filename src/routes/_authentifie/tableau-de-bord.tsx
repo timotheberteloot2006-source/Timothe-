@@ -86,7 +86,7 @@ function TableauDeBord() {
 
   function handleSupprimer(candidature: Candidature) {
     if (!window.confirm(`Supprimer la candidature de ${candidature.nom} ?`)) return
-    executer(() => supprimerCandidature(candidature.id))
+    executer(() => supprimerCandidature(candidature))
   }
 
   return (

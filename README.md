@@ -20,7 +20,7 @@ npm run dev
    `http://localhost:5173/nouveau-mot-de-passe` pour le lien « mot de passe oublié » et
    `http://localhost:5173/compte` pour la confirmation d'un changement d'e-mail.
 
-4. Créer la base (table des candidatures, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
+4. Créer la base (candidatures, notes, stockage des CV, abonnements, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
    `supabase/migrations/` (ou `supabase db push` avec la CLI Supabase).
 
 Les pages placées dans `src/routes/_authentifie/` exigent une session :
@@ -43,6 +43,10 @@ même nom (sans accents ni majuscules), dans la base ou plus haut dans le fichie
 ```bash
 npm test   # tests du filtrage, de l'import CSV et des règles SQL (Vitest + PGlite)
 ```
+
+Chaque candidature a sa fiche (clic sur le nom) : notes internes datées et CV en PDF (5 Mo au
+plus), rangé dans le bucket Supabase privé `cv` sous `<user_id>/…` ; chaque utilisateur n'accède
+qu'à ses fichiers. Les fichiers sont supprimés avec la candidature ou le compte.
 
 ## Abonnements (Stripe)
 
@@ -83,8 +87,8 @@ Un compte avec un abonnement actif ne peut pas être supprimé : il faut d'abord
 - `deno check` sur les fonctions Supabase.
 
 Les tests des migrations appliquent les fichiers de `supabase/migrations/` sur un Postgres en
-mémoire (PGlite) et vérifient la limite Gratuite, les doublons, la suppression de compte et les
-règles de sécurité (RLS).
+mémoire (PGlite) et vérifient la limite Gratuite, les doublons, la suppression de compte, les
+notes, le stockage des CV et les règles de sécurité (RLS).
 
 ## Mise en production
 

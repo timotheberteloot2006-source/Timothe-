@@ -1,4 +1,5 @@
 import type { PostgrestError } from '@supabase/supabase-js'
+import { supprimerFichiersCv } from './cv'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 
 export const STATUTS = ['nouveau', 'retenu', 'ecarte'] as const
@@ -19,6 +20,10 @@ export interface Candidature {
   experience: number
   statut: Statut
   created_at: string
+  // Chemin du PDF dans le bucket « cv » (supabase/migrations/0005_notes_et_cv.sql)
+  cv_chemin: string | null
+  // Rempli par listerCandidatures uniquement
+  nb_notes?: number
 }
 
 export type NouvelleCandidature = Pick<
@@ -33,7 +38,19 @@ function table() {
 }
 
 export async function listerCandidatures(): Promise<Candidature[]> {
-  const { data, error } = await table().select('*').order('created_at', { ascending: false })
+  const { data, error } = await table()
+    .select('*, notes(count)')
+    .order('created_at', { ascending: false })
+  if (error) throw erreurSupabase(error)
+  // notes(count) renvoie [{ count: n }]
+  return data.map(({ notes, ...candidature }) => ({
+    ...candidature,
+    nb_notes: notes?.[0]?.count ?? 0,
+  }))
+}
+
+export async function lireCandidature(id: string): Promise<Candidature | null> {
+  const { data, error } = await table().select('*').eq('id', id).maybeSingle()
   if (error) throw erreurSupabase(error)
   return data
 }
@@ -58,8 +75,10 @@ export async function changerStatut(id: string, statut: Statut) {
   if (error) throw erreurSupabase(error)
 }
 
-export async function supprimerCandidature(id: string) {
-  const { error } = await table().delete().eq('id', id)
+export async function supprimerCandidature(candidature: Candidature) {
+  // Le fichier n'est pas supprimé automatiquement avec la ligne
+  if (candidature.cv_chemin) await supprimerFichiersCv([candidature.cv_chemin])
+  const { error } = await table().delete().eq('id', candidature.id)
   if (error) throw erreurSupabase(error)
 }
 

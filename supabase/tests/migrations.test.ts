@@ -8,7 +8,8 @@ const DOSSIER = join(import.meta.dirname, '../migrations')
 const A = '00000000-0000-0000-0000-00000000000a'
 const B = '00000000-0000-0000-0000-00000000000b'
 
-// Simulacre minimal de Supabase : rôles, schéma auth et auth.uid() lu dans un réglage de session
+// Simulacre minimal de Supabase : rôles, schéma auth et auth.uid() lu dans un réglage de session,
+// schéma storage (buckets, objects avec RLS active, storage.foldername)
 const SIMULACRE_SUPABASE = `
   create role anon;
   create role authenticated;
@@ -16,6 +17,20 @@ const SIMULACRE_SUPABASE = `
   create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
+  create schema storage;
+  create table storage.buckets (
+    id text primary key, name text, public boolean,
+    file_size_limit bigint, allowed_mime_types text[]
+  );
+  create table storage.objects (
+    id uuid primary key default gen_random_uuid(),
+    bucket_id text references storage.buckets (id), name text
+  );
+  alter table storage.objects enable row level security;
+  create function storage.foldername(name text) returns text[] language sql immutable as
+    $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+  grant usage on schema storage to authenticated;
+  grant select, insert, delete on storage.objects to authenticated;
 `
 
 // Base migrée une seule fois, puis vidée avant chaque test (plus rapide que tout rejouer)
@@ -34,6 +49,7 @@ beforeEach(async () => {
     reset role;
     select set_config('test.uid', '', false);
     delete from auth.users;
+    delete from storage.objects;
     insert into auth.users values ('${A}', 'a@x.fr'), ('${B}', 'b@x.fr');
   `)
 })
@@ -187,5 +203,77 @@ describe('sécurité (RLS)', () => {
     await expect(
       db.exec(`insert into public.candidatures (user_id, nom) values ('${B}', 'Intrus')`),
     ).rejects.toThrow(/row-level security/)
+  })
+})
+
+describe('notes et CV', () => {
+  let candidatureA: string
+  let candidatureB: string
+
+  beforeEach(async () => {
+    const { rows } = await db.query<{ id: string; user_id: string }>(
+      `insert into public.candidatures (user_id, nom) values ('${A}', 'De A'), ('${B}', 'De B')
+       returning id, user_id`,
+    )
+    candidatureA = rows.find((r) => r.user_id === A)!.id
+    candidatureB = rows.find((r) => r.user_id === B)!.id
+    await db.exec(`
+      grant usage on schema public to authenticated;
+      grant select, insert, delete on public.notes to authenticated;
+      grant select on public.candidatures to authenticated;
+    `)
+    await enTantQue(A)
+    await db.exec('set role authenticated')
+  })
+
+  it('permet d’annoter ses candidatures, pas celles des autres', async () => {
+    await db.exec(
+      `insert into public.notes (candidature_id, contenu) values ('${candidatureA}', 'Bon profil')`,
+    )
+    await expect(
+      db.exec(
+        `insert into public.notes (candidature_id, contenu) values ('${candidatureB}', 'Intrus')`,
+      ),
+    ).rejects.toThrow(/row-level security/)
+    const { rows } = await db.query('select contenu from public.notes')
+    expect(rows).toEqual([{ contenu: 'Bon profil' }])
+  })
+
+  it('supprime les notes avec la candidature', async () => {
+    await db.exec(
+      `insert into public.notes (candidature_id, contenu) values ('${candidatureA}', 'Note')`,
+    )
+    await db.exec('reset role')
+    await db.exec(`delete from public.candidatures where id = '${candidatureA}'`)
+    const { rows } = await db.query('select count(*)::int as n from public.notes')
+    expect(rows).toEqual([{ n: 0 }])
+  })
+
+  it('limite les CV au dossier de l’utilisateur', async () => {
+    await db.exec(
+      `insert into storage.objects (bucket_id, name) values ('cv', '${A}/${candidatureA}/cv.pdf')`,
+    )
+    await expect(
+      db.exec(
+        `insert into storage.objects (bucket_id, name) values ('cv', '${B}/${candidatureB}/cv.pdf')`,
+      ),
+    ).rejects.toThrow(/row-level security/)
+    await db.exec('reset role')
+    await db.exec(
+      `insert into storage.objects (bucket_id, name) values ('cv', '${B}/${candidatureB}/cv.pdf')`,
+    )
+    await db.exec('set role authenticated')
+    const { rows } = await db.query<{ name: string }>('select name from storage.objects')
+    expect(rows).toEqual([{ name: `${A}/${candidatureA}/cv.pdf` }])
+  })
+
+  it('crée un bucket privé limité aux PDF de 5 Mo', async () => {
+    await db.exec('reset role')
+    const { rows } = await db.query(
+      'select public, file_size_limit, allowed_mime_types from storage.buckets',
+    )
+    expect(rows).toEqual([
+      { public: false, file_size_limit: 5242880, allowed_mime_types: ['application/pdf'] },
+    ])
   })
 })

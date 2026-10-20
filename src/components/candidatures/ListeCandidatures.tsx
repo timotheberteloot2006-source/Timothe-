@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import {
   LIBELLES_STATUT,
   STATUTS,
@@ -47,7 +48,25 @@ export function ListeCandidatures({
         ) : (
           <li key={c.id} className="flex flex-wrap items-start justify-between gap-4 p-4">
             <div className="min-w-0">
-              <p className="font-medium">{c.nom}</p>
+              <p className="flex flex-wrap items-center gap-2">
+                <Link
+                  to="/candidatures/$id"
+                  params={{ id: c.id }}
+                  className="font-medium hover:text-indigo-600 hover:underline"
+                >
+                  {c.nom}
+                </Link>
+                {c.cv_chemin && (
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
+                    CV
+                  </span>
+                )}
+                {!!c.nb_notes && (
+                  <span className="text-xs text-slate-500">
+                    {c.nb_notes} note{c.nb_notes > 1 ? 's' : ''}
+                  </span>
+                )}
+              </p>
               <p className="text-sm text-slate-600">
                 {[c.poste, `${c.experience} an${c.experience > 1 ? 's' : ''} d'expérience`, c.email]
                   .filter(Boolean)
