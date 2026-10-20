@@ -36,12 +36,17 @@ Les candidatures peuvent aussi être importées depuis un fichier CSV (bouton «
 jusqu'à 1000 lignes) : colonnes `nom` (obligatoire), `email`, `poste`, `competences`, `experience`.
 Le séparateur (`;`, `,` ou tabulation) et l'encodage (UTF-8 ou celui d'Excel) sont détectés.
 
+Le bouton « Exporter en CSV » télécharge les candidatures affichées (filtres compris), au même
+format que l'import (plus le statut et la date d'ajout) : un export peut être réimporté. Les
+cellules qui commencent par `=`, `+`, `-` ou `@` sont précédées d'une apostrophe pour qu'Excel ne
+les exécute pas comme des formules.
+
 Doublons : deux candidatures avec le même e-mail (sans tenir compte des majuscules) sont refusées
 par la base. À l'import, une ligne sans e-mail est aussi écartée si une candidature porte déjà le
 même nom (sans accents ni majuscules), dans la base ou plus haut dans le fichier.
 
 ```bash
-npm test   # tests du filtrage, de l'import CSV et des règles SQL (Vitest + PGlite)
+npm test   # tests du filtrage, de l'import/export CSV et des règles SQL (Vitest + PGlite)
 ```
 
 Chaque candidature a sa fiche (clic sur le nom) : notes internes datées et CV en PDF (5 Mo au
