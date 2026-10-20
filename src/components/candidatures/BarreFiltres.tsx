@@ -12,7 +12,9 @@ export function BarreFiltres({ filtres, onChange }: Props) {
     onChange({ ...filtres, ...champs })
   }
 
-  const actif = Object.values(filtres).some((v) => v !== undefined)
+  // La page n'est pas un filtre : elle seule ne justifie pas de « Réinitialiser »
+  const { page: _page, ...criteres } = filtres
+  const actif = Object.values(criteres).some((v) => v !== undefined)
 
   return (
     <div className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-2 lg:grid-cols-6">

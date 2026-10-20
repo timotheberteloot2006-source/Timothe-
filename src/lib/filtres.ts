@@ -9,7 +9,11 @@ export interface Filtres {
   statut?: Statut
   // Absent : plus récentes d'abord
   tri?: Tri
+  // Absent : première page
+  page?: number
 }
+
+export const PAR_PAGE = 25
 
 export const TRIS = {
   recent: 'Plus récentes',
@@ -36,6 +40,8 @@ export function lireFiltres(search: Record<string, unknown>): Filtres {
   // « recent » est l'ordre par défaut : inutile de le garder dans l'adresse
   if (typeof search.tri === 'string' && Object.hasOwn(TRIS, search.tri) && search.tri !== 'recent')
     filtres.tri = search.tri as Tri
+  const page = Number(search.page)
+  if (Number.isInteger(page) && page > 1) filtres.page = page
   return filtres
 }
 
@@ -71,4 +77,19 @@ export function trierCandidatures(candidatures: Candidature[], tri: Tri = 'recen
   }
   const comparer = comparaisons[tri]
   return [...candidatures].sort((a, b) => comparer(a, b) || plusRecente(a, b))
+}
+
+// Découpe la liste en pages ; une page trop grande (filtres modifiés…) devient la dernière
+export function paginer<T>(liste: T[], page = 1) {
+  const totalPages = Math.max(1, Math.ceil(liste.length / PAR_PAGE))
+  const courante = Math.min(Math.max(1, page), totalPages)
+  const debut = (courante - 1) * PAR_PAGE
+  return {
+    elements: liste.slice(debut, debut + PAR_PAGE),
+    page: courante,
+    totalPages,
+    // Positions affichées, comptées à partir de 1 (0 si la liste est vide)
+    premier: liste.length === 0 ? 0 : debut + 1,
+    dernier: Math.min(debut + PAR_PAGE, liste.length),
+  }
 }

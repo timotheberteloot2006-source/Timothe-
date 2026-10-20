@@ -16,7 +16,13 @@ import {
   type Statut,
 } from '@/lib/candidatures'
 import { estPro, LIMITE_GRATUITE, lireAbonnement, placesRestantes } from '@/lib/abonnement'
-import { filtrerCandidatures, lireFiltres, trierCandidatures, type Filtres } from '@/lib/filtres'
+import {
+  filtrerCandidatures,
+  lireFiltres,
+  paginer,
+  trierCandidatures,
+  type Filtres,
+} from '@/lib/filtres'
 import { genererCsv, nomFichierExport, telechargerCsv } from '@/lib/exportCandidatures'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
@@ -50,9 +56,15 @@ function TableauDeBord() {
   const [erreur, setErreur] = useState<string | null>(null)
 
   const resultats = trierCandidatures(filtrerCandidatures(candidatures, filtres), filtres.tri)
+  const pagination = paginer(resultats, filtres.page)
 
+  // Changer un filtre ou le tri ramène à la première page
   function changerFiltres(nouveaux: Filtres) {
-    navigate({ search: nouveaux, replace: true })
+    navigate({ search: { ...nouveaux, page: undefined }, replace: true })
+  }
+
+  function allerPage(page: number) {
+    navigate({ search: { ...filtres, page: page > 1 ? page : undefined } })
   }
 
   async function executer(action: () => Promise<void>) {
@@ -148,12 +160,14 @@ function TableauDeBord() {
             <p className="text-sm text-slate-600">
               {resultats.length} candidature{resultats.length > 1 ? 's' : ''} sur{' '}
               {candidatures.length}
+              {pagination.totalPages > 1 &&
+                ` · affichées : ${pagination.premier} à ${pagination.dernier}`}
             </p>
             <button
               type="button"
               disabled={resultats.length === 0}
               onClick={() => telechargerCsv(genererCsv(resultats), nomFichierExport())}
-              title="Exporte les candidatures affichées (filtres compris)"
+              title="Exporte toutes les candidatures filtrées, toutes pages confondues"
               className="rounded-md border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
             >
               Exporter en CSV
@@ -161,7 +175,7 @@ function TableauDeBord() {
           </div>
           {resultats.length > 0 ? (
             <ListeCandidatures
-              candidatures={resultats}
+              candidatures={pagination.elements}
               idEnEdition={idEnEdition}
               onChangerStatut={(id: string, statut: Statut) =>
                 executer(() => changerStatut(id, statut))
@@ -175,6 +189,13 @@ function TableauDeBord() {
             <div className="rounded-lg border border-dashed border-slate-300 bg-surface p-12 text-center text-slate-500">
               Aucune candidature ne correspond à ces filtres.
             </div>
+          )}
+          {pagination.totalPages > 1 && (
+            <Pagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              onChange={allerPage}
+            />
           )}
         </>
       )}
@@ -196,5 +217,41 @@ function BandeauQuota({ nombre }: { nombre: number }) {
         Passer à Pro
       </Link>
     </div>
+  )
+}
+
+function Pagination({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number
+  totalPages: number
+  onChange: (page: number) => void
+}) {
+  const classeBouton =
+    'rounded-md border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-50'
+  return (
+    <nav aria-label="Pagination" className="flex items-center justify-center gap-4">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onChange(page - 1)}
+        className={classeBouton}
+      >
+        ← Précédente
+      </button>
+      <span className="text-sm text-slate-600">
+        Page {page} sur {totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onChange(page + 1)}
+        className={classeBouton}
+      >
+        Suivante →
+      </button>
+    </nav>
   )
 }

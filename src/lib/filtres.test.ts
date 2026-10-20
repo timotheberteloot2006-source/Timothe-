@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decouperCompetences, type Candidature } from './candidatures'
-import { filtrerCandidatures, lireFiltres, trierCandidatures } from './filtres'
+import { filtrerCandidatures, lireFiltres, paginer, PAR_PAGE, trierCandidatures } from './filtres'
 
 function candidature(champs: Partial<Candidature>): Candidature {
   return {
@@ -158,5 +158,34 @@ describe('lireFiltres (tri)', () => {
     expect(lireFiltres({ tri: 'recent' })).toEqual({})
     expect(lireFiltres({ tri: 'inconnu' })).toEqual({})
     expect(lireFiltres({ tri: 'toString' })).toEqual({})
+  })
+})
+
+describe('paginer', () => {
+  const nombres = Array.from({ length: 60 }, (_, i) => i + 1)
+
+  it('découpe en pages de PAR_PAGE', () => {
+    expect(PAR_PAGE).toBe(25)
+    const page2 = paginer(nombres, 2)
+    expect(page2.elements[0]).toBe(26)
+    expect(page2.elements).toHaveLength(25)
+    expect(page2).toMatchObject({ page: 2, totalPages: 3, premier: 26, dernier: 50 })
+    expect(paginer(nombres, 3)).toMatchObject({ premier: 51, dernier: 60 })
+  })
+
+  it('ramène une page hors limites dans la plage valide', () => {
+    expect(paginer(nombres, 9)).toMatchObject({ page: 3, premier: 51 })
+    expect(paginer(nombres, 0)).toMatchObject({ page: 1, premier: 1 })
+  })
+
+  it('gère une liste vide', () => {
+    expect(paginer([], 2)).toEqual({ elements: [], page: 1, totalPages: 1, premier: 0, dernier: 0 })
+  })
+
+  it('lit la page depuis l’adresse', () => {
+    expect(lireFiltres({ page: '3' })).toEqual({ page: 3 })
+    expect(lireFiltres({ page: '1' })).toEqual({})
+    expect(lireFiltres({ page: 'abc' })).toEqual({})
+    expect(lireFiltres({ page: '2.5' })).toEqual({})
   })
 })

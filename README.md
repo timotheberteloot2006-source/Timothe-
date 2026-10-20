@@ -38,7 +38,7 @@ utiliser à la place de `bg-white`) et `accent` (liens, à la place de `text-ind
 Le tableau de bord liste les candidatures de l'utilisateur connecté (règles RLS : chacun ne voit
 que les siennes). Les filtres (recherche, compétences requises, expérience minimum, statut)
 s'appliquent dans le navigateur et sont conservés dans l'URL, comme le tri (date, nom, expérience,
-statut).
+statut) et la page (25 candidatures par page ; l'export contient toutes les pages).
 
 Les candidatures peuvent aussi être importées depuis un fichier CSV (bouton « Importer un CSV »,
 jusqu'à 1000 lignes) : colonnes `nom` (obligatoire), `email`, `poste`, `competences`, `experience`.
