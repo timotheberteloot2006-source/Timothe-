@@ -114,11 +114,21 @@ ligne :
 À chaque envoi sur GitHub (et sur chaque pull request), `.github/workflows/ci.yml` lance :
 
 - `npm run lint`, `npm test` et `npm run build` ;
+- `npm run test:e2e` : parcours dans un vrai navigateur (Playwright) ;
 - `deno check` sur les fonctions Supabase.
 
 Les tests des migrations appliquent les fichiers de `supabase/migrations/` sur un Postgres en
 mémoire (PGlite) et vérifient la limite Gratuite, les doublons, la suppression de compte, les
 notes, le stockage des CV et les règles de sécurité (RLS).
+
+### Tests de bout en bout
+
+`npm run test:e2e` construit le site en le branchant sur un **faux Supabase**
+(`e2e/fauxSupabase.ts`, qui simule authentification, base, stockage et fonctions de paiement en
+mémoire), puis joue les parcours de `e2e/*.e2e.ts` dans Chromium : connexion, ajout et
+modification, doublons, filtres, tri, pagination, actions groupées, import/export CSV, fiche
+(notes, CV) et abonnement. En local, installer le navigateur une fois avec
+`npx playwright install chromium`.
 
 ## Mise en production
 

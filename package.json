@@ -11,7 +11,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.10",
+    "@playwright/test": "^1.56.1",
     "@tanstack/router-plugin": "^1.168.47",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
