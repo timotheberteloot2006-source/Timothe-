@@ -20,6 +20,15 @@ export interface CandidatureFaux {
   offre_id: string | null
 }
 
+interface EntretienFaux {
+  id: string
+  candidature_id: string
+  user_id: string
+  debut: string
+  duree_minutes: number
+  lieu: string | null
+}
+
 interface OffreFaux {
   id: string
   user_id: string
@@ -57,6 +66,7 @@ export class FauxSupabase {
   candidatures: CandidatureFaux[] = []
   notes: NoteFaux[] = []
   offres: OffreFaux[] = []
+  entretiens: EntretienFaux[] = []
   fichiers = new Set<string>()
   abonnement: { statut: string; fin_periode: string | null } | null = null
   compteSupprime = false
@@ -96,6 +106,19 @@ export class FauxSupabase {
     }
     this.offres.push(offre)
     return offre
+  }
+
+  ajouterEntretien(candidatureId: string, debut: Date, champs: Partial<EntretienFaux> = {}) {
+    this.compteur++
+    this.entretiens.push({
+      id: crypto.randomUUID(),
+      candidature_id: candidatureId,
+      user_id: this.utilisateur.id,
+      debut: debut.toISOString(),
+      duree_minutes: 60,
+      lieu: null,
+      ...champs,
+    })
   }
 
   offre(titre: string) {
@@ -145,6 +168,7 @@ export class FauxSupabase {
     if (chemin === '/rest/v1/candidatures') return this.candidaturesRest(route, url, json)
     if (chemin === '/rest/v1/notes') return this.notesRest(route, url, json)
     if (chemin === '/rest/v1/offres') return this.offresRest(route, url, json)
+    if (chemin === '/rest/v1/entretiens') return this.entretiensRest(route, url, json)
     if (chemin === '/rest/v1/abonnements') {
       const objet = (requete.headers()['accept'] ?? '').includes('vnd.pgrst.object')
       return json(objet ? this.abonnement : this.abonnement ? [this.abonnement] : [])
@@ -241,6 +265,7 @@ export class FauxSupabase {
     if (methode === 'DELETE') {
       this.candidatures = this.candidatures.filter((c) => !ids?.includes(c.id))
       this.notes = this.notes.filter((n) => !ids?.includes(n.candidature_id))
+      this.entretiens = this.entretiens.filter((e) => !ids?.includes(e.candidature_id))
       return json(undefined, 204)
     }
     return json({}, 405)
@@ -269,6 +294,38 @@ export class FauxSupabase {
     if (methode === 'DELETE') {
       const ids = idsFiltres(url)
       this.notes = this.notes.filter((n) => !ids?.includes(n.id))
+      return json(undefined, 204)
+    }
+    return json({}, 405)
+  }
+
+  private entretiensRest(route: Route, url: URL, json: Repondre) {
+    const requete = route.request()
+    const methode = requete.method()
+    if (methode === 'GET') {
+      const candidature = url.searchParams.get('candidature_id')?.replace(/^eq\./, '')
+      const depuis = url.searchParams.get('debut')?.replace(/^gte\./, '')
+      const avecNom = (url.searchParams.get('select') ?? '').includes('candidatures(nom)')
+      const entretiens = this.entretiens
+        .filter((e) => !candidature || e.candidature_id === candidature)
+        .filter((e) => !depuis || new Date(e.debut) >= new Date(depuis))
+        .sort((a, b) => a.debut.localeCompare(b.debut))
+        .map(({ user_id: _u, ...e }) => ({
+          ...e,
+          ...(avecNom && {
+            candidatures: { nom: this.candidatures.find((c) => c.id === e.candidature_id)?.nom },
+          }),
+        }))
+      return json(entretiens)
+    }
+    if (methode === 'POST') {
+      const champs = corps(requete) as Omit<EntretienFaux, 'id' | 'user_id'>
+      this.ajouterEntretien(champs.candidature_id, new Date(champs.debut), champs)
+      return json(undefined, 201)
+    }
+    if (methode === 'DELETE') {
+      const ids = idsFiltres(url)
+      this.entretiens = this.entretiens.filter((e) => !ids?.includes(e.id))
       return json(undefined, 204)
     }
     return json({}, 405)

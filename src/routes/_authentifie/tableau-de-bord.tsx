@@ -29,16 +29,19 @@ import {
 } from '@/lib/filtres'
 import { genererCsv, nomFichierExport, telechargerCsv } from '@/lib/exportCandidatures'
 import { listerOffres, titresParId } from '@/lib/offres'
+import { listerEntretiensAVenir, prochainParCandidature } from '@/lib/entretiens'
+import { EntretiensAVenir } from '@/components/candidatures/EntretiensAVenir'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   validateSearch: lireFiltres,
   loader: async () => {
-    const [candidatures, abonnement, offres] = await Promise.all([
+    const [candidatures, abonnement, offres, entretiens] = await Promise.all([
       listerCandidatures(),
       lireAbonnement(),
       listerOffres(),
+      listerEntretiensAVenir(),
     ])
-    return { candidatures, abonnement, offres }
+    return { candidatures, abonnement, offres, entretiens }
   },
   // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
   shouldReload: false,
@@ -55,7 +58,8 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
 })
 
 function TableauDeBord() {
-  const { candidatures, abonnement, offres } = Route.useLoaderData()
+  const { candidatures, abonnement, offres, entretiens } = Route.useLoaderData()
+  const prochainsEntretiens = prochainParCandidature(entretiens)
   const places = placesRestantes(abonnement, candidatures.length)
   const filtres = Route.useSearch()
   // Offre du filtre en cours, présélectionnée à l'ajout et à l'import
@@ -215,6 +219,7 @@ function TableauDeBord() {
         </div>
       ) : (
         <>
+          <EntretiensAVenir entretiens={entretiens} />
           <Statistiques candidatures={candidatures} filtres={filtres} onChange={changerFiltres} />
           <BarreFiltres filtres={filtres} onChange={changerFiltres} offres={offres} />
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -249,6 +254,7 @@ function TableauDeBord() {
           {resultats.length > 0 ? (
             <ListeCandidatures
               offres={offres}
+              prochainsEntretiens={prochainsEntretiens}
               selection={idsSelectionnes}
               onBasculerSelection={basculerSelection}
               candidatures={pagination.elements}

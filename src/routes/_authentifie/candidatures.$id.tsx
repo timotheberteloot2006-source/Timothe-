@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from '@tanstack/react-router'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { CarteEntretiens } from '@/components/candidatures/CarteEntretiens'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
 import { classeChamp } from '@/components/candidatures/styles'
 import {
@@ -15,17 +16,19 @@ import {
 } from '@/lib/candidatures'
 import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
 import { ajouterNote, listerNotes, supprimerNote, type Note } from '@/lib/notes'
+import { listerEntretiens } from '@/lib/entretiens'
 import { listerOffres } from '@/lib/offres'
 
 export const Route = createFileRoute('/_authentifie/candidatures/$id')({
   loader: async ({ params }) => {
-    const [candidature, notes, offres] = await Promise.all([
+    const [candidature, notes, offres, entretiens] = await Promise.all([
       lireCandidature(params.id),
       listerNotes(params.id),
       listerOffres(),
+      listerEntretiens(params.id),
     ])
     if (!candidature) throw notFound()
-    return { candidature, notes, offres }
+    return { candidature, notes, offres, entretiens }
   },
   component: FicheCandidature,
   errorComponent: ({ error }) => (
@@ -39,7 +42,7 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
 })
 
 function FicheCandidature() {
-  const { candidature: c, notes, offres } = Route.useLoaderData()
+  const { candidature: c, notes, offres, entretiens } = Route.useLoaderData()
   const offre = offres.find((o) => o.id === c.offre_id)
   const router = useRouter()
   const navigate = useNavigate()
@@ -172,6 +175,12 @@ function FicheCandidature() {
       )}
 
       <CarteCv candidature={c} executer={executer} />
+      <CarteEntretiens
+        candidatureId={c.id}
+        nomCandidat={c.nom}
+        entretiens={entretiens}
+        executer={executer}
+      />
       <CarteNotes candidatureId={c.id} notes={notes} executer={executer} />
     </section>
   )

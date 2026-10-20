@@ -1,3 +1,4 @@
+import { telechargerFichier } from './telechargement'
 import { LIBELLES_STATUT, type Candidature } from './candidatures'
 
 const SEPARATEUR = ';'
@@ -52,11 +53,5 @@ export function nomFichierExport(date = new Date()) {
 }
 
 export function telechargerCsv(contenu: string, nomFichier: string) {
-  const url = URL.createObjectURL(new Blob([contenu], { type: 'text/csv;charset=utf-8' }))
-  const lien = document.createElement('a')
-  lien.href = url
-  lien.download = nomFichier
-  lien.click()
-  // Laisse au navigateur le temps de démarrer le téléchargement
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  telechargerFichier(contenu, nomFichier, 'text/csv;charset=utf-8')
 }

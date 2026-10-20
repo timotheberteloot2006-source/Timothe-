@@ -6,6 +6,7 @@ import {
   type NouvelleCandidature,
   type Statut,
 } from '@/lib/candidatures'
+import type { EntretienAVenir } from '@/lib/entretiens'
 import type { Offre } from '@/lib/offres'
 import { FormulaireCandidature } from './FormulaireCandidature'
 
@@ -28,6 +29,8 @@ interface Props {
   selection: Set<string>
   onBasculerSelection: (id: string) => void
   offres: Offre[]
+  // Prochain entretien de chaque candidature (par identifiant)
+  prochainsEntretiens: Map<string, EntretienAVenir>
 }
 
 export function ListeCandidatures({
@@ -41,6 +44,7 @@ export function ListeCandidatures({
   selection,
   onBasculerSelection,
   offres,
+  prochainsEntretiens,
 }: Props) {
   const titres = new Map(offres.map((o) => [o.id, o.titre]))
   return (
@@ -80,6 +84,17 @@ export function ListeCandidatures({
                   {c.cv_chemin && (
                     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
                       CV
+                    </span>
+                  )}
+                  {prochainsEntretiens.has(c.id) && (
+                    <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-700">
+                      Entretien le{' '}
+                      {new Date(prochainsEntretiens.get(c.id)!.debut).toLocaleString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   )}
                   {!!c.nb_notes && (

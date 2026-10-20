@@ -336,3 +336,50 @@ describe('offres', () => {
     ).rejects.toThrow(/row-level security/)
   })
 })
+
+describe('entretiens', () => {
+  let candidatureA: string
+  let candidatureB: string
+
+  beforeEach(async () => {
+    const { rows } = await db.query<{ id: string; user_id: string }>(
+      `insert into public.candidatures (user_id, nom) values ('${A}', 'De A'), ('${B}', 'De B')
+       returning id, user_id`,
+    )
+    candidatureA = rows.find((r) => r.user_id === A)!.id
+    candidatureB = rows.find((r) => r.user_id === B)!.id
+    await db.exec(`
+      grant usage on schema public to authenticated;
+      grant select, insert, delete on public.entretiens to authenticated;
+      grant select on public.candidatures to authenticated;
+    `)
+    await enTantQue(A)
+    await db.exec('set role authenticated')
+  })
+
+  const planifier = (candidature: string, champs = '') =>
+    db.exec(
+      `insert into public.entretiens (candidature_id, debut${champs ? ', duree_minutes' : ''})
+       values ('${candidature}', '2026-11-03T14:00:00Z'${champs ? `, ${champs}` : ''})`,
+    )
+
+  it('planifie sur ses candidatures, pas sur celles des autres', async () => {
+    await planifier(candidatureA)
+    await expect(planifier(candidatureB)).rejects.toThrow(/row-level security/)
+    const { rows } = await db.query('select duree_minutes from public.entretiens')
+    expect(rows).toEqual([{ duree_minutes: 60 }])
+  })
+
+  it('refuse une durée hors limites', async () => {
+    await expect(planifier(candidatureA, '0')).rejects.toThrow(/duree_minutes/)
+    await expect(planifier(candidatureA, '600')).rejects.toThrow(/duree_minutes/)
+  })
+
+  it('supprime les entretiens avec la candidature', async () => {
+    await planifier(candidatureA)
+    await db.exec('reset role')
+    await db.exec(`delete from public.candidatures where id = '${candidatureA}'`)
+    const { rows } = await db.query('select count(*)::int as n from public.entretiens')
+    expect(rows).toEqual([{ n: 0 }])
+  })
+})
