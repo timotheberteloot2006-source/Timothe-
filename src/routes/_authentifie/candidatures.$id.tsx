@@ -1,12 +1,16 @@
-import { createFileRoute, Link, notFound, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, notFound, useNavigate, useRouter } from '@tanstack/react-router'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
 import { classeChamp } from '@/components/candidatures/styles'
 import {
   changerStatut,
   LIBELLES_STATUT,
   lireCandidature,
+  modifierCandidature,
   STATUTS,
+  supprimerCandidature,
   type Candidature,
+  type NouvelleCandidature,
   type Statut,
 } from '@/lib/candidatures'
 import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
@@ -35,6 +39,8 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
 function FicheCandidature() {
   const { candidature: c, notes } = Route.useLoaderData()
   const router = useRouter()
+  const navigate = useNavigate()
+  const [enEdition, setEnEdition] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
   // Exécute une modification puis recharge la fiche ; renvoie false en cas d'erreur
@@ -51,51 +57,96 @@ function FicheCandidature() {
     }
   }
 
+  async function handleModification(champs: NouvelleCandidature) {
+    // Les erreurs (e-mail déjà utilisé…) sont affichées dans le formulaire, qui reste ouvert
+    await modifierCandidature(c.id, champs)
+    setEnEdition(false)
+    await router.invalidate()
+  }
+
+  async function handleSuppression() {
+    if (!window.confirm(`Supprimer la candidature de ${c.nom}, ses notes et son CV ?`)) return
+    setErreur(null)
+    try {
+      await supprimerCandidature(c)
+      navigate({ to: '/tableau-de-bord' })
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   return (
     <section className="mx-auto max-w-3xl space-y-6 px-4 py-12">
       <Link to="/tableau-de-bord" className="text-sm text-indigo-600 hover:underline">
         ← Retour aux candidatures
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{c.nom}</h1>
-          <p className="mt-1 text-slate-600">
-            {[c.poste, `${c.experience} an${c.experience > 1 ? 's' : ''} d'expérience`]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-          {c.email && (
-            <a href={`mailto:${c.email}`} className="text-sm text-indigo-600 hover:underline">
-              {c.email}
-            </a>
-          )}
-        </div>
-        <select
-          value={c.statut}
-          onChange={(e) => executer(() => changerStatut(c.id, e.target.value as Statut))}
-          aria-label="Statut"
-          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium"
-        >
-          {STATUTS.map((statut) => (
-            <option key={statut} value={statut}>
-              {LIBELLES_STATUT[statut]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {c.competences.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
-          {c.competences.map((competence) => (
-            <li
-              key={competence}
-              className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-sm text-indigo-700"
+      {enEdition ? (
+        <FormulaireCandidature
+          initiale={c}
+          onEnregistrer={handleModification}
+          onAnnuler={() => setEnEdition(false)}
+        />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">{c.nom}</h1>
+              <p className="mt-1 text-slate-600">
+                {[c.poste, `${c.experience} an${c.experience > 1 ? 's' : ''} d'expérience`]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+              {c.email && (
+                <a href={`mailto:${c.email}`} className="text-sm text-indigo-600 hover:underline">
+                  {c.email}
+                </a>
+              )}
+            </div>
+            <select
+              value={c.statut}
+              onChange={(e) => executer(() => changerStatut(c.id, e.target.value as Statut))}
+              aria-label="Statut"
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium"
             >
-              {competence}
-            </li>
-          ))}
-        </ul>
+              {STATUTS.map((statut) => (
+                <option key={statut} value={statut}>
+                  {LIBELLES_STATUT[statut]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {c.competences.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5">
+              {c.competences.map((competence) => (
+                <li
+                  key={competence}
+                  className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-sm text-indigo-700"
+                >
+                  {competence}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setEnEdition(true)}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100"
+            >
+              Modifier
+            </button>
+            <button
+              type="button"
+              onClick={handleSuppression}
+              className="rounded-md px-4 py-2 text-sm text-slate-500 hover:bg-red-50 hover:text-red-700"
+            >
+              Supprimer la candidature
+            </button>
+          </div>
+        </>
       )}
 
       {erreur && (
