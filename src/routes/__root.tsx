@@ -1,8 +1,13 @@
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
+import { createRootRouteWithContext, Link, Outlet } from '@tanstack/react-router'
 import { Footer } from '@/components/Footer'
 import { Header } from '@/components/Header'
+import type { AuthState } from '@/lib/auth'
 
-export const Route = createRootRoute({
+interface RouterContext {
+  auth: AuthState
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
   notFoundComponent: NotFound,
 })

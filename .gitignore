@@ -26,3 +26,4 @@ dist-ssr
 # Clés secrètes : ne jamais envoyer sur GitHub
 .env
 .env.*
+!.env.example

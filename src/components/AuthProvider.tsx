@@ -1,0 +1,65 @@
+import type { Session } from '@supabase/supabase-js'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AuthContext, type ResultatInscription } from '@/lib/auth'
+import { SUPABASE_NON_CONFIGURE, supabase } from '@/lib/supabase'
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null)
+  const [chargement, setChargement] = useState(supabase !== null)
+
+  useEffect(() => {
+    if (!supabase) return
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setChargement(false)
+    })
+    const { data } = supabase.auth.onAuthStateChange((_event, nouvelleSession) => {
+      setSession(nouvelleSession)
+    })
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  // Les fonctions renvoient un message d'erreur en français, ou null en cas de succès
+  async function connexion(email: string, motDePasse: string) {
+    if (!supabase) return SUPABASE_NON_CONFIGURE
+    const { error } = await supabase.auth.signInWithPassword({ email, password: motDePasse })
+    return error ? traduireErreur(error.message) : null
+  }
+
+  async function inscription(email: string, motDePasse: string): Promise<ResultatInscription> {
+    if (!supabase) return { erreur: SUPABASE_NON_CONFIGURE }
+    const { data, error } = await supabase.auth.signUp({ email, password: motDePasse })
+    if (error) return { erreur: traduireErreur(error.message) }
+    // Sans session, Supabase attend la confirmation de l'adresse e-mail
+    return { erreur: null, confirmationRequise: data.session === null }
+  }
+
+  async function deconnexion() {
+    await supabase?.auth.signOut()
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        session,
+        user: session?.user ?? null,
+        chargement,
+        connexion,
+        inscription,
+        deconnexion,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+function traduireErreur(message: string) {
+  if (message.includes('Invalid login credentials')) return 'E-mail ou mot de passe incorrect.'
+  if (message.includes('Email not confirmed'))
+    return "Adresse e-mail non confirmée : cliquez sur le lien reçu par e-mail."
+  if (message.includes('User already registered')) return 'Un compte existe déjà avec cet e-mail.'
+  if (message.includes('Password should be at least'))
+    return 'Le mot de passe doit contenir au moins 6 caractères.'
+  return message
+}

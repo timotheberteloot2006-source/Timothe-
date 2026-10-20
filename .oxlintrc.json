@@ -7,8 +7,9 @@
   },
   "overrides": [
     {
-      // Le plugin TanStack Router (autoCodeSplitting) sépare lui-même les composants des routes
-      "files": ["src/routes/**"],
+      // Routes : le plugin TanStack Router (autoCodeSplitting) sépare lui-même les composants.
+      // main.tsx : point d'entrée, jamais rechargé à chaud.
+      "files": ["src/routes/**", "src/main.tsx"],
       "rules": {
         "react/only-export-components": "off"
       }

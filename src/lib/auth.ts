@@ -1,0 +1,27 @@
+import type { Session, User } from '@supabase/supabase-js'
+import { createContext, useContext } from 'react'
+
+export interface AuthState {
+  session: Session | null
+  user: User | null
+  // true tant que la session initiale n'a pas été lue
+  chargement: boolean
+}
+
+export interface AuthContextValue extends AuthState {
+  connexion: (email: string, motDePasse: string) => Promise<string | null>
+  inscription: (email: string, motDePasse: string) => Promise<ResultatInscription>
+  deconnexion: () => Promise<void>
+}
+
+export type ResultatInscription =
+  | { erreur: string }
+  | { erreur: null; confirmationRequise: boolean }
+
+export const AuthContext = createContext<AuthContextValue | null>(null)
+
+export function useAuth() {
+  const contexte = useContext(AuthContext)
+  if (!contexte) throw new Error('useAuth doit être utilisé dans un AuthProvider')
+  return contexte
+}

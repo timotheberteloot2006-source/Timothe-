@@ -10,13 +10,19 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthentifieRouteImport } from './routes/_authentifie'
 import { Route as ConnexionRouteImport } from './routes/connexion'
-import { Route as TableauDeBordRouteImport } from './routes/tableau-de-bord'
+import { Route as InscriptionRouteImport } from './routes/inscription'
 import { Route as TarifsRouteImport } from './routes/tarifs'
+import { Route as AuthentifieTableauDeBordRouteImport } from './routes/_authentifie/tableau-de-bord'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthentifieRoute = AuthentifieRouteImport.update({
+  id: '/_authentifie',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnexionRoute = ConnexionRouteImport.update({
@@ -24,9 +30,9 @@ const ConnexionRoute = ConnexionRouteImport.update({
   path: '/connexion',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TableauDeBordRoute = TableauDeBordRouteImport.update({
-  id: '/tableau-de-bord',
-  path: '/tableau-de-bord',
+const InscriptionRoute = InscriptionRouteImport.update({
+  id: '/inscription',
+  path: '/inscription',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TarifsRoute = TarifsRouteImport.update({
@@ -34,38 +40,57 @@ const TarifsRoute = TarifsRouteImport.update({
   path: '/tarifs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthentifieTableauDeBordRoute =
+  AuthentifieTableauDeBordRouteImport.update({
+    id: '/tableau-de-bord',
+    path: '/tableau-de-bord',
+    getParentRoute: () => AuthentifieRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
-  '/tableau-de-bord': typeof TableauDeBordRoute
+  '/inscription': typeof InscriptionRoute
   '/tarifs': typeof TarifsRoute
+  '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
-  '/tableau-de-bord': typeof TableauDeBordRoute
+  '/inscription': typeof InscriptionRoute
   '/tarifs': typeof TarifsRoute
+  '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authentifie': typeof AuthentifieRouteWithChildren
   '/connexion': typeof ConnexionRoute
-  '/tableau-de-bord': typeof TableauDeBordRoute
+  '/inscription': typeof InscriptionRoute
   '/tarifs': typeof TarifsRoute
+  '/_authentifie/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/connexion' | '/tableau-de-bord' | '/tarifs'
+  fullPaths:
+    '/' | '/connexion' | '/inscription' | '/tarifs' | '/tableau-de-bord'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/connexion' | '/tableau-de-bord' | '/tarifs'
-  id: '__root__' | '/' | '/connexion' | '/tableau-de-bord' | '/tarifs'
+  to: '/' | '/connexion' | '/inscription' | '/tarifs' | '/tableau-de-bord'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authentifie'
+    | '/connexion'
+    | '/inscription'
+    | '/tarifs'
+    | '/_authentifie/tableau-de-bord'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthentifieRoute: typeof AuthentifieRouteWithChildren
   ConnexionRoute: typeof ConnexionRoute
-  TableauDeBordRoute: typeof TableauDeBordRoute
+  InscriptionRoute: typeof InscriptionRoute
   TarifsRoute: typeof TarifsRoute
 }
 
@@ -78,6 +103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authentifie': {
+      id: '/_authentifie'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthentifieRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/connexion': {
       id: '/connexion'
       path: '/connexion'
@@ -85,11 +117,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnexionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tableau-de-bord': {
-      id: '/tableau-de-bord'
-      path: '/tableau-de-bord'
-      fullPath: '/tableau-de-bord'
-      preLoaderRoute: typeof TableauDeBordRouteImport
+    '/inscription': {
+      id: '/inscription'
+      path: '/inscription'
+      fullPath: '/inscription'
+      preLoaderRoute: typeof InscriptionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tarifs': {
@@ -99,13 +131,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TarifsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authentifie/tableau-de-bord': {
+      id: '/_authentifie/tableau-de-bord'
+      path: '/tableau-de-bord'
+      fullPath: '/tableau-de-bord'
+      preLoaderRoute: typeof AuthentifieTableauDeBordRouteImport
+      parentRoute: typeof AuthentifieRoute
+    }
   }
 }
 
+interface AuthentifieRouteChildren {
+  AuthentifieTableauDeBordRoute: typeof AuthentifieTableauDeBordRoute
+}
+
+const AuthentifieRouteChildren: AuthentifieRouteChildren = {
+  AuthentifieTableauDeBordRoute: AuthentifieTableauDeBordRoute,
+}
+
+const AuthentifieRouteWithChildren = AuthentifieRoute._addFileChildren(
+  AuthentifieRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthentifieRoute: AuthentifieRouteWithChildren,
   ConnexionRoute: ConnexionRoute,
-  TableauDeBordRoute: TableauDeBordRoute,
+  InscriptionRoute: InscriptionRoute,
   TarifsRoute: TarifsRoute,
 }
 export const routeTree = rootRouteImport

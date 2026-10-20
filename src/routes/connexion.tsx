@@ -1,47 +1,42 @@
-import { createFileRoute } from '@tanstack/react-router'
-import type { FormEvent } from 'react'
+import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router'
+import { FormulaireAuth } from '@/components/FormulaireAuth'
+import { useAuth } from '@/lib/auth'
+import { cheminInterne } from '@/lib/redirection'
 
 export const Route = createFileRoute('/connexion')({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+    redirect: cheminInterne(search.redirect),
+  }),
+  beforeLoad: ({ context }) => {
+    if (context.auth.session) throw redirect({ to: '/tableau-de-bord' })
+  },
   component: Connexion,
 })
 
 function Connexion() {
-  // L'authentification sera branchée à une étape ultérieure
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  const { connexion } = useAuth()
+  const router = useRouter()
+  const { redirect: destination } = Route.useSearch()
+
+  async function handleSubmit(email: string, motDePasse: string) {
+    const erreur = await connexion(email, motDePasse)
+    if (!erreur) router.history.push(destination ?? '/tableau-de-bord')
+    return erreur
   }
 
   return (
-    <section className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="text-2xl font-bold">Connexion</h1>
-      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium">E-mail</span>
-          <input
-            type="email"
-            name="email"
-            required
-            autoComplete="email"
-            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none"
-          />
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium">Mot de passe</span>
-          <input
-            type="password"
-            name="password"
-            required
-            autoComplete="current-password"
-            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none"
-          />
-        </label>
-        <button
-          type="submit"
-          className="w-full rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500"
-        >
-          Se connecter
-        </button>
-      </form>
-    </section>
+    <FormulaireAuth
+      titre="Connexion"
+      libelleBouton="Se connecter"
+      autoCompleteMotDePasse="current-password"
+      onSubmit={handleSubmit}
+    >
+      <p className="mt-6 text-center text-sm text-slate-600">
+        Pas encore de compte ?{' '}
+        <Link to="/inscription" className="text-indigo-600 hover:underline">
+          Créer un compte
+        </Link>
+      </p>
+    </FormulaireAuth>
   )
 }
