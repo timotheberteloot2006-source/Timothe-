@@ -57,6 +57,10 @@ même nom (sans accents ni majuscules), dans la base ou plus haut dans le fichie
 npm test   # tests du filtrage, de l'import/export CSV et des règles SQL (Vitest + PGlite)
 ```
 
+Des cases à cocher permettent d'agir sur plusieurs candidatures de la page à la fois (changer le
+statut, supprimer avec notes et CV). La sélection se vide quand les filtres, le tri ou la page
+changent.
+
 Chaque candidature a sa fiche (clic sur le nom) : notes internes datées et CV en PDF (5 Mo au
 plus), rangé dans le bucket Supabase privé `cv` sous `<user_id>/…` ; chaque utilisateur n'accède
 qu'à ses fichiers. Les fichiers sont supprimés avec la candidature ou le compte.

@@ -23,6 +23,9 @@ interface Props {
   onEnregistrer: (id: string, champs: NouvelleCandidature) => Promise<void>
   onAnnulerEdition: () => void
   onSupprimer: (candidature: Candidature) => void
+  // Identifiants cochés pour les actions groupées
+  selection: Set<string>
+  onBasculerSelection: (id: string) => void
 }
 
 export function ListeCandidatures({
@@ -33,6 +36,8 @@ export function ListeCandidatures({
   onEnregistrer,
   onAnnulerEdition,
   onSupprimer,
+  selection,
+  onBasculerSelection,
 }: Props) {
   return (
     <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface">
@@ -46,72 +51,88 @@ export function ListeCandidatures({
             />
           </li>
         ) : (
-          <li key={c.id} className="flex flex-wrap items-start justify-between gap-4 p-4">
-            <div className="min-w-0">
-              <p className="flex flex-wrap items-center gap-2">
-                <Link
-                  to="/candidatures/$id"
-                  params={{ id: c.id }}
-                  className="font-medium hover:text-accent hover:underline"
+          <li
+            key={c.id}
+            className={`flex items-start gap-3 p-4 ${selection.has(c.id) ? 'bg-indigo-50' : ''}`}
+          >
+            <input
+              type="checkbox"
+              checked={selection.has(c.id)}
+              onChange={() => onBasculerSelection(c.id)}
+              aria-label={`Sélectionner ${c.nom}`}
+              className="mt-1.5 size-4 shrink-0 accent-indigo-600"
+            />
+            <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to="/candidatures/$id"
+                    params={{ id: c.id }}
+                    className="font-medium hover:text-accent hover:underline"
+                  >
+                    {c.nom}
+                  </Link>
+                  {c.cv_chemin && (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
+                      CV
+                    </span>
+                  )}
+                  {!!c.nb_notes && (
+                    <span className="text-xs text-slate-500">
+                      {c.nb_notes} note{c.nb_notes > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+                <p className="text-sm text-slate-600">
+                  {[
+                    c.poste,
+                    `${c.experience} an${c.experience > 1 ? 's' : ''} d'expérience`,
+                    c.email,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                {c.competences.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {c.competences.map((competence) => (
+                      <li
+                        key={competence}
+                        className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700"
+                      >
+                        {competence}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={c.statut}
+                  onChange={(e) => onChangerStatut(c.id, e.target.value as Statut)}
+                  aria-label={`Statut de ${c.nom}`}
+                  className={`rounded-md border-0 px-2 py-1 text-sm font-medium ${couleursStatut[c.statut]}`}
                 >
-                  {c.nom}
-                </Link>
-                {c.cv_chemin && (
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
-                    CV
-                  </span>
-                )}
-                {!!c.nb_notes && (
-                  <span className="text-xs text-slate-500">
-                    {c.nb_notes} note{c.nb_notes > 1 ? 's' : ''}
-                  </span>
-                )}
-              </p>
-              <p className="text-sm text-slate-600">
-                {[c.poste, `${c.experience} an${c.experience > 1 ? 's' : ''} d'expérience`, c.email]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-              {c.competences.length > 0 && (
-                <ul className="mt-2 flex flex-wrap gap-1.5">
-                  {c.competences.map((competence) => (
-                    <li
-                      key={competence}
-                      className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700"
-                    >
-                      {competence}
-                    </li>
+                  {STATUTS.map((statut) => (
+                    <option key={statut} value={statut}>
+                      {LIBELLES_STATUT[statut]}
+                    </option>
                   ))}
-                </ul>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={c.statut}
-                onChange={(e) => onChangerStatut(c.id, e.target.value as Statut)}
-                aria-label={`Statut de ${c.nom}`}
-                className={`rounded-md border-0 px-2 py-1 text-sm font-medium ${couleursStatut[c.statut]}`}
-              >
-                {STATUTS.map((statut) => (
-                  <option key={statut} value={statut}>
-                    {LIBELLES_STATUT[statut]}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => onModifier(c)}
-                className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-              >
-                Modifier
-              </button>
-              <button
-                type="button"
-                onClick={() => onSupprimer(c)}
-                className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-red-50 hover:text-red-700"
-              >
-                Supprimer
-              </button>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => onModifier(c)}
+                  className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                >
+                  Modifier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSupprimer(c)}
+                  className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-red-50 hover:text-red-700"
+                >
+                  Supprimer
+                </button>
+              </div>
             </div>
           </li>
         ),

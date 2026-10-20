@@ -82,6 +82,25 @@ export async function supprimerCandidature(candidature: Candidature) {
   if (error) throw erreurSupabase(error)
 }
 
+export async function changerStatutGroupe(ids: string[], statut: Statut) {
+  if (ids.length === 0) return
+  const { error } = await table().update({ statut }).in('id', ids)
+  if (error) throw erreurSupabase(error)
+}
+
+export async function supprimerCandidatures(candidatures: Candidature[]) {
+  if (candidatures.length === 0) return
+  const chemins = candidatures.flatMap((c) => (c.cv_chemin ? [c.cv_chemin] : []))
+  await supprimerFichiersCv(chemins)
+  const { error } = await table()
+    .delete()
+    .in(
+      'id',
+      candidatures.map((c) => c.id),
+    )
+  if (error) throw erreurSupabase(error)
+}
+
 // Violation de l'index unique de supabase/migrations/0002_candidatures_email_unique.sql
 const VIOLATION_UNICITE = '23505'
 

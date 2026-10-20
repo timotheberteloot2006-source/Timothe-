@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { BarreFiltres } from '@/components/candidatures/BarreFiltres'
+import { BarreSelection } from '@/components/candidatures/BarreSelection'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
 import { ImportCsv } from '@/components/candidatures/ImportCsv'
 import { ListeCandidatures } from '@/components/candidatures/ListeCandidatures'
@@ -8,9 +9,11 @@ import {
   ajouterCandidature,
   ajouterCandidatures,
   changerStatut,
+  changerStatutGroupe,
   listerCandidatures,
   modifierCandidature,
   supprimerCandidature,
+  supprimerCandidatures,
   type Candidature,
   type NouvelleCandidature,
   type Statut,
@@ -54,9 +57,51 @@ function TableauDeBord() {
   const [panneau, setPanneau] = useState<'ajout' | 'import' | null>(null)
   const [idEnEdition, setIdEnEdition] = useState<string | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
+  // Sélection liée aux filtres, au tri et à la page : elle se vide dès qu'ils changent,
+  // pour ne jamais agir sur des candidatures qui ne sont plus affichées
+  const cleAffichage = JSON.stringify(filtres)
+  const [selection, setSelection] = useState({ cle: cleAffichage, ids: new Set<string>() })
 
   const resultats = trierCandidatures(filtrerCandidatures(candidatures, filtres), filtres.tri)
   const pagination = paginer(resultats, filtres.page)
+  // Affichage changé : on oublie la sélection (mise à jour pendant le rendu, motif React
+  // « ajuster l'état quand une prop change »), elle ne réapparaîtra pas au retour
+  if (selection.cle !== cleAffichage) setSelection({ cle: cleAffichage, ids: new Set() })
+  const idsSelectionnes = selection.cle === cleAffichage ? selection.ids : new Set<string>()
+  const selectionnees = pagination.elements.filter((c) => idsSelectionnes.has(c.id))
+
+  function selectionner(ids: Iterable<string>) {
+    setSelection({ cle: cleAffichage, ids: new Set(ids) })
+  }
+
+  function basculerSelection(id: string) {
+    const ids = new Set(idsSelectionnes)
+    if (!ids.delete(id)) ids.add(id)
+    selectionner(ids)
+  }
+
+  function toutBasculer() {
+    const toutes = selectionnees.length === pagination.elements.length
+    selectionner(toutes ? [] : pagination.elements.map((c) => c.id))
+  }
+
+  async function changerStatutSelection(statut: Statut) {
+    await executer(() =>
+      changerStatutGroupe(
+        selectionnees.map((c) => c.id),
+        statut,
+      ),
+    )
+    selectionner([])
+  }
+
+  async function supprimerSelection() {
+    const n = selectionnees.length
+    if (!window.confirm(`Supprimer ${n} candidature${n > 1 ? 's' : ''}, avec leurs notes et CV ?`))
+      return
+    await executer(() => supprimerCandidatures(selectionnees))
+    selectionner([])
+  }
 
   // Changer un filtre ou le tri ramène à la première page
   function changerFiltres(nouveaux: Filtres) {
@@ -173,8 +218,20 @@ function TableauDeBord() {
               Exporter en CSV
             </button>
           </div>
+          {resultats.length > 0 && (
+            <BarreSelection
+              nombre={selectionnees.length}
+              total={pagination.elements.length}
+              onToutBasculer={toutBasculer}
+              onChangerStatut={changerStatutSelection}
+              onSupprimer={supprimerSelection}
+              onAnnuler={() => selectionner([])}
+            />
+          )}
           {resultats.length > 0 ? (
             <ListeCandidatures
+              selection={idsSelectionnes}
+              onBasculerSelection={basculerSelection}
               candidatures={pagination.elements}
               idEnEdition={idEnEdition}
               onChangerStatut={(id: string, statut: Statut) =>
