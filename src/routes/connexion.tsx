@@ -2,8 +2,10 @@ import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-rout
 import { FormulaireAuth } from '@/components/FormulaireAuth'
 import { useAuth } from '@/lib/auth'
 import { cheminInterne } from '@/lib/redirection'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/connexion')({
+  head: () => titrePage('Connexion'),
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
     redirect: cheminInterne(search.redirect),
   }),
@@ -38,7 +40,10 @@ function Connexion() {
       </p>
       <p className="mt-4 text-center text-sm text-slate-600">
         Pas encore de compte ?{' '}
-        <Link to="/inscription" className="text-accent hover:underline">
+        <Link
+          to="/inscription"
+          className="text-accent underline underline-offset-2 hover:no-underline"
+        >
           Créer un compte
         </Link>
       </p>

@@ -136,6 +136,14 @@ Les tests des migrations appliquent les fichiers de `supabase/migrations/` sur u
 mémoire (PGlite) et vérifient la limite Gratuite, les doublons, la suppression de compte, les
 notes, le stockage des CV et les règles de sécurité (RLS).
 
+### Accessibilité
+
+`e2e/accessibilite.e2e.ts` passe chaque page (publique et connectée, panneaux ouverts) à l'audit
+**axe-core** (règles WCAG 2.1 A et AA), en thème clair et sombre, et vérifie ce qu'axe ne voit pas :
+lien d'évitement « Aller au contenu », connexion entièrement au clavier, focus visible, titre de
+l'onglet propre à chaque page (option `head` des routes, `src/lib/titre.ts`). L'audit automatique
+ne remplace pas un test avec un lecteur d'écran.
+
 ### Tests de bout en bout
 
 `npm run test:e2e` construit le site en le branchant sur un **faux Supabase**

@@ -2,8 +2,10 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { FormulaireAuth } from '@/components/FormulaireAuth'
 import { useAuth } from '@/lib/auth'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/mot-de-passe-oublie')({
+  head: () => titrePage('Mot de passe oublié'),
   component: MotDePasseOublie,
 })
 

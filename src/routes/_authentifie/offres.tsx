@@ -2,8 +2,10 @@ import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useState, type FormEvent } from 'react'
 import { classeChamp } from '@/components/candidatures/styles'
 import { creerOffre, listerOffres, renommerOffre, supprimerOffre, type Offre } from '@/lib/offres'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/offres')({
+  head: () => titrePage('Offres d’emploi'),
   loader: listerOffres,
   component: Offres,
   errorComponent: ({ error }) => (

@@ -98,7 +98,7 @@ export function ListeCandidatures({
                     </span>
                   )}
                   {!!c.nb_notes && (
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-600">
                       {c.nb_notes} note{c.nb_notes > 1 ? 's' : ''}
                     </span>
                   )}
@@ -142,14 +142,14 @@ export function ListeCandidatures({
                 <button
                   type="button"
                   onClick={() => onModifier(c)}
-                  className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                  className="rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 >
                   Modifier
                 </button>
                 <button
                   type="button"
                   onClick={() => onSupprimer(c)}
-                  className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-red-50 hover:text-red-700"
+                  className="rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-red-50 hover:text-red-700"
                 >
                   Supprimer
                 </button>

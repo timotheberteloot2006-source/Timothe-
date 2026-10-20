@@ -17,8 +17,10 @@ import {
   type Abonnement,
 } from '@/lib/abonnement'
 import { useAuth } from '@/lib/auth'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/compte')({
+  head: () => titrePage('Mon compte'),
   // ?abonnement=ok : retour depuis le paiement Stripe
   validateSearch: (search: Record<string, unknown>): { abonnement?: 'ok' } =>
     search.abonnement === 'ok' ? { abonnement: 'ok' } : {},

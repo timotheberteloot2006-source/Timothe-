@@ -23,6 +23,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@electric-sql/pglite": "^0.5.10",
     "@playwright/test": "^1.56.1",
     "@tanstack/router-plugin": "^1.168.47",

@@ -8,6 +8,12 @@
   --color-accent: var(--color-indigo-600);
 }
 
+/* Focus clavier bien visible sur tous les éléments (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--color-indigo-500);
+  outline-offset: 2px;
+}
+
 html {
   color-scheme: light;
   background-color: var(--color-slate-50);

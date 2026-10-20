@@ -31,8 +31,10 @@ import { genererCsv, nomFichierExport, telechargerCsv } from '@/lib/exportCandid
 import { listerOffres, titresParId } from '@/lib/offres'
 import { listerEntretiensAVenir, prochainParCandidature } from '@/lib/entretiens'
 import { EntretiensAVenir } from '@/components/candidatures/EntretiensAVenir'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
+  head: () => titrePage('Candidatures'),
   validateSearch: lireFiltres,
   loader: async () => {
     const [candidatures, abonnement, offres, entretiens] = await Promise.all([

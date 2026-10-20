@@ -7,8 +7,10 @@ import {
   lireAbonnement,
   PRIX_PRO,
 } from '@/lib/abonnement'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/tarifs')({
+  head: () => titrePage('Tarifs'),
   // L'offre actuelle n'est connue que si l'utilisateur est connecté ; une erreur
   // (base pas encore créée…) ne doit pas empêcher d'afficher les tarifs
   loader: ({ context }) =>

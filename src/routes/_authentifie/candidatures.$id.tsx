@@ -18,6 +18,7 @@ import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
 import { ajouterNote, listerNotes, supprimerNote, type Note } from '@/lib/notes'
 import { listerEntretiens } from '@/lib/entretiens'
 import { listerOffres } from '@/lib/offres'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/candidatures/$id')({
   loader: async ({ params }) => {
@@ -30,6 +31,8 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
     if (!candidature) throw notFound()
     return { candidature, notes, offres, entretiens }
   },
+  // Après loader : les types de loaderData en dépendent
+  head: ({ loaderData }) => titrePage(loaderData?.candidature.nom ?? 'Candidature'),
   component: FicheCandidature,
   errorComponent: ({ error }) => (
     <section className="mx-auto max-w-3xl px-4 py-16">
@@ -105,7 +108,7 @@ function FicheCandidature() {
                   <Link
                     to="/tableau-de-bord"
                     search={{ offre: offre.id }}
-                    className="text-accent hover:underline"
+                    className="text-accent underline underline-offset-2 hover:no-underline"
                   >
                     {offre.titre}
                   </Link>

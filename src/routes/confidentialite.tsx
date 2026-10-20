@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { EmailContact, Info, PageLegale } from '@/components/PageLegale'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/confidentialite')({
+  head: () => titrePage('Politique de confidentialité'),
   component: Confidentialite,
 })
 

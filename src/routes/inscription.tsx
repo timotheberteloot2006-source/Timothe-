@@ -2,8 +2,10 @@ import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-ro
 import { useState } from 'react'
 import { FormulaireAuth } from '@/components/FormulaireAuth'
 import { useAuth } from '@/lib/auth'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/inscription')({
+  head: () => titrePage('Créer un compte'),
   beforeLoad: ({ context }) => {
     if (context.auth.session) throw redirect({ to: '/tableau-de-bord' })
   },
@@ -58,7 +60,10 @@ function Inscription() {
       </p>
       <p className="mt-6 text-center text-sm text-slate-600">
         Déjà un compte ?{' '}
-        <Link to="/connexion" className="text-accent hover:underline">
+        <Link
+          to="/connexion"
+          className="text-accent underline underline-offset-2 hover:no-underline"
+        >
           Se connecter
         </Link>
       </p>

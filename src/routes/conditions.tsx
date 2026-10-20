@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { EmailContact, Info, PageLegale } from '@/components/PageLegale'
 import { LIMITE_GRATUITE } from '@/lib/abonnement'
+import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/conditions')({
+  head: () => titrePage('Conditions générales'),
   component: Conditions,
 })
 

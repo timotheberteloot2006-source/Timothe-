@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { FormulaireAuth } from '@/components/FormulaireAuth'
 import { useAuth } from '@/lib/auth'
+import { titrePage } from '@/lib/titre'
 
 // Page ouverte par le lien de réinitialisation : Supabase y crée une session à partir de l'URL
 export const Route = createFileRoute('/nouveau-mot-de-passe')({
+  head: () => titrePage('Nouveau mot de passe'),
   component: NouveauMotDePasse,
 })
 
@@ -18,10 +20,7 @@ function NouveauMotDePasse() {
         <p className="mt-4 text-slate-600">
           Ce lien de réinitialisation ne fonctionne plus. Demandez-en un nouveau.
         </p>
-        <Link
-          to="/mot-de-passe-oublie"
-          className="mt-6 inline-block text-accent hover:underline"
-        >
+        <Link to="/mot-de-passe-oublie" className="mt-6 inline-block text-accent hover:underline">
           Demander un nouveau lien
         </Link>
       </section>
