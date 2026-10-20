@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decouperCompetences, type Candidature } from './candidatures'
-import { filtrerCandidatures, lireFiltres } from './filtres'
+import { filtrerCandidatures, lireFiltres, trierCandidatures } from './filtres'
 
 function candidature(champs: Partial<Candidature>): Candidature {
   return {
@@ -102,5 +102,61 @@ describe('decouperCompetences', () => {
       'TypeScript',
       'SQL',
     ])
+  })
+})
+
+describe('trierCandidatures', () => {
+  const dates = (liste: Candidature[]) => liste.map((c) => c.nom)
+  const anne = candidature({
+    nom: 'anne',
+    experience: 5,
+    statut: 'ecarte',
+    created_at: '2026-01-01T00:00:00Z',
+  })
+  const eric = candidature({
+    nom: 'Éric',
+    experience: 2,
+    statut: 'nouveau',
+    created_at: '2026-01-03T00:00:00Z',
+  })
+  const bea = candidature({
+    nom: 'Béa',
+    experience: 5,
+    statut: 'retenu',
+    created_at: '2026-01-02T00:00:00Z',
+  })
+  const liste = [anne, eric, bea]
+
+  it('met les plus récentes d’abord par défaut', () => {
+    expect(dates(trierCandidatures(liste))).toEqual(['Éric', 'Béa', 'anne'])
+    expect(dates(trierCandidatures(liste, 'ancien'))).toEqual(['anne', 'Béa', 'Éric'])
+  })
+
+  it('trie les noms sans tenir compte des accents ni des majuscules', () => {
+    expect(dates(trierCandidatures(liste, 'nom'))).toEqual(['anne', 'Béa', 'Éric'])
+    expect(dates(trierCandidatures(liste, 'nom-desc'))).toEqual(['Éric', 'Béa', 'anne'])
+  })
+
+  it('départage par date à expérience égale', () => {
+    expect(dates(trierCandidatures(liste, 'experience'))).toEqual(['Béa', 'anne', 'Éric'])
+    expect(dates(trierCandidatures(liste, 'experience-asc'))).toEqual(['Éric', 'Béa', 'anne'])
+  })
+
+  it('trie par statut : nouveau, retenu, écarté', () => {
+    expect(dates(trierCandidatures(liste, 'statut'))).toEqual(['Éric', 'Béa', 'anne'])
+  })
+
+  it('ne modifie pas la liste d’origine', () => {
+    trierCandidatures(liste, 'nom')
+    expect(dates(liste)).toEqual(['anne', 'Éric', 'Béa'])
+  })
+})
+
+describe('lireFiltres (tri)', () => {
+  it('garde un tri valide et ignore le tri par défaut ou inconnu', () => {
+    expect(lireFiltres({ tri: 'nom' })).toEqual({ tri: 'nom' })
+    expect(lireFiltres({ tri: 'recent' })).toEqual({})
+    expect(lireFiltres({ tri: 'inconnu' })).toEqual({})
+    expect(lireFiltres({ tri: 'toString' })).toEqual({})
   })
 })

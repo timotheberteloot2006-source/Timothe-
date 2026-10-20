@@ -30,7 +30,8 @@ sans connexion, l'utilisateur est renvoyé vers `/connexion`, puis ramené à la
 
 Le tableau de bord liste les candidatures de l'utilisateur connecté (règles RLS : chacun ne voit
 que les siennes). Les filtres (recherche, compétences requises, expérience minimum, statut)
-s'appliquent dans le navigateur et sont conservés dans l'URL.
+s'appliquent dans le navigateur et sont conservés dans l'URL, comme le tri (date, nom, expérience,
+statut).
 
 Les candidatures peuvent aussi être importées depuis un fichier CSV (bouton « Importer un CSV »,
 jusqu'à 1000 lignes) : colonnes `nom` (obligatoire), `email`, `poste`, `competences`, `experience`.

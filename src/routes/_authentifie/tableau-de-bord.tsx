@@ -16,7 +16,7 @@ import {
   type Statut,
 } from '@/lib/candidatures'
 import { estPro, LIMITE_GRATUITE, lireAbonnement, placesRestantes } from '@/lib/abonnement'
-import { filtrerCandidatures, lireFiltres, type Filtres } from '@/lib/filtres'
+import { filtrerCandidatures, lireFiltres, trierCandidatures, type Filtres } from '@/lib/filtres'
 import { genererCsv, nomFichierExport, telechargerCsv } from '@/lib/exportCandidatures'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
@@ -49,7 +49,7 @@ function TableauDeBord() {
   const [idEnEdition, setIdEnEdition] = useState<string | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
 
-  const resultats = filtrerCandidatures(candidatures, filtres)
+  const resultats = trierCandidatures(filtrerCandidatures(candidatures, filtres), filtres.tri)
 
   function changerFiltres(nouveaux: Filtres) {
     navigate({ search: nouveaux, replace: true })
