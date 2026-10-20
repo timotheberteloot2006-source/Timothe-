@@ -22,8 +22,9 @@ export function paiementEnAttente(abonnement: Abonnement | null) {
   return ['past_due', 'unpaid', 'incomplete'].includes(abonnement?.statut ?? '')
 }
 
-export function placesRestantes(abonnement: Abonnement | null, nombreCandidatures: number) {
-  if (estPro(abonnement)) return Infinity
+// pro : l'espace est couvert par l'offre Pro de son propriétaire
+export function placesRestantes(pro: boolean, nombreCandidatures: number) {
+  if (pro) return Infinity
   return Math.max(0, LIMITE_GRATUITE - nombreCandidatures)
 }
 

@@ -32,7 +32,7 @@ const PAGES_PUBLIQUES = [
 ]
 
 // « fiche » : remplacée par l'adresse de la fiche d'Alice Martin
-const PAGES_CONNECTE = ['/tableau-de-bord', 'fiche', '/offres', '/compte']
+const PAGES_CONNECTE = ['/tableau-de-bord', 'fiche', '/offres', '/compte', '/equipe']
 
 function donneesDeDemonstration(faux: FauxSupabase) {
   const offre = faux.ajouterOffre('Développeur front')
@@ -90,6 +90,16 @@ for (const schema of ['light', 'dark'] as const) {
         expect(await auditer(page)).toEqual([])
       })
     }
+
+    test('page d’invitation', async ({ page }) => {
+      const faux = new FauxSupabase()
+      await faux.installer(page)
+      const { jeton } = faux.ajouterEspaceInvitant('Agence RH', 'patronne@agence.fr')
+      await seConnecter(page, faux)
+      await page.goto(`/invitation/${jeton}`)
+      await expect(page.locator('h1')).toHaveText('Rejoindre l’espace « Agence RH »')
+      expect(await auditer(page)).toEqual([])
+    })
 
     test('panneaux ouverts du tableau de bord', async ({ page }) => {
       const faux = new FauxSupabase()

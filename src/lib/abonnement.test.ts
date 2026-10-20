@@ -20,9 +20,9 @@ describe('abonnement', () => {
   })
 
   it('calcule les places restantes', () => {
-    expect(placesRestantes(null, 0)).toBe(LIMITE_GRATUITE)
-    expect(placesRestantes(null, 48)).toBe(2)
-    expect(placesRestantes(avec('canceled'), 51)).toBe(0)
-    expect(placesRestantes(avec('active'), 500)).toBe(Infinity)
+    expect(placesRestantes(false, 0)).toBe(LIMITE_GRATUITE)
+    expect(placesRestantes(false, 48)).toBe(2)
+    expect(placesRestantes(false, 51)).toBe(0)
+    expect(placesRestantes(true, 500)).toBe(Infinity)
   })
 })

@@ -21,11 +21,27 @@ npm run dev
    `http://localhost:5173/compte` pour la confirmation d'un changement d'e-mail.
 
 4. Créer la base (candidatures, notes, stockage des CV, abonnements, offres, entretiens,
-   suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
+   espaces d'équipe, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
    `supabase/migrations/` (ou `supabase db push` avec la CLI Supabase).
 
 Les pages placées dans `src/routes/_authentifie/` exigent une session :
 sans connexion, l'utilisateur est renvoyé vers `/connexion`, puis ramené à la page demandée.
+
+## Travail en équipe
+
+Les données appartiennent à un **espace**. Chaque compte a un espace personnel (même identifiant
+que le compte) et peut être invité dans d'autres ; la page **Équipe** permet de choisir l'espace
+actif, dont le site affiche les données.
+
+- **Propriétaire** : renomme l'espace, crée des liens d'invitation (à usage unique, valables
+  7 jours, à transmettre soi-même), retire des membres, gère l'abonnement.
+- **Membres** : voient et modifient candidatures, notes, offres, entretiens et CV de l'espace ;
+  peuvent quitter l'espace.
+- **Offre Pro par espace** : l'abonnement du propriétaire couvre tous les membres ; en Gratuit,
+  la limite de 50 candidatures s'applique à l'espace entier.
+- La base n'expose que l'espace actif, et seulement à ses membres
+  (`supabase/migrations/0008_espaces.sql`). Supprimer le compte d'un membre conserve ce qu'il a
+  ajouté à l'équipe ; un propriétaire doit d'abord retirer ses membres.
 
 ## Thème clair / sombre
 

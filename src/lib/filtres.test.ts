@@ -14,6 +14,7 @@ function candidature(champs: Partial<Candidature>): Candidature {
     created_at: '2026-01-01T00:00:00Z',
     cv_chemin: null,
     offre_id: null,
+    espace_id: 'e1',
     ...champs,
   }
 }

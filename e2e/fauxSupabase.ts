@@ -18,6 +18,31 @@ export interface CandidatureFaux {
   created_at: string
   cv_chemin: string | null
   offre_id: string | null
+  espace_id: string
+}
+
+interface EspaceFaux {
+  id: string
+  nom: string
+  proprietaire_email: string
+  // Offre Pro d'un espace dont l'utilisateur n'est pas propriétaire
+  pro?: boolean
+}
+
+interface MembreFaux {
+  espace_id: string
+  user_id: string
+  email: string
+  role: 'proprietaire' | 'membre'
+  created_at: string
+}
+
+interface InvitationFaux {
+  id: string
+  espace_id: string
+  jeton: string
+  expire_le: string
+  utilisee: boolean
 }
 
 interface EntretienFaux {
@@ -32,6 +57,7 @@ interface EntretienFaux {
 interface OffreFaux {
   id: string
   user_id: string
+  espace_id: string
   titre: string
   created_at: string
 }
@@ -72,7 +98,53 @@ export class FauxSupabase {
   compteSupprime = false
   // Fonctions de paiement appelées (creer-checkout, portail-client)
   fonctionsAppelees: string[] = []
+  // Espace personnel : même identifiant que le compte (supabase/migrations/0008_espaces.sql)
+  espaces: EspaceFaux[] = [
+    { id: UTILISATEUR.id, nom: 'Mon espace', proprietaire_email: UTILISATEUR.email },
+  ]
+  membres: MembreFaux[] = [
+    {
+      espace_id: UTILISATEUR.id,
+      user_id: UTILISATEUR.id,
+      email: UTILISATEUR.email,
+      role: 'proprietaire',
+      created_at: '2026-01-01T00:00:00Z',
+    },
+  ]
+  invitations: InvitationFaux[] = []
+  espaceActif = UTILISATEUR.id
   private compteur = 0
+
+  // Espace d'une autre personne, avec une invitation pour l'utilisateur ; renvoie le jeton
+  ajouterEspaceInvitant(nom: string, proprietaireEmail: string, champs: Partial<EspaceFaux> = {}) {
+    const espace = {
+      id: crypto.randomUUID(),
+      nom,
+      proprietaire_email: proprietaireEmail,
+      ...champs,
+    }
+    this.espaces.push(espace)
+    this.membres.push({
+      espace_id: espace.id,
+      user_id: crypto.randomUUID(),
+      email: proprietaireEmail,
+      role: 'proprietaire',
+      created_at: '2026-01-01T00:00:00Z',
+    })
+    const jeton = crypto.randomUUID()
+    this.invitations.push({
+      id: crypto.randomUUID(),
+      espace_id: espace.id,
+      jeton,
+      expire_le: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      utilisee: false,
+    })
+    return { espace, jeton }
+  }
+
+  private estMembre(espaceId: string) {
+    return this.membres.some((m) => m.espace_id === espaceId && m.user_id === this.utilisateur.id)
+  }
 
   // Ajoute des candidatures ; les dates croissent avec l'ordre d'ajout
   ajouter(...champs: Partial<CandidatureFaux>[]) {
@@ -90,6 +162,7 @@ export class FauxSupabase {
         created_at: new Date(Date.UTC(2026, 0, 1, 0, this.compteur)).toISOString(),
         cv_chemin: null,
         offre_id: null,
+        espace_id: this.espaceActif,
         ...c,
       })
     }
@@ -101,6 +174,7 @@ export class FauxSupabase {
     const offre = {
       id: crypto.randomUUID(),
       user_id: this.utilisateur.id,
+      espace_id: this.espaceActif,
       titre,
       created_at: new Date(Date.UTC(2026, 0, 1, 0, this.compteur)).toISOString(),
     }
@@ -173,6 +247,15 @@ export class FauxSupabase {
       const objet = (requete.headers()['accept'] ?? '').includes('vnd.pgrst.object')
       return json(objet ? this.abonnement : this.abonnement ? [this.abonnement] : [])
     }
+    if (
+      chemin.startsWith('/rest/v1/rpc/') ||
+      chemin === '/rest/v1/membres' ||
+      chemin === '/rest/v1/espaces' ||
+      chemin === '/rest/v1/invitations'
+    ) {
+      const reponse = this.espacesRest(route, url, chemin)
+      if (reponse) return json(reponse.corps, reponse.status)
+    }
     if (chemin === '/rest/v1/rpc/supprimer_mon_compte') {
       this.compteSupprime = true
       return json(undefined, 204)
@@ -215,7 +298,8 @@ export class FauxSupabase {
     const ids = idsFiltres(url)
 
     if (methode === 'GET') {
-      let lignes = this.candidatures.filter((c) => c.user_id === this.utilisateur.id)
+      // Règle RLS : seulement l'espace actif
+      let lignes = this.candidatures.filter((c) => c.espace_id === this.espaceActif)
       if (ids) lignes = lignes.filter((c) => ids.includes(c.id))
       if (url.searchParams.get('cv_chemin') === 'not.is.null')
         lignes = lignes.filter((c) => c.cv_chemin)
@@ -331,6 +415,124 @@ export class FauxSupabase {
     return json({}, 405)
   }
 
+  // Espaces, membres, invitations et fonctions associées ; null si la requête n'est pas gérée ici
+  private espacesRest(route: Route, url: URL, chemin: string) {
+    const requete = route.request()
+    const methode = requete.method()
+    const parametres = (corps(requete) ?? {}) as Record<string, string>
+    const filtre = (cle: string) => url.searchParams.get(cle)?.replace(/^eq[.]/, '')
+
+    if (chemin === '/rest/v1/rpc/mon_espace') {
+      const espace = this.espaces.find((e) => e.id === this.espaceActif)!
+      const role = this.membres.find(
+        (m) => m.espace_id === espace.id && m.user_id === this.utilisateur.id,
+      )!.role
+      const pro = role === 'proprietaire' ? this.abonnement?.statut === 'active' : !!espace.pro
+      const nb = this.membres.filter((m) => m.espace_id === espace.id).length
+      return {
+        corps: [{ id: espace.id, nom: espace.nom, role, est_pro: pro, nb_membres: nb }],
+        status: 200,
+      }
+    }
+    if (chemin === '/rest/v1/rpc/choisir_espace') {
+      if (!this.estMembre(parametres.eid)) {
+        return { corps: { code: 'P0001', message: 'espace_inaccessible: non membre' }, status: 400 }
+      }
+      this.espaceActif = parametres.eid
+      return { corps: undefined, status: 204 }
+    }
+    if (chemin === '/rest/v1/rpc/lire_invitation') {
+      const invitation = this.invitations.find((i) => i.jeton === parametres.code)
+      if (!invitation) return { corps: [], status: 200 }
+      const espace = this.espaces.find((e) => e.id === invitation.espace_id)!
+      const valide = !invitation.utilisee && new Date(invitation.expire_le) > new Date()
+      return {
+        corps: [
+          {
+            espace_id: espace.id,
+            espace_nom: espace.nom,
+            proprietaire_email: espace.proprietaire_email,
+            valide,
+            deja_membre: this.estMembre(espace.id),
+          },
+        ],
+        status: 200,
+      }
+    }
+    if (chemin === '/rest/v1/rpc/accepter_invitation') {
+      const invitation = this.invitations.find((i) => i.jeton === parametres.code)
+      if (!invitation || invitation.utilisee || new Date(invitation.expire_le) <= new Date()) {
+        return {
+          corps: { code: 'P0001', message: 'invitation_invalide: lien invalide' },
+          status: 400,
+        }
+      }
+      if (!this.estMembre(invitation.espace_id)) {
+        this.membres.push({
+          espace_id: invitation.espace_id,
+          user_id: this.utilisateur.id,
+          email: this.utilisateur.email,
+          role: 'membre',
+          created_at: new Date().toISOString(),
+        })
+        invitation.utilisee = true
+      }
+      this.espaceActif = invitation.espace_id
+      return { corps: invitation.espace_id, status: 200 }
+    }
+
+    if (chemin === '/rest/v1/membres') {
+      const espaceId = filtre('espace_id')
+      const userId = filtre('user_id')
+      if (methode === 'GET') {
+        const lignes = this.membres
+          .filter((m) => this.estMembre(m.espace_id))
+          .filter((m) => !espaceId || m.espace_id === espaceId)
+          .filter((m) => !userId || m.user_id === userId)
+          .map((m) => ({
+            ...m,
+            espaces: { nom: this.espaces.find((e) => e.id === m.espace_id)?.nom },
+          }))
+        return { corps: lignes, status: 200 }
+      }
+      if (methode === 'DELETE') {
+        this.membres = this.membres.filter(
+          (m) => !(m.espace_id === espaceId && m.user_id === userId),
+        )
+        if (!this.estMembre(this.espaceActif)) this.espaceActif = this.utilisateur.id
+        return { corps: undefined, status: 204 }
+      }
+    }
+    if (chemin === '/rest/v1/espaces' && methode === 'PATCH') {
+      const espace = this.espaces.find((e) => e.id === filtre('id'))
+      if (espace) espace.nom = parametres.nom
+      return { corps: undefined, status: 204 }
+    }
+    if (chemin === '/rest/v1/invitations') {
+      if (methode === 'GET') {
+        const lignes = this.invitations
+          .filter((i) => i.espace_id === filtre('espace_id') && !i.utilisee)
+          .map(({ id, jeton, expire_le }) => ({ id, jeton, expire_le }))
+        return { corps: lignes, status: 200 }
+      }
+      if (methode === 'POST') {
+        this.invitations.push({
+          id: crypto.randomUUID(),
+          espace_id: parametres.espace_id,
+          jeton: crypto.randomUUID(),
+          expire_le: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+          utilisee: false,
+        })
+        return { corps: undefined, status: 201 }
+      }
+      if (methode === 'DELETE') {
+        this.invitations = this.invitations.filter((i) => i.id !== filtre('id'))
+        return { corps: undefined, status: 204 }
+      }
+    }
+    return null
+  }
+
   private offresRest(route: Route, url: URL, json: Repondre) {
     const requete = route.request()
     const methode = requete.method()
@@ -344,7 +546,8 @@ export class FauxSupabase {
     }
 
     if (methode === 'GET') {
-      const offres = [...this.offres]
+      const offres = this.offres
+        .filter((o) => o.espace_id === this.espaceActif)
         .sort((a, b) => a.titre.localeCompare(b.titre))
         .map((o) => ({
           ...o,

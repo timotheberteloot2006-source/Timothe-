@@ -22,20 +22,17 @@ export function verifierFichierCv(fichier: File): string | null {
   return null
 }
 
-// Dépose le PDF sous <user_id>/<candidature_id>/… et remplace l'éventuel CV précédent
+// Dépose le PDF sous <espace_id>/<candidature_id>/… (lisible par les membres de l'espace)
+// et remplace l'éventuel CV précédent
 export async function deposerCv(
-  candidature: { id: string; cv_chemin: string | null },
+  candidature: { id: string; cv_chemin: string | null; espace_id: string },
   fichier: File,
 ) {
   const erreur = verifierFichierCv(fichier)
   if (erreur) throw new Error(erreur)
 
-  const { data: session } = await client().auth.getSession()
-  const userId = session.session?.user.id
-  if (!userId) throw new Error('Session expirée : reconnectez-vous.')
-
   // Nom unique : évite qu'un ancien fichier reste en cache sous le même nom
-  const chemin = `${userId}/${candidature.id}/${crypto.randomUUID()}.pdf`
+  const chemin = `${candidature.espace_id}/${candidature.id}/${crypto.randomUUID()}.pdf`
   const depot = await bucket().upload(chemin, fichier, { contentType: 'application/pdf' })
   if (depot.error) throw new Error(`Dépôt du CV impossible : ${depot.error.message}`)
 
@@ -79,7 +76,8 @@ export async function supprimerFichiersCv(chemins: string[]) {
   if (error) throw new Error(`Suppression du CV impossible : ${error.message}`)
 }
 
-// Avant la suppression du compte : les fichiers ne sont pas effacés avec l'utilisateur
+// Avant la suppression du compte : les fichiers ne sont pas effacés avec l'utilisateur.
+// Porte sur l'espace actif : l'appelant choisit d'abord l'espace personnel.
 export async function supprimerTousLesCv() {
   const { data, error } = await client()
     .from('candidatures')

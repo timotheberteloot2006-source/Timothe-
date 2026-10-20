@@ -118,7 +118,7 @@ describe('doublons', () => {
       db.exec(
         `insert into public.candidatures (user_id, nom, email) values ('${A}', 'Alice 2', 'ALICE@x.fr')`,
       ),
-    ).rejects.toThrow(/candidatures_user_email_unique/)
+    ).rejects.toThrow(/candidatures_espace_email_unique/)
   })
 
   it('accepte le même e-mail chez deux utilisateurs différents', async () => {
@@ -199,10 +199,17 @@ describe('sécurité (RLS)', () => {
     expect(rows).toEqual([{ statut: 'active' }])
   })
 
-  it('empêche d’ajouter une candidature au nom d’un autre', async () => {
+  it('empêche d’écrire dans l’espace d’un autre ou en son nom', async () => {
     await expect(
-      db.exec(`insert into public.candidatures (user_id, nom) values ('${B}', 'Intrus')`),
+      db.exec(`insert into public.candidatures (espace_id, nom) values ('${B}', 'Intrus')`),
     ).rejects.toThrow(/row-level security/)
+    // Un user_id usurpé est remplacé par l'utilisateur connecté, dans son propre espace
+    await db.exec(`insert into public.candidatures (user_id, nom) values ('${B}', 'Moi')`)
+    await db.exec('reset role')
+    const { rows } = await db.query(
+      `select user_id, espace_id from public.candidatures where nom = 'Moi'`,
+    )
+    expect(rows).toEqual([{ user_id: A, espace_id: A }])
   })
 })
 
@@ -315,9 +322,9 @@ describe('offres', () => {
     expect(rows).toEqual([{ nom: 'C1', user_id: A, offre_id: null }])
   })
 
-  it('refuse deux offres de même titre pour un utilisateur', async () => {
+  it('refuse deux offres de même titre dans un espace', async () => {
     await creerOffre(A, 'Data analyst')
-    await expect(creerOffre(A, 'DATA ANALYST')).rejects.toThrow(/offres_user_titre_unique/)
+    await expect(creerOffre(A, 'DATA ANALYST')).rejects.toThrow(/offres_espace_titre_unique/)
     await creerOffre(B, 'Data analyst')
   })
 
@@ -332,7 +339,7 @@ describe('offres', () => {
     const { rows } = await db.query('select titre from public.offres')
     expect(rows).toEqual([{ titre: 'Offre de A' }])
     await expect(
-      db.exec(`insert into public.offres (user_id, titre) values ('${B}', 'Intrus')`),
+      db.exec(`insert into public.offres (espace_id, titre) values ('${B}', 'Intrus')`),
     ).rejects.toThrow(/row-level security/)
   })
 })
@@ -383,3 +390,199 @@ describe('entretiens', () => {
     expect(rows).toEqual([{ n: 0 }])
   })
 })
+
+describe('travail en équipe', () => {
+  const C = '00000000-0000-0000-0000-00000000000c'
+
+  beforeEach(async () => {
+    await db.exec(`insert into auth.users values ('${C}', 'c@x.fr')`)
+    // Droits par défaut de Supabase sur le schéma public
+    await db.exec(`
+      grant usage on schema public to authenticated;
+      grant select, insert, update, delete on all tables in schema public to authenticated;
+      grant execute on all functions in schema public to authenticated;
+    `)
+  })
+
+  // Exécute des requêtes en tant qu'utilisateur connecté (rôle authenticated + auth.uid())
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  async function inviter(espace: string, par = espace) {
+    return enTant(par, async () => {
+      const { rows } = await db.query<{ jeton: string }>(
+        `insert into public.invitations (espace_id) values ($1) returning jeton`,
+        [espace],
+      )
+      return rows[0].jeton
+    })
+  }
+
+  const accepter = (uid: string, jeton: string) =>
+    enTant(uid, () => db.query(`select public.accepter_invitation($1)`, [jeton]))
+
+  const noms = (uid: string) =>
+    enTant(uid, async () =>
+      (
+        await db.query<{ nom: string }>('select nom from public.candidatures order by nom')
+      ).rows.map((r) => r.nom),
+    )
+
+  it('crée un espace personnel avec chaque compte', async () => {
+    const { rows } = await db.query(
+      `select e.id, e.nom, m.role, m.email from public.espaces e
+       join public.membres m on m.espace_id = e.id where e.id = '${C}'`,
+    )
+    expect(rows).toEqual([{ id: C, nom: 'Mon espace', role: 'proprietaire', email: 'c@x.fr' }])
+  })
+
+  it('une invitation acceptée donne accès aux candidatures de l’espace', async () => {
+    await ajouter(A, ['Candidat de A'])
+    await ajouter(B, ['Candidat de B'])
+    const jeton = await inviter(A)
+
+    const apercu = await enTant(B, () =>
+      db.query(`select * from public.lire_invitation($1)`, [jeton]),
+    )
+    expect(apercu.rows).toEqual([
+      {
+        espace_id: A,
+        espace_nom: 'Mon espace',
+        proprietaire_email: 'a@x.fr',
+        valide: true,
+        deja_membre: false,
+      },
+    ])
+
+    await accepter(B, jeton)
+    expect(await noms(B)).toEqual(['Candidat de A'])
+    const espace = await enTant(B, () => db.query('select * from public.mon_espace()'))
+    expect(espace.rows).toEqual([
+      { id: A, nom: 'Mon espace', role: 'membre', est_pro: false, nb_membres: 2 },
+    ])
+
+    // Ce que B ajoute arrive dans l'espace de A, avec B comme auteur
+    await enTant(B, () => db.exec(`insert into public.candidatures (nom) values ('Ajout de B')`))
+    const { rows } = await db.query(
+      `select espace_id, user_id from public.candidatures where nom = 'Ajout de B'`,
+    )
+    expect(rows).toEqual([{ espace_id: A, user_id: B }])
+    expect(await noms(A)).toEqual(['Ajout de B', 'Candidat de A'])
+
+    // B peut revenir à son espace personnel
+    await enTant(B, () => db.exec(`select public.choisir_espace('${B}')`))
+    expect(await noms(B)).toEqual(['Candidat de B'])
+  })
+
+  it('un lien d’invitation ne sert qu’une fois et expire', async () => {
+    const jeton = await inviter(A)
+    await accepter(B, jeton)
+    await expect(accepter(C, jeton)).rejects.toThrow(/^invitation_invalide/)
+
+    const expire = await inviter(A)
+    await db.exec(
+      `update public.invitations set expire_le = now() - interval '1 minute' where jeton = '${expire}'`,
+    )
+    await expect(accepter(C, expire)).rejects.toThrow(/^invitation_invalide/)
+    expect(await noms(C)).toEqual([])
+  })
+
+  it('seul le propriétaire invite et retire des membres', async () => {
+    await accepter(B, await inviter(A))
+    await expect(inviter(A, B)).rejects.toThrow(/row-level security/)
+    // B ne peut pas retirer A (la suppression ne touche aucune ligne)
+    await enTant(B, () =>
+      db.exec(`delete from public.membres where espace_id = '${A}' and user_id = '${A}'`),
+    )
+    // A retire B : B retombe sur son espace personnel
+    await enTant(A, () =>
+      db.exec(`delete from public.membres where espace_id = '${A}' and user_id = '${B}'`),
+    )
+    const { rows } = await db.query(`select user_id from public.membres where espace_id = '${A}'`)
+    expect(rows).toEqual([{ user_id: A }])
+    await ajouter(A, ['Secret de A'])
+    expect(await noms(B)).toEqual([])
+  })
+
+  it('un membre peut quitter l’espace, pas le propriétaire', async () => {
+    await accepter(B, await inviter(A))
+    await enTant(A, () =>
+      db.exec(`delete from public.membres where espace_id = '${A}' and user_id = '${A}'`),
+    )
+    await enTant(B, () =>
+      db.exec(`delete from public.membres where espace_id = '${A}' and user_id = '${B}'`),
+    )
+    const { rows } = await db.query(`select user_id from public.membres where espace_id = '${A}'`)
+    expect(rows).toEqual([{ user_id: A }])
+  })
+
+  it('refuse de choisir un espace dont on n’est pas membre', async () => {
+    await expect(enTant(C, () => db.exec(`select public.choisir_espace('${A}')`))).rejects.toThrow(
+      /^espace_inaccessible/,
+    )
+  })
+
+  it('applique la limite Gratuite à l’espace, levée par l’offre Pro du propriétaire', async () => {
+    await accepter(B, await inviter(A))
+    await ajouter(A, noms50())
+    await expect(
+      enTant(B, () => db.exec(`insert into public.candidatures (nom) values ('51e')`)),
+    ).rejects.toThrow(/^limite_gratuite/)
+    await passerPro(A)
+    await enTant(B, () => db.exec(`insert into public.candidatures (nom) values ('51e')`))
+    const espace = await enTant(B, () => db.query('select est_pro from public.mon_espace()'))
+    expect(espace.rows).toEqual([{ est_pro: true }])
+  })
+
+  it('protège les données de l’équipe à la suppression d’un compte', async () => {
+    await accepter(B, await inviter(A))
+    await enTant(B, () => db.exec(`insert into public.candidatures (nom) values ('Ajout de B')`))
+    // A ne peut pas supprimer son compte tant que B est membre
+    await expect(enTant(A, () => db.exec('select public.supprimer_mon_compte()'))).rejects.toThrow(
+      /^equipe_non_vide/,
+    )
+    // B supprime son compte : ce qu'il a ajouté reste dans l'espace de A
+    await enTant(B, () => db.exec('select public.supprimer_mon_compte()'))
+    const { rows } = await db.query(`select nom, espace_id, user_id from public.candidatures`)
+    expect(rows).toEqual([{ nom: 'Ajout de B', espace_id: A, user_id: null }])
+  })
+
+  it('partage les CV entre membres, pas au-delà', async () => {
+    await accepter(B, await inviter(A))
+    await enTant(B, () =>
+      db.exec(`insert into storage.objects (bucket_id, name) values ('cv', '${A}/c1/cv.pdf')`),
+    )
+    const vusParA = await enTant(A, () => db.query('select name from storage.objects'))
+    expect(vusParA.rows).toEqual([{ name: `${A}/c1/cv.pdf` }])
+    const vusParC = await enTant(C, () => db.query('select name from storage.objects'))
+    expect(vusParC.rows).toEqual([])
+    await expect(
+      enTant(C, () =>
+        db.exec(`insert into storage.objects (bucket_id, name) values ('cv', '${A}/c2/cv.pdf')`),
+      ),
+    ).rejects.toThrow(/row-level security/)
+  })
+
+  it('refuse une offre d’un autre espace', async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.offres (user_id, titre) values ('${B}', 'Offre de B') returning id`,
+    )
+    await expect(
+      enTant(A, () =>
+        db.exec(`insert into public.candidatures (nom, offre_id) values ('X', '${rows[0].id}')`),
+      ),
+    ).rejects.toThrow(/candidatures_offre_fk|row-level security/)
+  })
+})
+
+function noms50() {
+  return Array.from({ length: 50 }, (_, i) => `C${i + 1}`)
+}

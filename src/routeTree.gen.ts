@@ -20,9 +20,11 @@ import { Route as MotDePasseOublieRouteImport } from './routes/mot-de-passe-oubl
 import { Route as NouveauMotDePasseRouteImport } from './routes/nouveau-mot-de-passe'
 import { Route as TarifsRouteImport } from './routes/tarifs'
 import { Route as AuthentifieCompteRouteImport } from './routes/_authentifie/compte'
+import { Route as AuthentifieEquipeRouteImport } from './routes/_authentifie/equipe'
 import { Route as AuthentifieOffresRouteImport } from './routes/_authentifie/offres'
 import { Route as AuthentifieTableauDeBordRouteImport } from './routes/_authentifie/tableau-de-bord'
 import { Route as AuthentifieCandidaturesIdRouteImport } from './routes/_authentifie/candidatures.$id'
+import { Route as AuthentifieInvitationJetonRouteImport } from './routes/_authentifie/invitation.$jeton'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -78,6 +80,11 @@ const AuthentifieCompteRoute = AuthentifieCompteRouteImport.update({
   path: '/compte',
   getParentRoute: () => AuthentifieRoute,
 } as any)
+const AuthentifieEquipeRoute = AuthentifieEquipeRouteImport.update({
+  id: '/equipe',
+  path: '/equipe',
+  getParentRoute: () => AuthentifieRoute,
+} as any)
 const AuthentifieOffresRoute = AuthentifieOffresRouteImport.update({
   id: '/offres',
   path: '/offres',
@@ -95,6 +102,12 @@ const AuthentifieCandidaturesIdRoute =
     path: '/candidatures/$id',
     getParentRoute: () => AuthentifieRoute,
   } as any)
+const AuthentifieInvitationJetonRoute =
+  AuthentifieInvitationJetonRouteImport.update({
+    id: '/invitation/$jeton',
+    path: '/invitation/$jeton',
+    getParentRoute: () => AuthentifieRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -107,9 +120,11 @@ export interface FileRoutesByFullPath {
   '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
   '/compte': typeof AuthentifieCompteRoute
+  '/equipe': typeof AuthentifieEquipeRoute
   '/offres': typeof AuthentifieOffresRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
   '/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
+  '/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -122,9 +137,11 @@ export interface FileRoutesByTo {
   '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
   '/compte': typeof AuthentifieCompteRoute
+  '/equipe': typeof AuthentifieEquipeRoute
   '/offres': typeof AuthentifieOffresRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
   '/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
+  '/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -139,9 +156,11 @@ export interface FileRoutesById {
   '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
   '/_authentifie/compte': typeof AuthentifieCompteRoute
+  '/_authentifie/equipe': typeof AuthentifieEquipeRoute
   '/_authentifie/offres': typeof AuthentifieOffresRoute
   '/_authentifie/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
   '/_authentifie/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
+  '/_authentifie/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -156,9 +175,11 @@ export interface FileRouteTypes {
     | '/nouveau-mot-de-passe'
     | '/tarifs'
     | '/compte'
+    | '/equipe'
     | '/offres'
     | '/tableau-de-bord'
     | '/candidatures/$id'
+    | '/invitation/$jeton'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -171,9 +192,11 @@ export interface FileRouteTypes {
     | '/nouveau-mot-de-passe'
     | '/tarifs'
     | '/compte'
+    | '/equipe'
     | '/offres'
     | '/tableau-de-bord'
     | '/candidatures/$id'
+    | '/invitation/$jeton'
   id:
     | '__root__'
     | '/'
@@ -187,9 +210,11 @@ export interface FileRouteTypes {
     | '/nouveau-mot-de-passe'
     | '/tarifs'
     | '/_authentifie/compte'
+    | '/_authentifie/equipe'
     | '/_authentifie/offres'
     | '/_authentifie/tableau-de-bord'
     | '/_authentifie/candidatures/$id'
+    | '/_authentifie/invitation/$jeton'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -284,6 +309,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthentifieCompteRouteImport
       parentRoute: typeof AuthentifieRoute
     }
+    '/_authentifie/equipe': {
+      id: '/_authentifie/equipe'
+      path: '/equipe'
+      fullPath: '/equipe'
+      preLoaderRoute: typeof AuthentifieEquipeRouteImport
+      parentRoute: typeof AuthentifieRoute
+    }
     '/_authentifie/offres': {
       id: '/_authentifie/offres'
       path: '/offres'
@@ -305,21 +337,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthentifieCandidaturesIdRouteImport
       parentRoute: typeof AuthentifieRoute
     }
+    '/_authentifie/invitation/$jeton': {
+      id: '/_authentifie/invitation/$jeton'
+      path: '/invitation/$jeton'
+      fullPath: '/invitation/$jeton'
+      preLoaderRoute: typeof AuthentifieInvitationJetonRouteImport
+      parentRoute: typeof AuthentifieRoute
+    }
   }
 }
 
 interface AuthentifieRouteChildren {
   AuthentifieCompteRoute: typeof AuthentifieCompteRoute
+  AuthentifieEquipeRoute: typeof AuthentifieEquipeRoute
   AuthentifieOffresRoute: typeof AuthentifieOffresRoute
   AuthentifieTableauDeBordRoute: typeof AuthentifieTableauDeBordRoute
   AuthentifieCandidaturesIdRoute: typeof AuthentifieCandidaturesIdRoute
+  AuthentifieInvitationJetonRoute: typeof AuthentifieInvitationJetonRoute
 }
 
 const AuthentifieRouteChildren: AuthentifieRouteChildren = {
   AuthentifieCompteRoute: AuthentifieCompteRoute,
+  AuthentifieEquipeRoute: AuthentifieEquipeRoute,
   AuthentifieOffresRoute: AuthentifieOffresRoute,
   AuthentifieTableauDeBordRoute: AuthentifieTableauDeBordRoute,
   AuthentifieCandidaturesIdRoute: AuthentifieCandidaturesIdRoute,
+  AuthentifieInvitationJetonRoute: AuthentifieInvitationJetonRoute,
 }
 
 const AuthentifieRouteWithChildren = AuthentifieRoute._addFileChildren(

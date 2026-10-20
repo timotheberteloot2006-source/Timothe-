@@ -24,6 +24,8 @@ export interface Candidature {
   cv_chemin: string | null
   // Offre d'emploi rattachée (supabase/migrations/0006_offres.sql)
   offre_id: string | null
+  // Espace auquel appartient la candidature (supabase/migrations/0008_espaces.sql)
+  espace_id: string
   // Rempli par listerCandidatures uniquement
   nb_notes?: number
 }

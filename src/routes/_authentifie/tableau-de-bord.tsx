@@ -19,7 +19,8 @@ import {
   type NouvelleCandidature,
   type Statut,
 } from '@/lib/candidatures'
-import { estPro, LIMITE_GRATUITE, lireAbonnement, placesRestantes } from '@/lib/abonnement'
+import { LIMITE_GRATUITE, placesRestantes } from '@/lib/abonnement'
+import { lireEspace } from '@/lib/espace'
 import {
   filtrerCandidatures,
   lireFiltres,
@@ -37,13 +38,13 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   head: () => titrePage('Candidatures'),
   validateSearch: lireFiltres,
   loader: async () => {
-    const [candidatures, abonnement, offres, entretiens] = await Promise.all([
+    const [candidatures, espace, offres, entretiens] = await Promise.all([
       listerCandidatures(),
-      lireAbonnement(),
+      lireEspace(),
       listerOffres(),
       listerEntretiensAVenir(),
     ])
-    return { candidatures, abonnement, offres, entretiens }
+    return { candidatures, espace, offres, entretiens }
   },
   // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
   shouldReload: false,
@@ -60,9 +61,9 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
 })
 
 function TableauDeBord() {
-  const { candidatures, abonnement, offres, entretiens } = Route.useLoaderData()
+  const { candidatures, espace, offres, entretiens } = Route.useLoaderData()
   const prochainsEntretiens = prochainParCandidature(entretiens)
-  const places = placesRestantes(abonnement, candidatures.length)
+  const places = placesRestantes(espace.est_pro, candidatures.length)
   const filtres = Route.useSearch()
   // Offre du filtre en cours, présélectionnée à l'ajout et à l'import
   const offreFiltree = filtres.offre && filtres.offre !== 'aucune' ? filtres.offre : null
@@ -164,7 +165,18 @@ function TableauDeBord() {
   return (
     <section className="mx-auto max-w-6xl space-y-6 px-4 py-12">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Candidatures</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Candidatures</h1>
+          {/* Nom de l'espace dès qu'il est partagé ou renommé */}
+          {(espace.nb_membres > 1 || espace.nom !== 'Mon espace') && (
+            <p className="text-sm text-slate-600">
+              Espace « {espace.nom} » ·{' '}
+              <Link to="/equipe" className="text-accent hover:underline">
+                {espace.nb_membres} membre{espace.nb_membres > 1 ? 's' : ''}
+              </Link>
+            </p>
+          )}
+        </div>
         {!panneau && (
           <div className="flex flex-wrap gap-3">
             <button
@@ -187,7 +199,9 @@ function TableauDeBord() {
         )}
       </div>
 
-      {!estPro(abonnement) && <BandeauQuota nombre={candidatures.length} />}
+      {!espace.est_pro && (
+        <BandeauQuota nombre={candidatures.length} proprietaire={espace.role === 'proprietaire'} />
+      )}
 
       {panneau === 'ajout' && (
         <FormulaireCandidature
@@ -287,7 +301,7 @@ function TableauDeBord() {
   )
 }
 
-function BandeauQuota({ nombre }: { nombre: number }) {
+function BandeauQuota({ nombre, proprietaire }: { nombre: number; proprietaire: boolean }) {
   const atteinte = nombre >= LIMITE_GRATUITE
   return (
     <div
@@ -297,9 +311,14 @@ function BandeauQuota({ nombre }: { nombre: number }) {
         Offre Gratuite : {Math.min(nombre, LIMITE_GRATUITE)} / {LIMITE_GRATUITE} candidatures
         {atteinte && ' — limite atteinte'}
       </span>
-      <Link to="/tarifs" className="font-medium text-accent hover:underline">
-        Passer à Pro
-      </Link>
+      {/* L'abonnement est géré par le propriétaire de l'espace */}
+      {proprietaire ? (
+        <Link to="/tarifs" className="font-medium text-accent hover:underline">
+          Passer à Pro
+        </Link>
+      ) : (
+        <span>Le propriétaire de l’espace peut passer à l’offre Pro.</span>
+      )}
     </div>
   )
 }

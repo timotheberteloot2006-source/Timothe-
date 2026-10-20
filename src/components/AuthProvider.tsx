@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { AuthContext, type ResultatInscription } from '@/lib/auth'
 import { estPro, lireAbonnement } from '@/lib/abonnement'
 import { supprimerTousLesCv } from '@/lib/cv'
+import { choisirEspace, lireEspace } from '@/lib/espace'
 import { SUPABASE_NON_CONFIGURE, supabase } from '@/lib/supabase'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -76,7 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return traduireErreur('abonnement_actif')
     }
     try {
-      // Les fichiers ne sont pas effacés avec l'utilisateur : on les supprime d'abord
+      // Les fichiers ne sont pas effacés avec l'utilisateur : on supprime d'abord ceux de son
+      // espace personnel (dont l'identifiant est celui du compte), jamais ceux d'une équipe
+      const userId = session?.user.id
+      if (!userId) return 'Aucun utilisateur connecté.'
+      await choisirEspace(userId)
+      // Refusé par la base si l'espace a d'autres membres : vérifié avant d'effacer les CV
+      if ((await lireEspace()).nb_membres > 1) return traduireErreur('equipe_non_vide')
       await supprimerTousLesCv()
     } catch (e) {
       return e instanceof Error ? e.message : String(e)
@@ -126,6 +133,8 @@ function traduireErreur(message: string) {
     return "Le nouveau mot de passe doit être différent de l'ancien."
   if (message.includes('already been registered'))
     return 'Cette adresse e-mail est déjà utilisée par un autre compte.'
+  if (message.startsWith('equipe_non_vide'))
+    return 'Retirez d’abord les membres de votre espace (page « Équipe ») avant de supprimer votre compte.'
   if (message.startsWith('abonnement_actif'))
     return 'Résiliez d’abord votre abonnement Pro (bouton « Gérer mon abonnement ») avant de supprimer votre compte.'
   if (message.includes('rate limit') || message.includes('For security purposes'))
