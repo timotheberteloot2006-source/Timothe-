@@ -16,10 +16,11 @@ npm run dev
    (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
 3. Dans *Authentication > URL Configuration*, mettre l'adresse du site dans *Site URL*
    (ex. `http://localhost:5173`) pour que les liens de confirmation y renvoient,
-   et ajouter `http://localhost:5173/nouveau-mot-de-passe` (puis l'équivalent en production)
-   dans *Redirect URLs* pour le lien « mot de passe oublié ».
+   et ajouter dans *Redirect URLs* (puis l'équivalent en production) :
+   `http://localhost:5173/nouveau-mot-de-passe` pour le lien « mot de passe oublié » et
+   `http://localhost:5173/compte` pour la confirmation d'un changement d'e-mail.
 
-4. Créer la table des candidatures : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
+4. Créer la base (table des candidatures, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
    `supabase/migrations/` (ou `supabase db push` avec la CLI Supabase).
 
 Les pages placées dans `src/routes/_authentifie/` exigent une session :

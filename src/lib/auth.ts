@@ -14,11 +14,15 @@ export interface AuthContextValue extends AuthState {
   deconnexion: () => Promise<void>
   demanderReinitialisation: (email: string) => Promise<string | null>
   changerMotDePasse: (motDePasse: string) => Promise<string | null>
+  // Envoie un lien de confirmation à la nouvelle adresse ; l'e-mail change après le clic
+  changerEmail: (email: string) => Promise<string | null>
+  // Vérifie le mot de passe actuel avant une opération sensible
+  verifierMotDePasse: (motDePasse: string) => Promise<string | null>
+  supprimerCompte: () => Promise<string | null>
 }
 
 export type ResultatInscription =
-  | { erreur: string }
-  | { erreur: null; confirmationRequise: boolean }
+  { erreur: string } | { erreur: null; confirmationRequise: boolean }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
 

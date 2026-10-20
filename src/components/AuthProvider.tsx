@@ -47,6 +47,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? traduireErreur(error.message) : null
   }
 
+  async function changerEmail(email: string) {
+    if (!supabase) return SUPABASE_NON_CONFIGURE
+    const { error } = await supabase.auth.updateUser(
+      { email },
+      { emailRedirectTo: `${window.location.origin}/compte` },
+    )
+    return error ? traduireErreur(error.message) : null
+  }
+
+  async function verifierMotDePasse(motDePasse: string) {
+    if (!supabase) return SUPABASE_NON_CONFIGURE
+    const email = session?.user.email
+    if (!email) return 'Aucun utilisateur connecté.'
+    const { error } = await supabase.auth.signInWithPassword({ email, password: motDePasse })
+    if (error?.message.includes('Invalid login credentials'))
+      return 'Mot de passe actuel incorrect.'
+    return error ? traduireErreur(error.message) : null
+  }
+
+  // Fonction SQL de supabase/migrations/0003_supprimer_mon_compte.sql
+  async function supprimerCompte() {
+    if (!supabase) return SUPABASE_NON_CONFIGURE
+    const { error } = await supabase.rpc('supprimer_mon_compte')
+    if (error) return traduireErreur(error.message)
+    // Le compte n'existe plus côté serveur : on ne vide que la session locale
+    await supabase.auth.signOut({ scope: 'local' })
+    return null
+  }
+
   async function changerMotDePasse(motDePasse: string) {
     if (!supabase) return SUPABASE_NON_CONFIGURE
     const { error } = await supabase.auth.updateUser({ password: motDePasse })
@@ -64,6 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         deconnexion,
         demanderReinitialisation,
         changerMotDePasse,
+        changerEmail,
+        verifierMotDePasse,
+        supprimerCompte,
       }}
     >
       {children}
@@ -74,12 +106,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 function traduireErreur(message: string) {
   if (message.includes('Invalid login credentials')) return 'E-mail ou mot de passe incorrect.'
   if (message.includes('Email not confirmed'))
-    return "Adresse e-mail non confirmée : cliquez sur le lien reçu par e-mail."
+    return 'Adresse e-mail non confirmée : cliquez sur le lien reçu par e-mail.'
   if (message.includes('User already registered')) return 'Un compte existe déjà avec cet e-mail.'
   if (message.includes('Password should be at least'))
     return 'Le mot de passe doit contenir au moins 6 caractères.'
   if (message.includes('should be different from the old password'))
     return "Le nouveau mot de passe doit être différent de l'ancien."
+  if (message.includes('already been registered'))
+    return 'Cette adresse e-mail est déjà utilisée par un autre compte.'
   if (message.includes('rate limit') || message.includes('For security purposes'))
     return 'Trop de tentatives : réessayez dans quelques instants.'
   return message

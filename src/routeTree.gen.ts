@@ -16,6 +16,7 @@ import { Route as InscriptionRouteImport } from './routes/inscription'
 import { Route as MotDePasseOublieRouteImport } from './routes/mot-de-passe-oublie'
 import { Route as NouveauMotDePasseRouteImport } from './routes/nouveau-mot-de-passe'
 import { Route as TarifsRouteImport } from './routes/tarifs'
+import { Route as AuthentifieCompteRouteImport } from './routes/_authentifie/compte'
 import { Route as AuthentifieTableauDeBordRouteImport } from './routes/_authentifie/tableau-de-bord'
 
 const IndexRoute = IndexRouteImport.update({
@@ -52,6 +53,11 @@ const TarifsRoute = TarifsRouteImport.update({
   path: '/tarifs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthentifieCompteRoute = AuthentifieCompteRouteImport.update({
+  id: '/compte',
+  path: '/compte',
+  getParentRoute: () => AuthentifieRoute,
+} as any)
 const AuthentifieTableauDeBordRoute =
   AuthentifieTableauDeBordRouteImport.update({
     id: '/tableau-de-bord',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
   '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
+  '/compte': typeof AuthentifieCompteRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
 export interface FileRoutesByTo {
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
   '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
+  '/compte': typeof AuthentifieCompteRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
 export interface FileRoutesById {
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
   '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
+  '/_authentifie/compte': typeof AuthentifieCompteRoute
   '/_authentifie/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
 export interface FileRouteTypes {
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/mot-de-passe-oublie'
     | '/nouveau-mot-de-passe'
     | '/tarifs'
+    | '/compte'
     | '/tableau-de-bord'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/mot-de-passe-oublie'
     | '/nouveau-mot-de-passe'
     | '/tarifs'
+    | '/compte'
     | '/tableau-de-bord'
   id:
     | '__root__'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/mot-de-passe-oublie'
     | '/nouveau-mot-de-passe'
     | '/tarifs'
+    | '/_authentifie/compte'
     | '/_authentifie/tableau-de-bord'
   fileRoutesById: FileRoutesById
 }
@@ -180,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TarifsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authentifie/compte': {
+      id: '/_authentifie/compte'
+      path: '/compte'
+      fullPath: '/compte'
+      preLoaderRoute: typeof AuthentifieCompteRouteImport
+      parentRoute: typeof AuthentifieRoute
+    }
     '/_authentifie/tableau-de-bord': {
       id: '/_authentifie/tableau-de-bord'
       path: '/tableau-de-bord'
@@ -191,10 +210,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthentifieRouteChildren {
+  AuthentifieCompteRoute: typeof AuthentifieCompteRoute
   AuthentifieTableauDeBordRoute: typeof AuthentifieTableauDeBordRoute
 }
 
 const AuthentifieRouteChildren: AuthentifieRouteChildren = {
+  AuthentifieCompteRoute: AuthentifieCompteRoute,
   AuthentifieTableauDeBordRoute: AuthentifieTableauDeBordRoute,
 }
 

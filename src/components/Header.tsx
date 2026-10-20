@@ -33,6 +33,15 @@ export function Header() {
           >
             Tableau de bord
           </Link>
+          {user && (
+            <Link
+              to="/compte"
+              className={navLinkClass}
+              activeProps={{ className: activeNavLinkClass }}
+            >
+              Mon compte
+            </Link>
+          )}
           {user ? (
             <button
               type="button"
