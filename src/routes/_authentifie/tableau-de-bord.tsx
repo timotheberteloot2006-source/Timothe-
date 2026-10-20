@@ -7,6 +7,7 @@ import {
   ajouterCandidature,
   changerStatut,
   listerCandidatures,
+  modifierCandidature,
   supprimerCandidature,
   type Candidature,
   type NouvelleCandidature,
@@ -37,6 +38,7 @@ function TableauDeBord() {
   const navigate = Route.useNavigate()
   const router = useRouter()
   const [formulaireOuvert, setFormulaireOuvert] = useState(false)
+  const [idEnEdition, setIdEnEdition] = useState<string | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
 
   const resultats = filtrerCandidatures(candidatures, filtres)
@@ -61,6 +63,13 @@ function TableauDeBord() {
     await router.invalidate()
   }
 
+  async function handleModification(id: string, champs: NouvelleCandidature) {
+    // Les erreurs sont affichées dans le formulaire, qui reste alors ouvert
+    await modifierCandidature(id, champs)
+    setIdEnEdition(null)
+    await router.invalidate()
+  }
+
   function handleSupprimer(candidature: Candidature) {
     if (!window.confirm(`Supprimer la candidature de ${candidature.nom} ?`)) return
     executer(() => supprimerCandidature(candidature.id))
@@ -82,7 +91,10 @@ function TableauDeBord() {
       </div>
 
       {formulaireOuvert && (
-        <FormulaireCandidature onAjout={handleAjout} onAnnuler={() => setFormulaireOuvert(false)} />
+        <FormulaireCandidature
+          onEnregistrer={handleAjout}
+          onAnnuler={() => setFormulaireOuvert(false)}
+        />
       )}
 
       {erreur && (
@@ -105,9 +117,13 @@ function TableauDeBord() {
           {resultats.length > 0 ? (
             <ListeCandidatures
               candidatures={resultats}
+              idEnEdition={idEnEdition}
               onChangerStatut={(id: string, statut: Statut) =>
                 executer(() => changerStatut(id, statut))
               }
+              onModifier={(c) => setIdEnEdition(c.id)}
+              onEnregistrer={handleModification}
+              onAnnulerEdition={() => setIdEnEdition(null)}
               onSupprimer={handleSupprimer}
             />
           ) : (

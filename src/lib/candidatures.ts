@@ -42,6 +42,11 @@ export async function ajouterCandidature(candidature: NouvelleCandidature) {
   if (error) throw new Error(error.message)
 }
 
+export async function modifierCandidature(id: string, champs: NouvelleCandidature) {
+  const { error } = await table().update(champs).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 export async function changerStatut(id: string, statut: Statut) {
   const { error } = await table().update({ statut }).eq('id', id)
   if (error) throw new Error(error.message)
