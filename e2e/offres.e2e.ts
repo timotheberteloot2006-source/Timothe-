@@ -81,6 +81,8 @@ test('rattacher, filtrer et détacher des candidatures', async ({ page }) => {
   await page.getByRole('link', { name: 'Développeur front' }).click()
   await expect(page).toHaveURL(new RegExp(`offre=${front.id}`))
   await page.getByRole('link', { name: 'Offres', exact: true }).click()
+  // Attendre la page des offres : les lignes du tableau de bord mentionnent aussi l'offre
+  await expect(page.getByRole('heading', { name: 'Offres d’emploi' })).toBeVisible()
   await page
     .getByRole('listitem')
     .filter({ hasText: 'Développeur front' })
