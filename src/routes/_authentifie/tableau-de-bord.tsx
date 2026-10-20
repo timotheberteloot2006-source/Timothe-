@@ -5,6 +5,7 @@ import { BarreSelection } from '@/components/candidatures/BarreSelection'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
 import { ImportCsv } from '@/components/candidatures/ImportCsv'
 import { ListeCandidatures } from '@/components/candidatures/ListeCandidatures'
+import { Statistiques } from '@/components/candidatures/Statistiques'
 import {
   ajouterCandidature,
   ajouterCandidatures,
@@ -200,6 +201,7 @@ function TableauDeBord() {
         </div>
       ) : (
         <>
+          <Statistiques candidatures={candidatures} filtres={filtres} onChange={changerFiltres} />
           <BarreFiltres filtres={filtres} onChange={changerFiltres} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-slate-600">

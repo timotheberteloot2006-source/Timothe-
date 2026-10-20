@@ -57,6 +57,10 @@ même nom (sans accents ni majuscules), dans la base ou plus haut dans le fichie
 npm test   # tests du filtrage, de l'import/export CSV et des règles SQL (Vitest + PGlite)
 ```
 
+La « Vue d'ensemble » en haut du tableau de bord résume toutes les candidatures (nombre par statut,
+expérience moyenne, CV, compétences les plus fréquentes) ; un clic sur un statut ou une compétence
+applique le filtre correspondant, un second clic le retire.
+
 Des cases à cocher permettent d'agir sur plusieurs candidatures de la page à la fois (changer le
 statut, supprimer avec notes et CV). La sélection se vide quand les filtres, le tri ou la page
 changent.
@@ -126,7 +130,8 @@ notes, le stockage des CV et les règles de sécurité (RLS).
 `npm run test:e2e` construit le site en le branchant sur un **faux Supabase**
 (`e2e/fauxSupabase.ts`, qui simule authentification, base, stockage et fonctions de paiement en
 mémoire), puis joue les parcours de `e2e/*.e2e.ts` dans Chromium : connexion, ajout et
-modification, doublons, filtres, tri, pagination, actions groupées, import/export CSV, fiche
+modification, doublons, filtres, tri, pagination, actions groupées, statistiques, import/export
+CSV, fiche
 (notes, CV) et abonnement. En local, installer le navigateur une fois avec
 `npx playwright install chromium`.
 

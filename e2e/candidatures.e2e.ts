@@ -9,7 +9,8 @@ test.beforeEach(async ({ page }) => {
   page.on('dialog', (dialogue) => dialogue.accept())
 })
 
-const nomsAffiches = (page: Page) => page.locator('main ul > li p a').allInnerTexts()
+// Liens des noms, dans l'ordre affiché (toHaveText attend que la liste soit chargée)
+const nomsAffiches = (page: Page) => page.locator('main ul > li p a')
 // Une ligne de candidature = une case « Sélectionner … » (les compétences sont aussi des <li>)
 const lignes = (page: Page) => page.getByRole('checkbox', { name: /^Sélectionner / })
 
@@ -45,16 +46,16 @@ test('filtres et tri sont gardés dans l’adresse', async ({ page }) => {
     { nom: 'Béa', competences: ['react', 'sql'], experience: 7 },
   )
   await seConnecter(page, faux)
-  expect(await nomsAffiches(page)).toEqual(['Béa', 'Éric', 'anne'])
+  await expect(nomsAffiches(page)).toHaveText(['Béa', 'Éric', 'anne'])
 
   await page.getByLabel('Compétences requises').fill('react, SQL')
   await page.getByLabel('Trier par').selectOption('nom')
   await expect(page).toHaveURL(/competences=react/)
-  expect(await nomsAffiches(page)).toEqual(['anne', 'Béa'])
+  await expect(nomsAffiches(page)).toHaveText(['anne', 'Béa'])
 
   await page.reload()
   await expect(page.getByLabel('Trier par')).toHaveValue('nom')
-  expect(await nomsAffiches(page)).toEqual(['anne', 'Béa'])
+  await expect(nomsAffiches(page)).toHaveText(['anne', 'Béa'])
 
   await page.getByRole('button', { name: 'Réinitialiser les filtres' }).click()
   await expect(lignes(page)).toHaveCount(3)
