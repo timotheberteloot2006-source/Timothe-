@@ -29,7 +29,7 @@ function NotFound() {
     <div className="mx-auto max-w-6xl px-4 py-24 text-center">
       <h1 className="text-2xl font-semibold">Page introuvable</h1>
       <p className="mt-2 text-slate-600">Cette page n'existe pas.</p>
-      <Link to="/" className="mt-6 inline-block text-indigo-600 hover:underline">
+      <Link to="/" className="mt-6 inline-block text-accent hover:underline">
         Retour à l'accueil
       </Link>
     </div>

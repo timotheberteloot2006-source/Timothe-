@@ -21,7 +21,7 @@ export function ApercuProduit() {
     <div
       role="img"
       aria-label="Aperçu du tableau de bord : deux candidatures correspondant aux filtres React et SQL, 3 ans d'expérience minimum"
-      className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white p-4 text-left shadow-lg sm:p-6"
+      className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-surface p-4 text-left shadow-lg sm:p-6"
     >
       <div aria-hidden="true">
         <div className="flex flex-wrap gap-2 text-xs sm:text-sm">

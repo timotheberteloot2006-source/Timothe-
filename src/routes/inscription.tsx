@@ -31,7 +31,7 @@ function Inscription() {
           Un lien de confirmation a été envoyé à <strong>{emailAConfirmer}</strong>. Cliquez dessus
           pour activer votre compte, puis connectez-vous.
         </p>
-        <Link to="/connexion" className="mt-6 inline-block text-indigo-600 hover:underline">
+        <Link to="/connexion" className="mt-6 inline-block text-accent hover:underline">
           Aller à la connexion
         </Link>
       </section>
@@ -58,7 +58,7 @@ function Inscription() {
       </p>
       <p className="mt-6 text-center text-sm text-slate-600">
         Déjà un compte ?{' '}
-        <Link to="/connexion" className="text-indigo-600 hover:underline">
+        <Link to="/connexion" className="text-accent hover:underline">
           Se connecter
         </Link>
       </p>

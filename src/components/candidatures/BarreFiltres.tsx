@@ -15,7 +15,7 @@ export function BarreFiltres({ filtres, onChange }: Props) {
   const actif = Object.values(filtres).some((v) => v !== undefined)
 
   return (
-    <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
+    <div className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-2 lg:grid-cols-6">
       <label className="block lg:col-span-2">
         <span className="text-sm font-medium">Recherche</span>
         <input
@@ -87,7 +87,7 @@ export function BarreFiltres({ filtres, onChange }: Props) {
         <button
           type="button"
           onClick={() => onChange({})}
-          className="justify-self-start text-sm text-indigo-600 hover:underline sm:col-span-2 lg:col-span-6"
+          className="justify-self-start text-sm text-accent hover:underline sm:col-span-2 lg:col-span-6"
         >
           Réinitialiser les filtres
         </button>

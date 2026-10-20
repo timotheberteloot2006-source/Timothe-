@@ -103,7 +103,7 @@ function Offre({
 }) {
   return (
     <div
-      className={`flex flex-col rounded-lg border bg-white p-6 ${miseEnAvant ? 'border-indigo-300 ring-1 ring-indigo-300' : 'border-slate-200'}`}
+      className={`flex flex-col rounded-lg border bg-surface p-6 ${miseEnAvant ? 'border-indigo-300 ring-1 ring-indigo-300' : 'border-slate-200'}`}
     >
       <h2 className="text-lg font-semibold">{nom}</h2>
       <p className="mt-2 text-2xl font-bold">{prix}</p>

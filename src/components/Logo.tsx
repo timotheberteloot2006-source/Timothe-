@@ -10,7 +10,7 @@ export function Logo() {
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="size-6 text-indigo-600"
+        className="size-6 text-accent"
         aria-hidden="true"
       >
         <path d="M3 4h18l-7 8.5V19l-4 2v-8.5z" />

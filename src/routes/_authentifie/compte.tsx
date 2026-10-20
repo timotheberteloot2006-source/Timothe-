@@ -217,7 +217,7 @@ function Carte({
 }) {
   return (
     <div
-      className={`space-y-4 rounded-lg border bg-white p-6 ${danger ? 'border-red-200' : 'border-slate-200'}`}
+      className={`space-y-4 rounded-lg border bg-surface p-6 ${danger ? 'border-red-200' : 'border-slate-200'}`}
     >
       <h2 className={`text-lg font-semibold ${danger ? 'text-red-700' : ''}`}>{titre}</h2>
       {children}

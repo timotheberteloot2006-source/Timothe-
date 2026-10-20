@@ -41,7 +41,7 @@ export function FormulaireCandidature({ initiale, onEnregistrer, onAnnuler }: Pr
   return (
     <form
       onSubmit={handleSubmit}
-      className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2"
+      className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-2"
     >
       <label className="block">
         <span className="text-sm font-medium">Nom *</span>

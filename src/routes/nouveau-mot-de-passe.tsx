@@ -20,7 +20,7 @@ function NouveauMotDePasse() {
         </p>
         <Link
           to="/mot-de-passe-oublie"
-          className="mt-6 inline-block text-indigo-600 hover:underline"
+          className="mt-6 inline-block text-accent hover:underline"
         >
           Demander un nouveau lien
         </Link>

@@ -25,7 +25,7 @@ function MotDePasseOublie() {
           Si un compte existe pour <strong>{emailEnvoye}</strong>, un lien pour choisir un nouveau
           mot de passe vient d'y être envoyé.
         </p>
-        <Link to="/connexion" className="mt-6 inline-block text-indigo-600 hover:underline">
+        <Link to="/connexion" className="mt-6 inline-block text-accent hover:underline">
           Retour à la connexion
         </Link>
       </section>
@@ -40,7 +40,7 @@ function MotDePasseOublie() {
       onSubmit={handleSubmit}
     >
       <p className="mt-6 text-center text-sm text-slate-600">
-        <Link to="/connexion" className="text-indigo-600 hover:underline">
+        <Link to="/connexion" className="text-accent hover:underline">
           Retour à la connexion
         </Link>
       </p>

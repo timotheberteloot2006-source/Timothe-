@@ -15,7 +15,7 @@ export function Header() {
   }
 
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="border-b border-slate-200 bg-surface">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
         <Logo />
         <nav className="flex items-center gap-6">

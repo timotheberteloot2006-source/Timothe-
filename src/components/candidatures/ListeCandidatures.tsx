@@ -35,7 +35,7 @@ export function ListeCandidatures({
   onSupprimer,
 }: Props) {
   return (
-    <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+    <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface">
       {candidatures.map((c) =>
         c.id === idEnEdition ? (
           <li key={c.id} className="bg-slate-50 p-2">
@@ -52,7 +52,7 @@ export function ListeCandidatures({
                 <Link
                   to="/candidatures/$id"
                   params={{ id: c.id }}
-                  className="font-medium hover:text-indigo-600 hover:underline"
+                  className="font-medium hover:text-accent hover:underline"
                 >
                   {c.nom}
                 </Link>

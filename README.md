@@ -26,6 +26,13 @@ npm run dev
 Les pages placées dans `src/routes/_authentifie/` exigent une session :
 sans connexion, l'utilisateur est renvoyé vers `/connexion`, puis ramené à la page demandée.
 
+## Thème clair / sombre
+
+Le site suit le réglage clair ou sombre de l'appareil. Le thème sombre est défini dans
+`src/index.css` en redéfinissant les couleurs Tailwind utilisées (échelle de gris inversée, fonds
+d'alerte foncés). Deux couleurs sont propres au site : `surface` (fond des cartes et champs, à
+utiliser à la place de `bg-white`) et `accent` (liens, à la place de `text-indigo-600`).
+
 ## Candidatures
 
 Le tableau de bord liste les candidatures de l'utilisateur connecté (règles RLS : chacun ne voit

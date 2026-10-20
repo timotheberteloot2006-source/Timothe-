@@ -43,14 +43,14 @@ export function ImportCsv({ existantes, placesRestantes, onImporter, onFermer }:
   const depasseQuota = nombre > placesRestantes
 
   return (
-    <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+    <div className="space-y-4 rounded-lg border border-slate-200 bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-semibold">Importer un fichier CSV</h2>
         <a
           // Le BOM indique à Excel que le fichier est en UTF-8
           href={`data:text/csv;charset=utf-8,${encodeURIComponent('\uFEFF' + MODELE_CSV)}`}
           download="modele-candidatures.csv"
-          className="text-sm text-indigo-600 hover:underline"
+          className="text-sm text-accent hover:underline"
         >
           Télécharger un modèle
         </a>

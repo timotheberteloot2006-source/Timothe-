@@ -86,7 +86,7 @@ function Accueil() {
           )}
           <Link
             to="/tarifs"
-            className="rounded-md border border-slate-300 bg-white px-5 py-2.5 font-medium hover:bg-slate-100"
+            className="rounded-md border border-slate-300 bg-surface px-5 py-2.5 font-medium hover:bg-slate-100"
           >
             Voir les tarifs
           </Link>
@@ -99,7 +99,7 @@ function Accueil() {
       <Section titre="Pourquoi Filtre ?" fond>
         <div className="grid gap-6 sm:grid-cols-2">
           {avantages.map((a) => (
-            <div key={a.titre} className="rounded-lg border border-slate-200 bg-white p-6">
+            <div key={a.titre} className="rounded-lg border border-slate-200 bg-surface p-6">
               <h3 className="font-semibold">{a.titre}</h3>
               <p className="mt-2 text-sm text-slate-600">{a.texte}</p>
             </div>
@@ -122,7 +122,7 @@ function Accueil() {
       </Section>
 
       <Section titre="Questions fréquentes" fond>
-        <div className="mx-auto max-w-3xl divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+        <div className="mx-auto max-w-3xl divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface">
           {questions.map((q) => (
             <details key={q.question} className="group p-5">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium">
@@ -163,7 +163,7 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className={fond ? 'border-y border-slate-200 bg-white/60' : ''}>
+    <section className={fond ? 'border-y border-slate-200 bg-surface/60' : ''}>
       <div className="mx-auto max-w-6xl px-4 py-16">
         <h2 className="mb-10 text-center text-2xl font-bold sm:text-3xl">{titre}</h2>
         {children}

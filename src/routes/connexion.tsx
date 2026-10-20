@@ -32,13 +32,13 @@ function Connexion() {
       onSubmit={handleSubmit}
     >
       <p className="mt-4 text-right text-sm">
-        <Link to="/mot-de-passe-oublie" className="text-indigo-600 hover:underline">
+        <Link to="/mot-de-passe-oublie" className="text-accent hover:underline">
           Mot de passe oublié ?
         </Link>
       </p>
       <p className="mt-4 text-center text-sm text-slate-600">
         Pas encore de compte ?{' '}
-        <Link to="/inscription" className="text-indigo-600 hover:underline">
+        <Link to="/inscription" className="text-accent hover:underline">
           Créer un compte
         </Link>
       </p>
