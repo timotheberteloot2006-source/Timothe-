@@ -41,7 +41,7 @@ par la base. À l'import, une ligne sans e-mail est aussi écartée si une candi
 même nom (sans accents ni majuscules), dans la base ou plus haut dans le fichier.
 
 ```bash
-npm test   # tests du filtrage et de l'import CSV (Vitest)
+npm test   # tests du filtrage, de l'import CSV et des règles SQL (Vitest + PGlite)
 ```
 
 ## Abonnements (Stripe)
@@ -74,4 +74,36 @@ Carte de test Stripe : `4242 4242 4242 4242`, date future, n'importe quel code.
 
 Un compte avec un abonnement actif ne peut pas être supprimé : il faut d'abord résilier
 (bouton « Gérer mon abonnement » dans *Mon compte*).
+
+## Vérifications automatiques
+
+À chaque envoi sur GitHub (et sur chaque pull request), `.github/workflows/ci.yml` lance :
+
+- `npm run lint`, `npm test` et `npm run build` ;
+- `deno check` sur les fonctions Supabase.
+
+Les tests des migrations appliquent les fichiers de `supabase/migrations/` sur un Postgres en
+mémoire (PGlite) et vérifient la limite Gratuite, les doublons, la suppression de compte et les
+règles de sécurité (RLS).
+
+## Mise en production
+
+Le site est une application monopage statique (`npm run build` produit `dist/`).
+`vercel.json` et `netlify.toml` renvoient toutes les adresses vers `index.html`.
+
+1. **Hébergement** (Vercel ou Netlify) : importer le dépôt GitHub. Commande `npm run build`,
+   dossier `dist` (détectés automatiquement). Ajouter les variables d'environnement
+   `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`.
+2. **Supabase**, *Authentication > URL Configuration* : *Site URL* = l'adresse de production
+   (ex. `https://filtre.fr`), et ajouter `https://filtre.fr/nouveau-mot-de-passe` et
+   `https://filtre.fr/compte` aux *Redirect URLs*.
+3. **Supabase**, base : exécuter les migrations de `supabase/migrations/` dans l'ordre
+   (ou `supabase db push`).
+4. **Stripe** en mode réel (*live*) : recréer le produit et le prix Pro, activer le portail
+   client, créer le webhook vers `https://<id-du-projet>.supabase.co/functions/v1/webhook-stripe`.
+5. **Secrets des fonctions** : `STRIPE_SECRET_KEY` (clé live), `STRIPE_PRICE_PRO`,
+   `STRIPE_WEBHOOK_SECRET` (celui du webhook live) et `SITE_URL` = l'adresse de production, puis
+   `supabase secrets set --env-file supabase/functions/.env` et redéployer les fonctions.
+6. **Vérifier** : inscription, confirmation par e-mail, connexion, ajout d'une candidature,
+   passage à Pro avec une vraie carte, puis résiliation depuis *Mon compte*.
 

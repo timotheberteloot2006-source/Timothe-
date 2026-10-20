@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Application monopage : toutes les adresses servent index.html (le routeur s'occupe du reste)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

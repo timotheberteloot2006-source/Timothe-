@@ -27,3 +27,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Généré par deno check en local
+supabase/functions/deno.lock
