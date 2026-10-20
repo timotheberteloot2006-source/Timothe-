@@ -12,6 +12,8 @@ export interface AuthContextValue extends AuthState {
   connexion: (email: string, motDePasse: string) => Promise<string | null>
   inscription: (email: string, motDePasse: string) => Promise<ResultatInscription>
   deconnexion: () => Promise<void>
+  demanderReinitialisation: (email: string) => Promise<string | null>
+  changerMotDePasse: (motDePasse: string) => Promise<string | null>
 }
 
 export type ResultatInscription =

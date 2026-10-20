@@ -31,7 +31,12 @@ function Connexion() {
       autoCompleteMotDePasse="current-password"
       onSubmit={handleSubmit}
     >
-      <p className="mt-6 text-center text-sm text-slate-600">
+      <p className="mt-4 text-right text-sm">
+        <Link to="/mot-de-passe-oublie" className="text-indigo-600 hover:underline">
+          Mot de passe oublié ?
+        </Link>
+      </p>
+      <p className="mt-4 text-center text-sm text-slate-600">
         Pas encore de compte ?{' '}
         <Link to="/inscription" className="text-indigo-600 hover:underline">
           Créer un compte

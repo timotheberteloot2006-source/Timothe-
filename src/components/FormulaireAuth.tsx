@@ -3,7 +3,11 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 interface Props {
   titre: string
   libelleBouton: string
-  autoCompleteMotDePasse: 'current-password' | 'new-password'
+  // Champs affichés ; un champ absent est transmis à onSubmit comme chaîne vide
+  avecEmail?: boolean
+  avecMotDePasse?: boolean
+  autoCompleteMotDePasse?: 'current-password' | 'new-password'
+  libelleMotDePasse?: string
   // Renvoie un message d'erreur, ou null en cas de succès
   onSubmit: (email: string, motDePasse: string) => Promise<string | null>
   children?: ReactNode
@@ -12,7 +16,10 @@ interface Props {
 export function FormulaireAuth({
   titre,
   libelleBouton,
-  autoCompleteMotDePasse,
+  avecEmail = true,
+  avecMotDePasse = true,
+  autoCompleteMotDePasse = 'current-password',
+  libelleMotDePasse = 'Mot de passe',
   onSubmit,
   children,
 }: Props) {
@@ -24,7 +31,10 @@ export function FormulaireAuth({
     const donnees = new FormData(event.currentTarget)
     setEnvoi(true)
     setErreur(null)
-    const message = await onSubmit(String(donnees.get('email')), String(donnees.get('password')))
+    const message = await onSubmit(
+      String(donnees.get('email') ?? ''),
+      String(donnees.get('password') ?? ''),
+    )
     setErreur(message)
     setEnvoi(false)
   }
@@ -33,27 +43,31 @@ export function FormulaireAuth({
     <section className="mx-auto max-w-sm px-4 py-16">
       <h1 className="text-2xl font-bold">{titre}</h1>
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium">E-mail</span>
-          <input
-            type="email"
-            name="email"
-            required
-            autoComplete="email"
-            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none"
-          />
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium">Mot de passe</span>
-          <input
-            type="password"
-            name="password"
-            required
-            minLength={6}
-            autoComplete={autoCompleteMotDePasse}
-            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none"
-          />
-        </label>
+        {avecEmail && (
+          <label className="block">
+            <span className="text-sm font-medium">E-mail</span>
+            <input
+              type="email"
+              name="email"
+              required
+              autoComplete="email"
+              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+        )}
+        {avecMotDePasse && (
+          <label className="block">
+            <span className="text-sm font-medium">{libelleMotDePasse}</span>
+            <input
+              type="password"
+              name="password"
+              required
+              minLength={6}
+              autoComplete={autoCompleteMotDePasse}
+              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+        )}
         {erreur && (
           <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {erreur}

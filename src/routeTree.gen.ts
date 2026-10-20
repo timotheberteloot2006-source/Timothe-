@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthentifieRouteImport } from './routes/_authentifie'
 import { Route as ConnexionRouteImport } from './routes/connexion'
 import { Route as InscriptionRouteImport } from './routes/inscription'
+import { Route as MotDePasseOublieRouteImport } from './routes/mot-de-passe-oublie'
+import { Route as NouveauMotDePasseRouteImport } from './routes/nouveau-mot-de-passe'
 import { Route as TarifsRouteImport } from './routes/tarifs'
 import { Route as AuthentifieTableauDeBordRouteImport } from './routes/_authentifie/tableau-de-bord'
 
@@ -35,6 +37,16 @@ const InscriptionRoute = InscriptionRouteImport.update({
   path: '/inscription',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MotDePasseOublieRoute = MotDePasseOublieRouteImport.update({
+  id: '/mot-de-passe-oublie',
+  path: '/mot-de-passe-oublie',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NouveauMotDePasseRoute = NouveauMotDePasseRouteImport.update({
+  id: '/nouveau-mot-de-passe',
+  path: '/nouveau-mot-de-passe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TarifsRoute = TarifsRouteImport.update({
   id: '/tarifs',
   path: '/tarifs',
@@ -51,6 +63,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
   '/inscription': typeof InscriptionRoute
+  '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
+  '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
@@ -58,6 +72,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
   '/inscription': typeof InscriptionRoute
+  '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
+  '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
@@ -67,21 +83,38 @@ export interface FileRoutesById {
   '/_authentifie': typeof AuthentifieRouteWithChildren
   '/connexion': typeof ConnexionRoute
   '/inscription': typeof InscriptionRoute
+  '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
+  '/nouveau-mot-de-passe': typeof NouveauMotDePasseRoute
   '/tarifs': typeof TarifsRoute
   '/_authentifie/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/connexion' | '/inscription' | '/tarifs' | '/tableau-de-bord'
+    | '/'
+    | '/connexion'
+    | '/inscription'
+    | '/mot-de-passe-oublie'
+    | '/nouveau-mot-de-passe'
+    | '/tarifs'
+    | '/tableau-de-bord'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/connexion' | '/inscription' | '/tarifs' | '/tableau-de-bord'
+  to:
+    | '/'
+    | '/connexion'
+    | '/inscription'
+    | '/mot-de-passe-oublie'
+    | '/nouveau-mot-de-passe'
+    | '/tarifs'
+    | '/tableau-de-bord'
   id:
     | '__root__'
     | '/'
     | '/_authentifie'
     | '/connexion'
     | '/inscription'
+    | '/mot-de-passe-oublie'
+    | '/nouveau-mot-de-passe'
     | '/tarifs'
     | '/_authentifie/tableau-de-bord'
   fileRoutesById: FileRoutesById
@@ -91,6 +124,8 @@ export interface RootRouteChildren {
   AuthentifieRoute: typeof AuthentifieRouteWithChildren
   ConnexionRoute: typeof ConnexionRoute
   InscriptionRoute: typeof InscriptionRoute
+  MotDePasseOublieRoute: typeof MotDePasseOublieRoute
+  NouveauMotDePasseRoute: typeof NouveauMotDePasseRoute
   TarifsRoute: typeof TarifsRoute
 }
 
@@ -122,6 +157,20 @@ declare module '@tanstack/react-router' {
       path: '/inscription'
       fullPath: '/inscription'
       preLoaderRoute: typeof InscriptionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mot-de-passe-oublie': {
+      id: '/mot-de-passe-oublie'
+      path: '/mot-de-passe-oublie'
+      fullPath: '/mot-de-passe-oublie'
+      preLoaderRoute: typeof MotDePasseOublieRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nouveau-mot-de-passe': {
+      id: '/nouveau-mot-de-passe'
+      path: '/nouveau-mot-de-passe'
+      fullPath: '/nouveau-mot-de-passe'
+      preLoaderRoute: typeof NouveauMotDePasseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tarifs': {
@@ -158,6 +207,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthentifieRoute: AuthentifieRouteWithChildren,
   ConnexionRoute: ConnexionRoute,
   InscriptionRoute: InscriptionRoute,
+  MotDePasseOublieRoute: MotDePasseOublieRoute,
+  NouveauMotDePasseRoute: NouveauMotDePasseRoute,
   TarifsRoute: TarifsRoute,
 }
 export const routeTree = rootRouteImport

@@ -38,6 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase?.auth.signOut()
   }
 
+  // Le lien reçu par e-mail ouvre une session temporaire sur /nouveau-mot-de-passe
+  async function demanderReinitialisation(email: string) {
+    if (!supabase) return SUPABASE_NON_CONFIGURE
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/nouveau-mot-de-passe`,
+    })
+    return error ? traduireErreur(error.message) : null
+  }
+
+  async function changerMotDePasse(motDePasse: string) {
+    if (!supabase) return SUPABASE_NON_CONFIGURE
+    const { error } = await supabase.auth.updateUser({ password: motDePasse })
+    return error ? traduireErreur(error.message) : null
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -47,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         connexion,
         inscription,
         deconnexion,
+        demanderReinitialisation,
+        changerMotDePasse,
       }}
     >
       {children}
@@ -61,5 +78,9 @@ function traduireErreur(message: string) {
   if (message.includes('User already registered')) return 'Un compte existe déjà avec cet e-mail.'
   if (message.includes('Password should be at least'))
     return 'Le mot de passe doit contenir au moins 6 caractères.'
+  if (message.includes('should be different from the old password'))
+    return "Le nouveau mot de passe doit être différent de l'ancien."
+  if (message.includes('rate limit') || message.includes('For security purposes'))
+    return 'Trop de tentatives : réessayez dans quelques instants.'
   return message
 }
