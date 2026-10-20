@@ -2,9 +2,11 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { BarreFiltres } from '@/components/candidatures/BarreFiltres'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
+import { ImportCsv } from '@/components/candidatures/ImportCsv'
 import { ListeCandidatures } from '@/components/candidatures/ListeCandidatures'
 import {
   ajouterCandidature,
+  ajouterCandidatures,
   changerStatut,
   listerCandidatures,
   modifierCandidature,
@@ -37,7 +39,7 @@ function TableauDeBord() {
   const filtres = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()
-  const [formulaireOuvert, setFormulaireOuvert] = useState(false)
+  const [panneau, setPanneau] = useState<'ajout' | 'import' | null>(null)
   const [idEnEdition, setIdEnEdition] = useState<string | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
 
@@ -63,6 +65,13 @@ function TableauDeBord() {
     await router.invalidate()
   }
 
+  async function handleImport(nouvelles: NouvelleCandidature[]) {
+    // Les erreurs d'import sont affichées dans le panneau
+    await ajouterCandidatures(nouvelles)
+    setPanneau(null)
+    await router.invalidate()
+  }
+
   async function handleModification(id: string, champs: NouvelleCandidature) {
     // Les erreurs sont affichées dans le formulaire, qui reste alors ouvert
     await modifierCandidature(id, champs)
@@ -79,22 +88,31 @@ function TableauDeBord() {
     <section className="mx-auto max-w-6xl space-y-6 px-4 py-12">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Candidatures</h1>
-        {!formulaireOuvert && (
-          <button
-            type="button"
-            onClick={() => setFormulaireOuvert(true)}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-          >
-            Ajouter une candidature
-          </button>
+        {!panneau && (
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setPanneau('import')}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100"
+            >
+              Importer un CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanneau('ajout')}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              Ajouter une candidature
+            </button>
+          </div>
         )}
       </div>
 
-      {formulaireOuvert && (
-        <FormulaireCandidature
-          onEnregistrer={handleAjout}
-          onAnnuler={() => setFormulaireOuvert(false)}
-        />
+      {panneau === 'ajout' && (
+        <FormulaireCandidature onEnregistrer={handleAjout} onAnnuler={() => setPanneau(null)} />
+      )}
+      {panneau === 'import' && (
+        <ImportCsv onImporter={handleImport} onFermer={() => setPanneau(null)} />
       )}
 
       {erreur && (
@@ -105,7 +123,8 @@ function TableauDeBord() {
 
       {candidatures.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
-          Aucune candidature pour le moment. Ajoutez-en une pour commencer.
+          Aucune candidature pour le moment. Ajoutez-en une ou importez un fichier CSV pour
+          commencer.
         </div>
       ) : (
         <>

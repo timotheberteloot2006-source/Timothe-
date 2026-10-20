@@ -31,6 +31,10 @@ Le tableau de bord liste les candidatures de l'utilisateur connecté (règles RL
 que les siennes). Les filtres (recherche, compétences requises, expérience minimum, statut)
 s'appliquent dans le navigateur et sont conservés dans l'URL.
 
+Les candidatures peuvent aussi être importées depuis un fichier CSV (bouton « Importer un CSV »,
+jusqu'à 1000 lignes) : colonnes `nom` (obligatoire), `email`, `poste`, `competences`, `experience`.
+Le séparateur (`;`, `,` ou tabulation) et l'encodage (UTF-8 ou celui d'Excel) sont détectés.
+
 ```bash
-npm test   # tests de la logique de filtrage (Vitest)
+npm test   # tests du filtrage et de l'import CSV (Vitest)
 ```

@@ -42,6 +42,11 @@ export async function ajouterCandidature(candidature: NouvelleCandidature) {
   if (error) throw new Error(error.message)
 }
 
+export async function ajouterCandidatures(candidatures: NouvelleCandidature[]) {
+  const { error } = await table().insert(candidatures)
+  if (error) throw new Error(error.message)
+}
+
 export async function modifierCandidature(id: string, champs: NouvelleCandidature) {
   const { error } = await table().update(champs).eq('id', id)
   if (error) throw new Error(error.message)
