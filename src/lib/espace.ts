@@ -52,6 +52,8 @@ export function erreurEspace(message: string) {
   if (message.startsWith('invitation_invalide'))
     return 'Ce lien d’invitation est invalide, expiré ou déjà utilisé.'
   if (message.startsWith('espace_inaccessible')) return 'Vous n’êtes pas membre de cet espace.'
+  if (message.startsWith('reserve_proprietaire'))
+    return 'Seul le propriétaire de l’espace peut régler l’accusé de réception.'
   return message
 }
 
@@ -150,4 +152,24 @@ export function accepterInvitation(jeton: string) {
 
 export function lienInvitation(jeton: string) {
   return `${window.location.origin}/invitation/${jeton}`
+}
+
+// Notifications par e-mail de l'espace actif (supabase/migrations/0014_notifications.sql)
+export interface ReglagesNotifications {
+  // Être prévenu des candidatures reçues par le formulaire en ligne
+  notifier: boolean
+  // Accusé de réception envoyé aux candidats (réglé par le propriétaire)
+  accuse_reception: boolean
+  proprietaire: boolean
+}
+
+export async function lireNotifications(): Promise<ReglagesNotifications> {
+  const lignes = await rpc<ReglagesNotifications[]>('mes_notifications')
+  if (!lignes?.[0]) throw new Error('Espace introuvable.')
+  return lignes[0]
+}
+
+// accuse : seulement pour le propriétaire (sinon laissé tel quel)
+export function reglerNotifications(pourMoi: boolean, accuse?: boolean) {
+  return rpc<void>('regler_notifications', { pour_moi: pourMoi, accuse: accuse ?? null })
 }

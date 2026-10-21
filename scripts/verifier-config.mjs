@@ -7,7 +7,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import {
   lireEnv,
+  verifierCourriel,
   verifierFonctions,
+  verifierResend,
   verifierSite,
   verifierStripe,
   verifierSupabase,
@@ -25,7 +27,14 @@ function charger(chemin, filtre) {
 
 const site = charger('.env', (cle) => cle.startsWith('VITE_SUPABASE_'))
 const fonctions = charger('supabase/functions/.env', (cle) =>
-  ['STRIPE_SECRET_KEY', 'STRIPE_PRICE_PRO', 'STRIPE_WEBHOOK_SECRET', 'SITE_URL'].includes(cle),
+  [
+    'STRIPE_SECRET_KEY',
+    'STRIPE_PRICE_PRO',
+    'STRIPE_WEBHOOK_SECRET',
+    'SITE_URL',
+    'RESEND_API_KEY',
+    'EMAIL_EXPEDITEUR',
+  ].includes(cle),
 )
 
 const SYMBOLES = { ok: '✓', attention: '!', erreur: '✗' }
@@ -43,11 +52,13 @@ function afficher(titre, resultats) {
 
 const resultatsSite = verifierSite(site.valeurs)
 const resultatsFonctions = verifierFonctions(fonctions.valeurs, { production })
+const resultatsCourriel = verifierCourriel(fonctions.valeurs, { production })
 afficher(`Site (${site.present ? '.env' : 'variables d’environnement'})`, resultatsSite)
 afficher(
   `Fonctions Supabase (${fonctions.present ? 'supabase/functions/.env' : 'variables d’environnement'})`,
   resultatsFonctions,
 )
+afficher('E-mails (supabase/functions/.env)', resultatsCourriel)
 
 const sansErreur = (resultats) => resultats.every((r) => r.niveau !== 'erreur')
 if (distant) {
@@ -62,6 +73,9 @@ if (distant) {
         await verifierStripe(fonctions.valeurs, site.valeurs.VITE_SUPABASE_URL, fetch),
       )
     else console.log('\nStripe non interrogé : corrigez d’abord les secrets des fonctions.')
+    // Seulement si les notifications sont configurées sans erreur
+    if (resultatsCourriel.every((r) => r.niveau === 'ok'))
+      afficher('Resend (en ligne)', await verifierResend(fonctions.valeurs, fetch))
   }
 } else {
   console.log('\nAjoutez --distant pour interroger aussi Supabase et Stripe.')

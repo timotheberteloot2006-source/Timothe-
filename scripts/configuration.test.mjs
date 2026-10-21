@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  domaineExpediteur,
   lireEnv,
   lireJwt,
   MIGRATIONS,
+  verifierCourriel,
   verifierFonctions,
+  verifierResend,
   verifierSite,
   verifierStripe,
   verifierSupabase,
@@ -167,6 +170,7 @@ describe('verifierSupabase', () => {
       if (url.includes('select=par_systeme')) return [400, { code: '42703' }]
       if (url.includes('select=stripe_evenement_le')) return [400, { code: '42703' }]
       if (url.includes('/offres?select=jeton_public')) return [400, { code: '42703' }]
+      if (url.includes('/membres?select=notifier')) return [400, { code: '42703' }]
       if (url.endsWith('/portail-client')) return [404, {}]
       if (url.endsWith('/webhook-stripe')) return [401, { msg: 'Missing authorization header' }]
       if (url.endsWith('/postuler')) return [401, { msg: 'Missing authorization header' }]
@@ -176,7 +180,7 @@ describe('verifierSupabase', () => {
     })
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
-      expect.stringContaining('à partir de 0011 : 0011, 0012, 0013 manquent'),
+      expect.stringContaining('à partir de 0011 : 0011, 0012, 0013, 0014 manquent'),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
       expect.stringContaining('postuler refuse'),
@@ -194,7 +198,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0013')
+    expect(MIGRATIONS.at(-1).numero).toBe('0014')
   })
 })
 
@@ -291,6 +295,89 @@ describe('verifierStripe', () => {
     )
     expect(erreurs(await verifierStripe(FONCTIONS, URL_PROJET, fetch))).toEqual([
       expect.stringContaining('Aucun webhook Stripe actif'),
+    ])
+  })
+})
+
+describe('verifierCourriel', () => {
+  const COURRIEL = {
+    RESEND_API_KEY: 're_123',
+    EMAIL_EXPEDITEUR: 'Filtre <notifications@filtre.fr>',
+  }
+
+  it('désactivé : simple point d’attention', () => {
+    expect(niveaux(verifierCourriel({}))).toEqual(['attention'])
+    expect(
+      niveaux(
+        verifierCourriel({
+          RESEND_API_KEY: 're_...',
+          EMAIL_EXPEDITEUR: 'Filtre <notifications@votre-domaine.fr>',
+        }),
+      ),
+    ).toEqual(['attention'])
+  })
+
+  it('configuration correcte', () => {
+    expect(niveaux(verifierCourriel(COURRIEL))).toEqual(['ok', 'ok'])
+    expect(domaineExpediteur('notifications@filtre.fr')).toBe('filtre.fr')
+    expect(domaineExpediteur('Filtre <notifications@mail.filtre.fr>')).toBe('mail.filtre.fr')
+  })
+
+  it('valeur manquante ou mal formée', () => {
+    expect(niveaux(verifierCourriel({ RESEND_API_KEY: 're_123' }))).toEqual(['ok', 'erreur'])
+    expect(niveaux(verifierCourriel({ ...COURRIEL, RESEND_API_KEY: 'sk_123' }))).toEqual([
+      'erreur',
+      'ok',
+    ])
+    expect(niveaux(verifierCourriel({ ...COURRIEL, EMAIL_EXPEDITEUR: 'Filtre' }))).toEqual([
+      'ok',
+      'erreur',
+    ])
+  })
+
+  it('domaine de test resend.dev : refusé en production', () => {
+    const essai = { ...COURRIEL, EMAIL_EXPEDITEUR: 'onboarding@resend.dev' }
+    expect(niveaux(verifierCourriel(essai))).toEqual(['ok', 'attention'])
+    expect(niveaux(verifierCourriel(essai, { production: true }))).toEqual(['ok', 'erreur'])
+  })
+})
+
+describe('verifierResend', () => {
+  const COURRIEL = {
+    RESEND_API_KEY: 're_123',
+    EMAIL_EXPEDITEUR: 'Filtre <notifications@filtre.fr>',
+  }
+  const domaines = (data) => fauxFetch(() => [200, { data }]).fetch
+
+  it('domaine vérifié', async () => {
+    const resultats = await verifierResend(
+      COURRIEL,
+      domaines([{ name: 'filtre.fr', status: 'verified' }]),
+    )
+    expect(resultats).toEqual([{ niveau: 'ok', message: 'Domaine filtre.fr vérifié chez Resend.' }])
+  })
+
+  it('domaine absent ou en attente de vérification DNS', async () => {
+    expect(erreurs(await verifierResend(COURRIEL, domaines([])))).toEqual([
+      expect.stringContaining('absent du compte Resend'),
+    ])
+    expect(
+      erreurs(await verifierResend(COURRIEL, domaines([{ name: 'filtre.fr', status: 'pending' }]))),
+    ).toEqual([expect.stringContaining('pas encore vérifié')])
+  })
+
+  it('clé refusée, clé limitée à l’envoi, Resend injoignable', async () => {
+    expect(erreurs(await verifierResend(COURRIEL, fauxFetch(() => [401, {}]).fetch))).toEqual([
+      'Clé Resend refusée (RESEND_API_KEY).',
+    ])
+    expect(niveaux(await verifierResend(COURRIEL, fauxFetch(() => [403, {}]).fetch))).toEqual([
+      'attention',
+    ])
+    const enPanne = async () => {
+      throw new Error('ENOTFOUND')
+    }
+    expect(erreurs(await verifierResend(COURRIEL, enPanne))).toEqual([
+      'Resend injoignable : ENOTFOUND',
     ])
   })
 })

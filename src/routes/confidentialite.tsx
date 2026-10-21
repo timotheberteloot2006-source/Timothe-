@@ -43,6 +43,10 @@ function Confidentialite() {
         Pour limiter les envois abusifs, une empreinte non réversible de votre adresse IP est
         conservée une journée au plus ; l’adresse elle-même n’est pas enregistrée.
       </p>
+      <p>
+        Si le recruteur l’a activé, un accusé de réception vous est envoyé par e-mail ; ses membres
+        peuvent aussi être prévenus de votre candidature par e-mail (votre nom et le poste visé).
+      </p>
 
       <h2>Données collectées sur votre compte</h2>
       <ul>
@@ -89,6 +93,7 @@ function Confidentialite() {
           <Info cle="regionDonnees" /> ;
         </li>
         <li>Stripe (paiement des abonnements) ;</li>
+        <li>Resend (envoi des e-mails de notification des candidatures reçues en ligne) ;</li>
         <li>
           <Info cle="hebergeurNom" /> (hébergement du site).
         </li>

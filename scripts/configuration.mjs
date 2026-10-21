@@ -15,6 +15,7 @@ export const MIGRATIONS = [
   { numero: '0011', table: 'historique', colonne: 'par_systeme' },
   { numero: '0012', table: 'abonnements', colonne: 'stripe_evenement_le' },
   { numero: '0013', table: 'offres', colonne: 'jeton_public' },
+  { numero: '0014', table: 'membres', colonne: 'notifier' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite
@@ -329,4 +330,72 @@ async function interrogerStripe(envFonctions, urlSupabase, fetch) {
     )
   else resultats.push(ok('Portail client Stripe activé, résiliation possible.'))
   return resultats
+}
+
+// Adresse de l'expéditeur, « Nom <adresse> » ou « adresse » : renvoie son domaine, ou null
+export function domaineExpediteur(expediteur) {
+  return expediteur.trim().match(/^(?:[^<>]*<)?[^<>\s@]+@([^<>\s@]+\.[^<>\s@]+?)>?$/)?.[1] ?? null
+}
+
+// Notifications par e-mail (facultatives) : RESEND_API_KEY et EMAIL_EXPEDITEUR vont ensemble
+export function verifierCourriel(env, { production = false } = {}) {
+  const cle = env.RESEND_API_KEY ?? ''
+  const expediteur = env.EMAIL_EXPEDITEUR ?? ''
+  if (estExemple(cle) && estExemple(expediteur))
+    return [
+      attention(
+        'Notifications par e-mail désactivées (RESEND_API_KEY et EMAIL_EXPEDITEUR absents) : ni l’équipe ni les candidats ne seront prévenus.',
+      ),
+    ]
+  const resultats = []
+  if (estExemple(cle)) resultats.push(erreur('RESEND_API_KEY n’est pas renseignée.'))
+  else if (!cle.startsWith('re_'))
+    resultats.push(erreur('RESEND_API_KEY doit commencer par re_ (clé API Resend).'))
+  else resultats.push(ok('Clé Resend.'))
+
+  const domaine = domaineExpediteur(expediteur)
+  if (estExemple(expediteur) || !domaine)
+    resultats.push(
+      erreur(
+        `EMAIL_EXPEDITEUR doit être « Nom <adresse@domaine> » (reçu : ${expediteur || 'vide'}).`,
+      ),
+    )
+  else if (domaine === 'resend.dev')
+    resultats.push(
+      (production ? erreur : attention)(
+        'Expéditeur de test resend.dev : Resend n’envoie alors qu’à l’adresse de votre compte Resend. Vérifiez votre propre domaine.',
+      ),
+    )
+  else resultats.push(ok(`Expéditeur : ${expediteur}`))
+  return resultats
+}
+
+// Domaine de l'expéditeur vérifié chez Resend (lecture seule)
+export async function verifierResend(env, fetch) {
+  const domaine = domaineExpediteur(env.EMAIL_EXPEDITEUR ?? '')
+  try {
+    const reponse = await fetch('https://api.resend.com/domains', {
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}` },
+    })
+    if (reponse.status === 401) return [erreur('Clé Resend refusée (RESEND_API_KEY).')]
+    if (reponse.status === 403)
+      return [
+        attention(
+          'Clé Resend limitée à l’envoi : le domaine ne peut pas être vérifié d’ici. Contrôlez-le dans Resend (Domains).',
+        ),
+      ]
+    const corps = await reponse.json().catch(() => ({}))
+    const trouve = corps.data?.find((d) => d.name === domaine)
+    if (!trouve)
+      return [erreur(`Domaine ${domaine} absent du compte Resend : ajoutez-le (Domains).`)]
+    if (trouve.status !== 'verified')
+      return [
+        erreur(
+          `Domaine ${domaine} pas encore vérifié chez Resend (état : ${trouve.status}) : ajoutez les enregistrements DNS indiqués.`,
+        ),
+      ]
+    return [ok(`Domaine ${domaine} vérifié chez Resend.`)]
+  } catch (e) {
+    return [erreur(`Resend injoignable : ${e.message}`)]
+  }
 }

@@ -902,19 +902,31 @@ describe('formulaire public', () => {
     `)
   })
 
-  async function deposer(email: string, empreinte = IP, code = JETON) {
+  interface Depot {
+    resultat: string
+    candidature: string
+    offre_titre: string
+    espace_nom: string
+    accuse_reception: boolean
+    destinataires: string[]
+  }
+
+  async function deposerLigne(email: string, empreinte = IP, code = JETON) {
     await db.exec('set role service_role')
     try {
-      const { rows } = await db.query<{ resultat: string }>(
-        `select public.deposer_candidature_publique($1, $2, gen_random_uuid(), 'Alice Martin',
-           $3, array['React'], 4, null) as resultat`,
+      const { rows } = await db.query<Depot>(
+        `select * from public.deposer_candidature_publique($1, $2, gen_random_uuid(),
+           'Alice Martin', $3, array['React'], 4, null)`,
         [code, empreinte, email],
       )
-      return rows[0].resultat
+      return rows[0]
     } finally {
       await db.exec('reset role')
     }
   }
+
+  const deposer = async (email: string, empreinte = IP, code = JETON) =>
+    (await deposerLigne(email, empreinte, code)).resultat
 
   it('l’offre publiée se lit sans compte, une offre non publiée non', async () => {
     await db.exec('set role anon')
@@ -1016,5 +1028,74 @@ describe('formulaire public', () => {
       await db.exec('reset role')
     }
     await expect(deposer('b@x.fr')).rejects.toThrow(/^limite_gratuite/)
+  })
+  describe('notifications', () => {
+    // Un membre (B) dans l'espace de A
+    beforeEach(async () => {
+      await db.exec(`
+        insert into public.membres (espace_id, user_id, email, role)
+          values ('${A}', '${B}', 'b@x.fr', 'membre');
+        grant usage on schema public to authenticated;
+      `)
+    })
+
+    async function enTantQue2<T>(uid: string, action: () => Promise<T>) {
+      await enTantQue(uid)
+      await db.exec(`update public.profils set espace_actif = '${A}' where user_id = '${uid}'`)
+      await db.exec('set role authenticated')
+      try {
+        return await action()
+      } finally {
+        await db.exec('reset role')
+        await db.exec(`select set_config('test.uid', '', false)`)
+      }
+    }
+
+    it('le dépôt renvoie de quoi prévenir l’équipe et le candidat', async () => {
+      const depot = await deposerLigne('alice@x.fr')
+      expect(depot).toMatchObject({
+        resultat: 'creee',
+        offre_titre: 'Développeur front',
+        espace_nom: 'Mon espace',
+        accuse_reception: true,
+        destinataires: ['a@x.fr', 'b@x.fr'],
+      })
+      const { rows } = await db.query('select id from public.candidatures')
+      expect(rows).toEqual([{ id: depot.candidature }])
+      // Second envoi : la candidature existante
+      const encore = await deposerLigne('alice@x.fr')
+      expect(encore).toMatchObject({ resultat: 'deja_recue', candidature: depot.candidature })
+    })
+
+    it('chacun règle ses notifications ; seul le propriétaire règle l’accusé de réception', async () => {
+      await enTantQue2(B, () => db.exec('select public.regler_notifications(false)'))
+      await expect(
+        enTantQue2(B, () => db.exec('select public.regler_notifications(false, false)')),
+      ).rejects.toThrow(/^reserve_proprietaire/)
+      const reglagesB = await enTantQue2(B, () =>
+        db.query('select * from public.mes_notifications()'),
+      )
+      expect(reglagesB.rows).toEqual([
+        { notifier: false, accuse_reception: true, proprietaire: false },
+      ])
+
+      await enTantQue2(A, () => db.exec('select public.regler_notifications(true, false)'))
+      const depot = await deposerLigne('alice@x.fr')
+      expect(depot).toMatchObject({ accuse_reception: false, destinataires: ['a@x.fr'] })
+    })
+
+    it('les réglages ne sont pas accessibles sans compte', async () => {
+      await db.exec('set role anon')
+      try {
+        await expect(db.exec('select * from public.mes_notifications()')).rejects.toThrow(
+          /permission denied/,
+        )
+        await expect(db.exec('select public.regler_notifications(false)')).rejects.toThrow(
+          /permission denied/,
+        )
+      } finally {
+        await db.exec('reset role')
+      }
+    })
   })
 })

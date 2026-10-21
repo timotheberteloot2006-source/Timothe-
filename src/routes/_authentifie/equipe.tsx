@@ -10,6 +10,8 @@ import {
   listerInvitations,
   listerMembres,
   listerMesEspaces,
+  lireNotifications,
+  reglerNotifications,
   renommerEspace,
   retirerMembre,
   revoquerInvitation,
@@ -21,13 +23,14 @@ export const Route = createFileRoute('/_authentifie/equipe')({
   head: () => titrePage('Équipe'),
   loader: async ({ context }) => {
     const espace = await lireEspace()
-    const [membres, invitations, mesEspaces] = await Promise.all([
+    const [membres, invitations, mesEspaces, notifications] = await Promise.all([
       listerMembres(espace.id),
       // Seul le propriétaire voit et gère les invitations
       espace.role === 'proprietaire' ? listerInvitations(espace.id) : Promise.resolve([]),
       listerMesEspaces(context.auth.user!.id),
+      lireNotifications(),
     ])
-    return { espace, membres, invitations, mesEspaces }
+    return { espace, membres, invitations, mesEspaces, notifications }
   },
   component: Equipe,
   errorComponent: ({ error }) => (
@@ -40,7 +43,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
 })
 
 function Equipe() {
-  const { espace, membres, invitations, mesEspaces } = Route.useLoaderData()
+  const { espace, membres, invitations, mesEspaces, notifications } = Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
   const [erreur, setErreur] = useState<string | null>(null)
@@ -143,6 +146,27 @@ function Equipe() {
               Renommer
             </button>
           </form>
+        )}
+      </Carte>
+
+      <Carte titre="Notifications">
+        <p className="text-sm text-slate-600">
+          E-mails envoyés quand un candidat postule par le formulaire en ligne d’une offre (page «
+          Offres »).
+        </p>
+        <CaseReglage
+          libelle="Me prévenir par e-mail des nouvelles candidatures de cet espace"
+          valeur={notifications.notifier}
+          enregistrer={(valeur) => executer(() => reglerNotifications(valeur))}
+        />
+        {proprietaire && (
+          <CaseReglage
+            libelle="Envoyer un accusé de réception aux candidats"
+            valeur={notifications.accuse_reception}
+            enregistrer={(valeur) =>
+              executer(() => reglerNotifications(notifications.notifier, valeur))
+            }
+          />
         )}
       </Carte>
 
@@ -275,6 +299,29 @@ function Equipe() {
         </Carte>
       )}
     </section>
+  )
+}
+
+// Case à cocher enregistrée aussitôt : cochée tout de suite, décochée si l'enregistrement échoue
+function CaseReglage({
+  libelle,
+  valeur,
+  enregistrer,
+}: {
+  libelle: string
+  valeur: boolean
+  enregistrer: (valeur: boolean) => Promise<boolean>
+}) {
+  const [coche, setCoche] = useState(valeur)
+  async function basculer(nouvelle: boolean) {
+    setCoche(nouvelle)
+    if (!(await enregistrer(nouvelle))) setCoche(!nouvelle)
+  }
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input type="checkbox" checked={coche} onChange={(e) => basculer(e.target.checked)} />
+      {libelle}
+    </label>
   )
 }
 

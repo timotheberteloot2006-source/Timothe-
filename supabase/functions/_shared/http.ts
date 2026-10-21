@@ -1,6 +1,9 @@
 // Outils communs aux fonctions : réponses JSON, client administrateur, utilisateur connecté
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0'
 
+// Adresse du site, pour les retours depuis Stripe et les liens des e-mails (ex. https://filtre.fr)
+export const SITE_URL = Deno.env.get('SITE_URL') ?? 'http://localhost:5173'
+
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',

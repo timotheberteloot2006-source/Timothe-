@@ -154,3 +154,50 @@ test('transférer la propriété de l’espace à un membre', async ({ page }) =
   await expect(page.getByText('rh@exemple.fr (vous)')).toBeVisible()
   await expect(page.getByText('collegue@exemple.fr')).toHaveCount(0)
 })
+
+test('notifications : chacun choisit d’être prévenu, le propriétaire règle l’accusé de réception', async ({
+  page,
+}) => {
+  await seConnecter(page, faux)
+  await page.goto('/equipe')
+  const carte = page.getByRole('heading', { name: 'Notifications' }).locator('xpath=..')
+  const pourMoi = carte.getByLabel(
+    'Me prévenir par e-mail des nouvelles candidatures de cet espace',
+  )
+  const accuse = carte.getByLabel('Envoyer un accusé de réception aux candidats')
+  await expect(pourMoi).toBeChecked()
+  await expect(accuse).toBeChecked()
+
+  await pourMoi.uncheck()
+  await expect.poll(() => faux.membres[0].notifier).toBe(false)
+  await accuse.uncheck()
+  await expect.poll(() => faux.espaces[0].accuse_reception).toBe(false)
+  // Le réglage personnel n'a pas été modifié par celui de l'espace
+  expect(faux.membres[0].notifier).toBe(false)
+
+  // Rechargée, la page garde les réglages
+  await page.reload()
+  await expect(pourMoi).not.toBeChecked()
+  await expect(accuse).not.toBeChecked()
+})
+
+test('notifications : un membre ne voit pas le réglage de l’accusé de réception', async ({
+  page,
+}) => {
+  const { espace } = faux.ajouterEspaceInvitant('Agence RH', 'patronne@agence.fr')
+  faux.membres.push({
+    espace_id: espace.id,
+    user_id: faux.utilisateur.id,
+    email: faux.utilisateur.email,
+    role: 'membre',
+    created_at: '2026-01-02T00:00:00Z',
+  })
+  faux.espaceActif = espace.id
+  await seConnecter(page, faux)
+  await page.goto('/equipe')
+  const carte = page.getByRole('heading', { name: 'Notifications' }).locator('xpath=..')
+  await expect(
+    carte.getByLabel('Me prévenir par e-mail des nouvelles candidatures de cet espace'),
+  ).toBeChecked()
+  await expect(carte.getByLabel('Envoyer un accusé de réception aux candidats')).toHaveCount(0)
+})

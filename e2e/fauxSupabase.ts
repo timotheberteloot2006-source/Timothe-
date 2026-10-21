@@ -29,6 +29,8 @@ interface EspaceFaux {
   proprietaire_email: string
   // Offre Pro d'un espace dont l'utilisateur n'est pas propriétaire
   pro?: boolean
+  // Accusé de réception aux candidats (absent : activé)
+  accuse_reception?: boolean
 }
 
 interface MembreFaux {
@@ -37,6 +39,8 @@ interface MembreFaux {
   email: string
   role: 'proprietaire' | 'membre'
   created_at: string
+  // E-mails des candidatures reçues par le formulaire (absent : oui)
+  notifier?: boolean
 }
 
 interface InvitationFaux {
@@ -373,6 +377,30 @@ export class FauxSupabase {
     }
     if (chemin.startsWith('/storage/v1/object/sign/')) {
       return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4' })
+    }
+
+    // Notifications (supabase/migrations/0014_notifications.sql)
+    const moi = this.membres.find(
+      (m) => m.espace_id === this.espaceActif && m.user_id === this.utilisateur.id,
+    )
+    const espaceActif = this.espaces.find((e) => e.id === this.espaceActif)
+    if (chemin === '/rest/v1/rpc/mes_notifications' && moi && espaceActif) {
+      return json([
+        {
+          notifier: moi.notifier ?? true,
+          accuse_reception: espaceActif.accuse_reception ?? true,
+          proprietaire: moi.role === 'proprietaire',
+        },
+      ])
+    }
+    if (chemin === '/rest/v1/rpc/regler_notifications' && moi && espaceActif) {
+      const { pour_moi, accuse } = corps(requete) as { pour_moi: boolean; accuse: boolean | null }
+      if (accuse !== null && moi.role !== 'proprietaire') {
+        return json({ code: 'P0001', message: 'reserve_proprietaire: refusé' }, 400)
+      }
+      moi.notifier = pour_moi
+      if (accuse !== null) espaceActif.accuse_reception = accuse
+      return json(undefined, 204)
     }
 
     // Formulaire public (supabase/migrations/0013_formulaire_public.sql et functions/postuler)

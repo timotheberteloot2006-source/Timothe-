@@ -83,6 +83,23 @@ Renseigner `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO` et `SITE_URL` (pour l'instant
 `http://localhost:5173`). `STRIPE_WEBHOOK_SECRET` viendra à l'étape 4 : laisser `whsec_...`.
 Ce fichier ne doit jamais être envoyé sur GitHub (il est dans `.gitignore`).
 
+**E-mails de notification (facultatif).** Quand un candidat postule par le formulaire en ligne,
+l'équipe est prévenue et le candidat reçoit un accusé de réception. Ces e-mails passent par
+[Resend](https://resend.com) :
+
+1. Créer un compte Resend, puis *Domains > Add domain* : ajouter le domaine d'envoi (ex.
+   `filtre.fr`, ou un sous-domaine `mail.filtre.fr`) et créer chez votre registraire les
+   enregistrements DNS indiqués. La vérification prend de quelques minutes à quelques heures.
+2. *API Keys* : créer une clé (`re_…`). Une clé « Full access » permet à `verifier:config` de
+   contrôler le domaine ; une clé « Sending access » suffit pour envoyer.
+3. Renseigner `RESEND_API_KEY` et `EMAIL_EXPEDITEUR` (ex. `Filtre <notifications@filtre.fr>`)
+   dans `supabase/functions/.env`.
+
+Sans ces deux valeurs, tout fonctionne mais aucun e-mail n'est envoyé. Un échec d'envoi ne fait
+jamais perdre une candidature : il est seulement noté dans les journaux de la fonction
+(*Edge Functions > postuler > Logs*). Le domaine de test `resend.dev` n'envoie qu'à l'adresse
+du compte Resend : il ne convient pas en production.
+
 ### 3c. Déploiement
 
 ```bash
@@ -98,11 +115,11 @@ Le script affiche les migrations qu'il va appliquer et demande confirmation.
 > sans rien casser). Déclarer d'abord ce qui est déjà en place, puis relancer le script :
 > ```bash
 > npx supabase migration repair --status applied 0001 0002 0003 0004 0005 0006 0007 0008 0009 0010
-> npm run deployer:supabase    # n'applique plus que 0011, 0012 et 0013
+> npm run deployer:supabase    # n'applique plus que les migrations suivantes (0011…)
 > ```
-> Sans la CLI, on peut aussi exécuter `0011_historique_corrections.sql`,
-> `0012_relecture_securite.sql` puis `0013_formulaire_public.sql` dans le *SQL Editor* : les deux
-> méthodes ne doivent simplement pas être mélangées par la suite.
+> Sans la CLI, on peut aussi exécuter les fichiers suivants (`0011_…`, `0012_…`, etc.) un par un,
+> dans l'ordre, dans le *SQL Editor* : les deux méthodes ne doivent simplement pas être mélangées
+> par la suite.
 
 ## Étape 4 — Webhook Stripe
 
@@ -119,9 +136,10 @@ Le script affiche les migrations qu'il va appliquer et demande confirmation.
    ```bash
    npm run verifier:config -- --distant
    ```
-   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0013 »,
+   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0014 »,
    « webhook-stripe déployée et joignable par Stripe » et « postuler déployée et ouverte aux
-   candidats ». Si une fonction « refuse les appels sans jeton », elle a été déployée sans
+   candidats », puis, si les e-mails sont configurés, « Domaine … vérifié chez Resend ». Si une
+   fonction « refuse les appels sans jeton », elle a été déployée sans
    `--no-verify-jwt` : relancer le script.
 
 ## Étape 5 — Hébergement
@@ -160,7 +178,10 @@ Avec une vraie adresse e-mail, sur le site en ligne :
       abonnement.
 - [ ] Formulaire public : sur *Offres*, ouvrir « Formulaire de candidature », cocher
       « Formulaire en ligne », copier le lien et l'ouvrir dans une fenêtre privée. Postuler avec
-      un CV : la candidature apparaît dans la liste, avec son CV, rattachée à l'offre.
+      un CV : la candidature apparaît dans la liste, avec son CV, rattachée à l'offre. Les
+      membres reçoivent l'e-mail « Nouvelle candidature », le candidat l'accusé de réception
+      (vérifier qu'ils n'arrivent pas en indésirables) ; *Équipe > Notifications* permet de les
+      couper.
 - [ ] Invitation : depuis *Équipe*, créer un lien, l'ouvrir dans une fenêtre privée, créer un
       second compte depuis ce lien : on revient à l'invitation après confirmation.
 - [ ] *Gérer mon abonnement > Résilier* : l'offre reste Pro jusqu'à la fin de la période, et la

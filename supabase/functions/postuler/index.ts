@@ -2,7 +2,9 @@
 // À déployer sans vérification de jeton Supabase : le candidat n'a pas de compte.
 // Le dépôt lui-même (offre publiée, limite d'envois, doublons, limite Gratuite) est fait par la
 // fonction SQL deposer_candidature_publique (supabase/migrations/0013_formulaire_public.sql).
-import { corsHeaders, json, supabaseAdmin } from '../_shared/http.ts'
+import { envoyerCourriels } from '../_shared/courriel.ts'
+import { corsHeaders, json, SITE_URL, supabaseAdmin } from '../_shared/http.ts'
+import { preparerCourriels, type Depot } from './courriels.ts'
 import { estRobot, lireFormulaire, traduireErreur, verifierCv } from './validation.ts'
 
 Deno.serve(async (req) => {
@@ -57,7 +59,7 @@ Deno.serve(async (req) => {
     if (depot.error) return json({ erreur: traduireErreur(depot.error.message).erreur }, 500)
   }
 
-  const { data: resultat, error } = await admin.rpc('deposer_candidature_publique', {
+  const { data, error } = await admin.rpc('deposer_candidature_publique', {
     code: candidature.jeton,
     empreinte_ip: await empreinte(req),
     id_candidature: id,
@@ -67,11 +69,19 @@ Deno.serve(async (req) => {
     annees_experience: candidature.experience,
     chemin_cv: chemin,
   })
+  const depot = (data as Depot[] | null)?.[0]
   // CV inutile si la candidature n'a pas été créée (refus, ou candidat déjà présent)
-  if (chemin && (error || resultat !== 'creee')) await admin.storage.from('cv').remove([chemin])
-  if (error) {
-    const { erreur, status } = traduireErreur(error.message)
+  if (chemin && depot?.resultat !== 'creee') await admin.storage.from('cv').remove([chemin])
+  if (error || !depot) {
+    const { erreur, status } = traduireErreur(error?.message ?? '')
     return json({ erreur }, status)
+  }
+
+  // Équipe et accusé de réception : un échec d'envoi ne doit pas faire échouer la candidature
+  try {
+    await envoyerCourriels(preparerCourriels(depot, candidature, SITE_URL))
+  } catch (e) {
+    console.error('Notifications non envoyées :', e)
   }
   // Même réponse si le candidat était déjà présent : rien n'indique qui figure dans la base
   return json({ recu: true })

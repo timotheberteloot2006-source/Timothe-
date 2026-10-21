@@ -100,6 +100,13 @@ l'offre, et son historique indique « Candidature reçue par le formulaire en li
 - En offre Gratuite, le formulaire indique qu'il n'accepte plus de candidatures quand l'espace
   atteint 50 candidatures.
 - « Nouveau lien » désactive l'ancien, s'il a été trop diffusé.
+- **Notifications par e-mail** (facultatives, par [Resend](https://resend.com) : secrets
+  `RESEND_API_KEY` et `EMAIL_EXPEDITEUR`) : chaque membre est prévenu d'une nouvelle candidature,
+  avec le lien vers sa fiche, et le candidat reçoit un accusé de réception. Page **Équipe**,
+  rubrique « Notifications » : chaque membre choisit d'être prévenu ou non, le propriétaire active
+  ou coupe l'accusé de réception (`supabase/migrations/0014_notifications.sql`). L'accusé ne
+  reprend rien de ce que le candidat a saisi, pour que le formulaire ne serve pas à envoyer des
+  messages à n'importe qui. Un échec d'envoi ne fait pas perdre la candidature.
 
 Sur la fiche d'une candidature, on planifie des **entretiens** (date, durée, lieu ou lien de
 visio) et on les ajoute à son agenda grâce à un fichier `.ics` (Google Agenda, Outlook, Apple
