@@ -13,6 +13,7 @@ import {
   renommerEspace,
   retirerMembre,
   revoquerInvitation,
+  transfererPropriete,
 } from '@/lib/espace'
 import { titrePage } from '@/lib/titre'
 
@@ -87,11 +88,20 @@ function Equipe() {
       )
     )
       return
-    // On revient d'abord à son espace personnel (identifiant = celui du compte)
+    // On revient d'abord à un espace dont on est propriétaire (sinon la base y ramène d'elle-même)
+    const personnel = mesEspaces.find((e) => e.role === 'proprietaire' && e.espace_id !== espace.id)
     executer(async () => {
-      await choisirEspace(user!.id)
+      if (personnel) await choisirEspace(personnel.espace_id)
       await retirerMembre(espace.id, user!.id)
     })
+  }
+
+  function transferer(email: string | null, userId: string) {
+    const message =
+      `Transférer la propriété de l’espace « ${espace.nom} » à ${email ?? 'ce membre'} ?\n\n` +
+      'Il pourra inviter et retirer des membres, et c’est son offre (Gratuite ou Pro) qui ' +
+      's’appliquera à l’espace. Vous resterez membre, et un nouvel espace personnel vous sera créé.'
+    if (window.confirm(message)) executer(() => transfererPropriete(espace.id, userId))
   }
 
   return (
@@ -148,13 +158,22 @@ function Equipe() {
                 </span>
               </span>
               {proprietaire && m.user_id !== user?.id && (
-                <button
-                  type="button"
-                  onClick={() => retirer(m.email, m.user_id)}
-                  className="rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-red-50 hover:text-red-700"
-                >
-                  Retirer
-                </button>
+                <span className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => transferer(m.email, m.user_id)}
+                    className="rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  >
+                    Transférer la propriété
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => retirer(m.email, m.user_id)}
+                    className="rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-red-50 hover:text-red-700"
+                  >
+                    Retirer
+                  </button>
+                </span>
               )}
             </li>
           ))}

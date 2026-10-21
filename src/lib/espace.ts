@@ -47,6 +47,8 @@ function client() {
 }
 
 export function erreurEspace(message: string) {
+  if (message.startsWith('transfert_refuse'))
+    return 'Transfert impossible : seul le propriétaire peut transférer l’espace, à l’un de ses membres.'
   if (message.startsWith('invitation_invalide'))
     return 'Ce lien d’invitation est invalide, expiré ou déjà utilisé.'
   if (message.startsWith('espace_inaccessible')) return 'Vous n’êtes pas membre de cet espace.'
@@ -82,6 +84,16 @@ export async function listerMesEspaces(userId: string): Promise<MonEspace[]> {
     ...membre,
     nom: (espaces as unknown as { nom: string } | null)?.nom ?? '',
   }))
+}
+
+// Espaces dont l'utilisateur est propriétaire (son espace personnel, et ceux qu'on lui a transférés)
+export async function listerEspacesPossedes(userId: string) {
+  return (await listerMesEspaces(userId)).filter((e) => e.role === 'proprietaire')
+}
+
+// Le nouveau propriétaire doit être membre ; l'ancien devient membre et reçoit un nouvel espace
+export function transfererPropriete(espaceId: string, nouveauProprietaire: string) {
+  return rpc<void>('transferer_propriete', { eid: espaceId, nouveau: nouveauProprietaire })
 }
 
 export async function renommerEspace(id: string, nom: string) {

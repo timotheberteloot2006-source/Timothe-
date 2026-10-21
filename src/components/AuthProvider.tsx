@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { AuthContext, type ResultatInscription } from '@/lib/auth'
 import { estPro, lireAbonnement } from '@/lib/abonnement'
 import { supprimerTousLesCv } from '@/lib/cv'
-import { choisirEspace, lireEspace } from '@/lib/espace'
+import { choisirEspace, lireEspace, listerEspacesPossedes } from '@/lib/espace'
 import { SUPABASE_NON_CONFIGURE, supabase } from '@/lib/supabase'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -29,9 +29,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? traduireErreur(error.message) : null
   }
 
-  async function inscription(email: string, motDePasse: string): Promise<ResultatInscription> {
+  async function inscription(
+    email: string,
+    motDePasse: string,
+    redirection?: string,
+  ): Promise<ResultatInscription> {
     if (!supabase) return { erreur: SUPABASE_NON_CONFIGURE }
-    const { data, error } = await supabase.auth.signUp({ email, password: motDePasse })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: motDePasse,
+      // Le lien de confirmation ramène à la page demandée (ex. une invitation), déjà connecté
+      options: redirection ? { emailRedirectTo: `${window.location.origin}${redirection}` } : {},
+    })
     if (error) return { erreur: traduireErreur(error.message) }
     // Sans session, Supabase attend la confirmation de l'adresse e-mail
     return { erreur: null, confirmationRequise: data.session === null }
@@ -77,14 +86,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return traduireErreur('abonnement_actif')
     }
     try {
-      // Les fichiers ne sont pas effacés avec l'utilisateur : on supprime d'abord ceux de son
-      // espace personnel (dont l'identifiant est celui du compte), jamais ceux d'une équipe
+      // Les fichiers ne sont pas effacés avec l'utilisateur : on supprime d'abord les CV des
+      // espaces dont il est propriétaire (supprimés avec lui), jamais ceux d'une autre équipe
       const userId = session?.user.id
       if (!userId) return 'Aucun utilisateur connecté.'
-      await choisirEspace(userId)
-      // Refusé par la base si l'espace a d'autres membres : vérifié avant d'effacer les CV
-      if ((await lireEspace()).nb_membres > 1) return traduireErreur('equipe_non_vide')
-      await supprimerTousLesCv()
+      const possedes = await listerEspacesPossedes(userId)
+      // Refusé par la base si l'un d'eux a d'autres membres : vérifié avant d'effacer les CV
+      for (const espace of possedes) {
+        await choisirEspace(espace.espace_id)
+        if ((await lireEspace()).nb_membres > 1) return traduireErreur('equipe_non_vide')
+      }
+      for (const espace of possedes) {
+        await choisirEspace(espace.espace_id)
+        await supprimerTousLesCv()
+      }
     } catch (e) {
       return e instanceof Error ? e.message : String(e)
     }

@@ -18,7 +18,8 @@ npm run dev
    (ex. `http://localhost:5173`) pour que les liens de confirmation y renvoient,
    et ajouter dans *Redirect URLs* (puis l'équivalent en production) :
    `http://localhost:5173/nouveau-mot-de-passe` pour le lien « mot de passe oublié » et
-   `http://localhost:5173/compte` pour la confirmation d'un changement d'e-mail.
+   `http://localhost:5173/compte` pour la confirmation d'un changement d'e-mail ; plus simple :
+   `http://localhost:5173/**`, qui couvre aussi le retour aux invitations après l'inscription.
 
 4. Créer la base (candidatures, notes, stockage des CV, abonnements, offres, entretiens,
    espaces d'équipe, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
@@ -41,7 +42,11 @@ actif, dont le site affiche les données.
   la limite de 50 candidatures s'applique à l'espace entier.
 - La base n'expose que l'espace actif, et seulement à ses membres
   (`supabase/migrations/0008_espaces.sql`). Supprimer le compte d'un membre conserve ce qu'il a
-  ajouté à l'équipe ; un propriétaire doit d'abord retirer ses membres.
+  ajouté à l'équipe ; un propriétaire doit d'abord retirer ses membres, ou transférer la
+  propriété à l'un d'eux (il devient alors membre et reçoit un nouvel espace personnel).
+- Une personne invitée qui crée son compte depuis le lien est ramenée à l'invitation par le lien
+  de confirmation : ajouter `http://localhost:5173/**` (et l'équivalent en production) aux
+  *Redirect URLs* de Supabase.
 
 ## Thème clair / sombre
 

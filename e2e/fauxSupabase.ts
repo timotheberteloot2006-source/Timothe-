@@ -113,6 +113,8 @@ export class FauxSupabase {
   ]
   invitations: InvitationFaux[] = []
   espaceActif = UTILISATEUR.id
+  // Adresse de retour demandée à l'inscription (lien de confirmation de l'e-mail)
+  redirectionInscription: string | null = null
   private compteur = 0
 
   // Espace d'une autre personne, avec une invitation pour l'utilisateur ; renvoie le jeton
@@ -140,6 +142,19 @@ export class FauxSupabase {
       utilisee: false,
     })
     return { espace, jeton }
+  }
+
+  // Ajoute un membre (autre compte) à l'espace personnel ; renvoie son identifiant
+  ajouterMembre(email: string) {
+    const userId = crypto.randomUUID()
+    this.membres.push({
+      espace_id: this.utilisateur.id,
+      user_id: userId,
+      email,
+      role: 'membre',
+      created_at: new Date().toISOString(),
+    })
+    return userId
   }
 
   private estMembre(espaceId: string) {
@@ -234,8 +249,10 @@ export class FauxSupabase {
     }
     if (chemin === '/auth/v1/logout') return json(undefined, 204)
     if (chemin === '/auth/v1/user') return json(this.utilisateur)
-    if (chemin === '/auth/v1/signup')
+    if (chemin === '/auth/v1/signup') {
+      this.redirectionInscription = url.searchParams.get('redirect_to')
       return json({ ...this.utilisateur, email: corps(requete).email })
+    }
     if (chemin === '/auth/v1/recover') return json({})
 
     // Base de données
@@ -479,6 +496,36 @@ export class FauxSupabase {
       }
       this.espaceActif = invitation.espace_id
       return { corps: invitation.espace_id, status: 200 }
+    }
+
+    if (chemin === '/rest/v1/rpc/transferer_propriete') {
+      const dans = (userId: string) =>
+        this.membres.find((m) => m.espace_id === parametres.eid && m.user_id === userId)
+      const moi = dans(this.utilisateur.id)
+      const nouveau = dans(parametres.nouveau)
+      if (moi?.role !== 'proprietaire' || !nouveau || nouveau === moi) {
+        return { corps: { code: 'P0001', message: 'transfert_refuse: refusé' }, status: 400 }
+      }
+      moi.role = 'membre'
+      nouveau.role = 'proprietaire'
+      const espace = this.espaces.find((e) => e.id === parametres.eid)!
+      espace.proprietaire_email = nouveau.email
+      espace.pro = false
+      // Nouvel espace personnel pour l'ancien propriétaire
+      const personnel = {
+        id: crypto.randomUUID(),
+        nom: 'Mon espace',
+        proprietaire_email: this.utilisateur.email,
+      }
+      this.espaces.push(personnel)
+      this.membres.push({
+        espace_id: personnel.id,
+        user_id: this.utilisateur.id,
+        email: this.utilisateur.email,
+        role: 'proprietaire',
+        created_at: new Date().toISOString(),
+      })
+      return { corps: undefined, status: 204 }
     }
 
     if (chemin === '/rest/v1/membres') {

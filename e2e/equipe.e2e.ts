@@ -107,3 +107,50 @@ test('un lien invalide ou inconnu est refusé', async ({ page }) => {
   await page.goto('/invitation/pas-un-jeton')
   await expect(page.getByRole('heading', { name: 'Invitation invalide' })).toBeVisible()
 })
+
+test('créer son compte depuis une invitation y ramène après la confirmation de l’e-mail', async ({
+  page,
+}) => {
+  const { jeton } = faux.ajouterEspaceInvitant('Agence RH', 'patronne@agence.fr')
+  await page.goto(`/invitation/${jeton}`)
+  await expect(page).toHaveURL(/\/connexion\?redirect=/)
+
+  await page.getByRole('link', { name: 'Créer un compte' }).click()
+  await expect(page).toHaveURL(new RegExp(`/inscription\\?redirect=%2Finvitation%2F${jeton}`))
+  await page.getByLabel('E-mail').fill('nouvelle@exemple.fr')
+  await page.getByLabel('Mot de passe').fill('motdepasse')
+  await page.getByRole('button', { name: 'Créer mon compte' }).click()
+
+  await expect(page.getByText('vous reviendrez directement à votre invitation')).toBeVisible()
+  // Le lien de confirmation envoyé par Supabase ramènera à l'invitation
+  expect(faux.redirectionInscription).toMatch(new RegExp(`/invitation/${jeton}$`))
+})
+
+test('transférer la propriété de l’espace à un membre', async ({ page }) => {
+  faux.ajouter({ nom: 'Candidat de l’équipe' })
+  const collegue = faux.ajouterMembre('collegue@exemple.fr')
+  await seConnecter(page, faux)
+  await page.goto('/equipe')
+
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'collegue@exemple.fr' })
+    .getByRole('button', { name: 'Transférer la propriété' })
+    .click()
+  await expect(page.getByText('Votre rôle : membre')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Quitter l’espace' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Créer un lien d’invitation' })).toHaveCount(0)
+  expect(faux.membres.find((m) => m.user_id === collegue)?.role).toBe('proprietaire')
+
+  // Un nouvel espace personnel apparaît parmi « Vos espaces »
+  const vosEspaces = page.getByRole('heading', { name: 'Vos espaces' })
+  await expect(vosEspaces).toBeVisible()
+  // L'espace d'équipe (actif, où l'on est désormais membre) et le nouvel espace personnel
+  const lignes = page.getByRole('listitem').filter({ hasText: /^Mon espace(Membre|Propriétaire)/ })
+  await expect(lignes).toHaveCount(2)
+  await expect(lignes.filter({ hasText: 'Membre' })).toContainText('Espace actif')
+  await lignes.filter({ hasText: 'Propriétaire' }).getByRole('button', { name: 'Ouvrir' }).click()
+  await expect(page.getByText('Votre rôle : propriétaire')).toBeVisible()
+  await expect(page.getByText('rh@exemple.fr (vous)')).toBeVisible()
+  await expect(page.getByText('collegue@exemple.fr')).toHaveCount(0)
+})

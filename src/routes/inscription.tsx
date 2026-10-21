@@ -1,11 +1,15 @@
-import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { FormulaireAuth } from '@/components/FormulaireAuth'
 import { useAuth } from '@/lib/auth'
+import { cheminInterne } from '@/lib/redirection'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/inscription')({
   head: () => titrePage('Créer un compte'),
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+    redirect: cheminInterne(search.redirect),
+  }),
   beforeLoad: ({ context }) => {
     if (context.auth.session) throw redirect({ to: '/tableau-de-bord' })
   },
@@ -14,14 +18,15 @@ export const Route = createFileRoute('/inscription')({
 
 function Inscription() {
   const { inscription } = useAuth()
-  const navigate = useNavigate()
+  const router = useRouter()
+  const { redirect: destination } = Route.useSearch()
   const [emailAConfirmer, setEmailAConfirmer] = useState<string | null>(null)
 
   async function handleSubmit(email: string, motDePasse: string) {
-    const resultat = await inscription(email, motDePasse)
+    const resultat = await inscription(email, motDePasse, destination)
     if (resultat.erreur !== null) return resultat.erreur
     if (resultat.confirmationRequise) setEmailAConfirmer(email)
-    else navigate({ to: '/tableau-de-bord' })
+    else router.history.push(destination ?? '/tableau-de-bord')
     return null
   }
 
@@ -31,9 +36,16 @@ function Inscription() {
         <h1 className="text-2xl font-bold">Vérifiez vos e-mails</h1>
         <p className="mt-4 text-slate-600">
           Un lien de confirmation a été envoyé à <strong>{emailAConfirmer}</strong>. Cliquez dessus
-          pour activer votre compte, puis connectez-vous.
+          pour activer votre compte
+          {destination?.startsWith('/invitation/')
+            ? ' : vous reviendrez directement à votre invitation.'
+            : ', puis connectez-vous.'}
         </p>
-        <Link to="/connexion" className="mt-6 inline-block text-accent hover:underline">
+        <Link
+          to="/connexion"
+          search={{ redirect: destination }}
+          className="mt-6 inline-block text-accent hover:underline"
+        >
           Aller à la connexion
         </Link>
       </section>
@@ -62,6 +74,7 @@ function Inscription() {
         Déjà un compte ?{' '}
         <Link
           to="/connexion"
+          search={{ redirect: destination }}
           className="text-accent underline underline-offset-2 hover:no-underline"
         >
           Se connecter

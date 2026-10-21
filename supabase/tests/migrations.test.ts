@@ -571,6 +571,56 @@ describe('travail en équipe', () => {
     ).rejects.toThrow(/row-level security/)
   })
 
+  it('transfère la propriété : l’ancien propriétaire devient membre, avec un nouvel espace', async () => {
+    await ajouter(A, ['Candidat de l’équipe'])
+    await accepter(B, await inviter(A))
+    // B (simple membre) ne peut pas transférer
+    await expect(
+      enTant(B, () => db.exec(`select public.transferer_propriete('${A}', '${B}')`)),
+    ).rejects.toThrow(/^transfert_refuse/)
+    // Ni vers quelqu'un qui n'est pas membre
+    await expect(
+      enTant(A, () => db.exec(`select public.transferer_propriete('${A}', '${C}')`)),
+    ).rejects.toThrow(/^transfert_refuse/)
+
+    await enTant(A, () => db.exec(`select public.transferer_propriete('${A}', '${B}')`))
+    const roles = await db.query(
+      `select user_id, role from public.membres where espace_id = '${A}' order by role`,
+    )
+    expect(roles.rows).toEqual([
+      { user_id: A, role: 'membre' },
+      { user_id: B, role: 'proprietaire' },
+    ])
+    // B gère désormais l'espace (invitations) ; A non
+    await inviter(A, B)
+    await expect(inviter(A, A)).rejects.toThrow(/row-level security/)
+    // L'offre Pro de l'espace est maintenant celle de B
+    await passerPro(B)
+    const espace = await enTant(A, () => db.query('select role, est_pro from public.mon_espace()'))
+    expect(espace.rows).toEqual([{ role: 'membre', est_pro: true }])
+  })
+
+  it('après un transfert, l’ancien propriétaire qui part perd l’accès à l’équipe', async () => {
+    await ajouter(A, ['Candidat de l’équipe'])
+    await accepter(B, await inviter(A))
+    await enTant(A, () => db.exec(`select public.transferer_propriete('${A}', '${B}')`))
+    await enTant(A, () =>
+      db.exec(`delete from public.membres where espace_id = '${A}' and user_id = '${A}'`),
+    )
+    // L'identifiant de l'espace d'équipe est toujours celui du compte de A : le repli ne doit
+    // pas y donner accès
+    expect(await noms(A)).toEqual([])
+    await enTant(A, () =>
+      db.exec(`insert into public.candidatures (nom) values ('Nouveau départ')`),
+    )
+    expect(await noms(A)).toEqual(['Nouveau départ'])
+    const { rows } = await db.query<{ espace_id: string }>(
+      `select espace_id from public.candidatures where nom = 'Nouveau départ'`,
+    )
+    expect(rows[0].espace_id).not.toBe(A)
+    expect(await noms(B)).toEqual(['Candidat de l’équipe'])
+  })
+
   it('refuse une offre d’un autre espace', async () => {
     const { rows } = await db.query<{ id: string }>(
       `insert into public.offres (user_id, titre) values ('${B}', 'Offre de B') returning id`,

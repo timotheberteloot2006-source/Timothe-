@@ -10,7 +10,12 @@ export interface AuthState {
 
 export interface AuthContextValue extends AuthState {
   connexion: (email: string, motDePasse: string) => Promise<string | null>
-  inscription: (email: string, motDePasse: string) => Promise<ResultatInscription>
+  // redirection : page (chemin interne) où ramener après la confirmation de l'e-mail
+  inscription: (
+    email: string,
+    motDePasse: string,
+    redirection?: string,
+  ) => Promise<ResultatInscription>
   deconnexion: () => Promise<void>
   demanderReinitialisation: (email: string) => Promise<string | null>
   changerMotDePasse: (motDePasse: string) => Promise<string | null>

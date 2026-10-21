@@ -42,6 +42,8 @@ function Connexion() {
         Pas encore de compte ?{' '}
         <Link
           to="/inscription"
+          // Garde la page demandée (ex. une invitation) pendant l'inscription
+          search={{ redirect: destination }}
           className="text-accent underline underline-offset-2 hover:no-underline"
         >
           Créer un compte
