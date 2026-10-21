@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { FauxSupabase, seConnecter } from './fauxSupabase.ts'
+import { FauxSupabase, MOT_DE_PASSE, seConnecter } from './fauxSupabase.ts'
 
 let faux: FauxSupabase
 
@@ -40,4 +40,59 @@ test('au retour du paiement, l’offre Pro s’affiche dès qu’elle est active
 
   await page.getByRole('button', { name: 'Gérer mon abonnement' }).click()
   await expect(page).toHaveURL('https://stripe.test/portail-client')
+})
+
+test('paiement en attente : on régularise l’abonnement existant, sans en ouvrir un second', async ({
+  page,
+}) => {
+  faux.abonnement = { statut: 'past_due', fin_periode: '2026-11-20T10:00:00Z' }
+  await seConnecter(page, faux)
+  await page.goto('/tarifs')
+  await expect(page.getByRole('button', { name: 'Passer à Pro' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Gérer mon abonnement' }).click()
+  await expect(page).toHaveURL('https://stripe.test/portail-client')
+  expect(faux.fonctionsAppelees).toEqual(['portail-client'])
+})
+
+async function supprimerLeCompte(page: import('@playwright/test').Page) {
+  await page.goto('/compte')
+  const carte = page.getByRole('heading', { name: 'Supprimer mon compte' }).locator('xpath=..')
+  await carte.getByLabel('Mot de passe').fill(MOT_DE_PASSE)
+  await carte.getByLabel('Tapez SUPPRIMER pour confirmer').fill('SUPPRIMER')
+  await carte.getByRole('button', { name: 'Supprimer définitivement' }).click()
+}
+
+test('suppression du compte refusée tant qu’un paiement est en attente, CV conservés', async ({
+  page,
+}) => {
+  faux.abonnement = { statut: 'past_due', fin_periode: '2026-11-20T10:00:00Z' }
+  faux.ajouter({ cv_chemin: 'moi/c1/cv.pdf' })
+  faux.fichiers.add('moi/c1/cv.pdf')
+  await seConnecter(page, faux)
+  await supprimerLeCompte(page)
+  await expect(page.getByText('Résiliez d’abord votre abonnement Pro')).toBeVisible()
+  expect(faux.compteSupprime).toBe(false)
+  expect([...faux.fichiers]).toEqual(['moi/c1/cv.pdf'])
+})
+
+test('suppression du compte : seuls les CV de mes espaces sont effacés', async ({ page }) => {
+  faux.ajouter({ cv_chemin: 'moi/c1/cv.pdf' })
+  faux.fichiers.add('moi/c1/cv.pdf')
+  // Espace d'une autre équipe dont l'utilisateur est membre : ses CV restent
+  const { espace } = faux.ajouterEspaceInvitant('Agence', 'patron@exemple.fr')
+  faux.membres.push({
+    espace_id: espace.id,
+    user_id: faux.utilisateur.id,
+    email: faux.utilisateur.email,
+    role: 'membre',
+    created_at: '2026-01-02T00:00:00Z',
+  })
+  faux.ajouter({ cv_chemin: 'agence/c2/cv.pdf', espace_id: espace.id })
+  faux.fichiers.add('agence/c2/cv.pdf')
+
+  await seConnecter(page, faux)
+  await supprimerLeCompte(page)
+  await page.waitForURL((url) => url.pathname === '/')
+  expect(faux.compteSupprime).toBe(true)
+  expect([...faux.fichiers]).toEqual(['agence/c2/cv.pdf'])
 })

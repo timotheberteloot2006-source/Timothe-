@@ -41,16 +41,27 @@ function table() {
   return supabase.from('candidatures')
 }
 
+// L'API renvoie au plus 1000 lignes par requête : on lit par tranches jusqu'à la dernière
+const TRANCHE = 1000
+
 export async function listerCandidatures(): Promise<Candidature[]> {
-  const { data, error } = await table()
-    .select('*, notes(count)')
-    .order('created_at', { ascending: false })
-  if (error) throw erreurSupabase(error)
-  // notes(count) renvoie [{ count: n }]
-  return data.map(({ notes, ...candidature }) => ({
-    ...candidature,
-    nb_notes: notes?.[0]?.count ?? 0,
-  }))
+  const lignes: Candidature[] = []
+  for (let debut = 0; ; debut += TRANCHE) {
+    const { data, error } = await table()
+      .select('*, notes(count)')
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(debut, debut + TRANCHE - 1)
+    if (error) throw erreurSupabase(error)
+    // notes(count) renvoie [{ count: n }]
+    lignes.push(
+      ...data.map(({ notes, ...candidature }) => ({
+        ...candidature,
+        nb_notes: notes?.[0]?.count ?? 0,
+      })),
+    )
+    if (data.length < TRANCHE) return lignes
+  }
 }
 
 export async function lireCandidature(id: string): Promise<Candidature | null> {

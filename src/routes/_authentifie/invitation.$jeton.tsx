@@ -20,11 +20,13 @@ function Invitation() {
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
-  async function rejoindre() {
+  // dejaMembre : il suffit d'ouvrir l'espace, l'invitation n'est pas consommée
+  async function rejoindre(dejaMembre: boolean, espaceId: string) {
     setEnvoi(true)
     setErreur(null)
     try {
-      await accepterInvitation(jeton)
+      if (dejaMembre) await choisirEspace(espaceId)
+      else await accepterInvitation(jeton)
       await router.invalidate()
       navigate({ to: '/tableau-de-bord' })
     } catch (e) {
@@ -60,28 +62,18 @@ function Invitation() {
           {erreur}
         </p>
       )}
-      {apercu.deja_membre ? (
-        <button
-          type="button"
-          onClick={async () => {
-            await choisirEspace(apercu.espace_id)
-            await router.invalidate()
-            navigate({ to: '/tableau-de-bord' })
-          }}
-          className="rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500"
-        >
-          Vous êtes déjà membre : ouvrir l’espace
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={rejoindre}
-          disabled={envoi}
-          className="rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-        >
-          {envoi ? 'Patientez…' : 'Rejoindre l’espace'}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => rejoindre(apercu.deja_membre, apercu.espace_id)}
+        disabled={envoi}
+        className="rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+      >
+        {envoi
+          ? 'Patientez…'
+          : apercu.deja_membre
+            ? 'Vous êtes déjà membre : ouvrir l’espace'
+            : 'Rejoindre l’espace'}
+      </button>
     </Cadre>
   )
 }

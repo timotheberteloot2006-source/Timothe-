@@ -306,6 +306,34 @@ export class FauxSupabase {
       const reponse = this.espacesRest(route, url, chemin)
       if (reponse) return json(reponse.corps, reponse.status)
     }
+    // Fonctions de supabase/migrations/0012_relecture_securite.sql
+    const possedes = this.membres
+      .filter((m) => m.user_id === this.utilisateur.id && m.role === 'proprietaire')
+      .map((m) => m.espace_id)
+    if (chemin === '/rest/v1/rpc/verifier_suppression_compte') {
+      if (
+        ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(
+          this.abonnement?.statut ?? '',
+        )
+      ) {
+        return json({ code: 'P0001', message: 'abonnement_actif: résiliez votre abonnement' }, 400)
+      }
+      if (
+        this.membres.some(
+          (m) => possedes.includes(m.espace_id) && m.user_id !== this.utilisateur.id,
+        )
+      ) {
+        return json({ code: 'P0001', message: 'equipe_non_vide: retirez les membres' }, 400)
+      }
+      return json(undefined, 204)
+    }
+    if (chemin === '/rest/v1/rpc/cv_de_mes_espaces') {
+      return json(
+        this.candidatures
+          .filter((c) => possedes.includes(c.espace_id) && c.cv_chemin)
+          .map((c) => c.cv_chemin),
+      )
+    }
     if (chemin === '/rest/v1/rpc/supprimer_mon_compte') {
       this.compteSupprime = true
       return json(undefined, 204)
@@ -384,7 +412,10 @@ export class FauxSupabase {
 
     if (methode === 'PATCH') {
       const champs = corps(requete) as Partial<CandidatureFaux>
-      const cibles = this.candidatures.filter((c) => ids?.includes(c.id))
+      // Règle RLS : seulement l'espace actif
+      const cibles = this.candidatures.filter(
+        (c) => ids?.includes(c.id) && c.espace_id === this.espaceActif,
+      )
       if (
         champs.email &&
         this.emailPris(
@@ -416,6 +447,9 @@ export class FauxSupabase {
         if (modifies.length > 0) this.journaliser(c.id, 'modification', { champs: modifies })
         Object.assign(c, champs)
       }
+      // Avec « select », PostgREST renvoie les lignes modifiées
+      const select = url.searchParams.get('select')
+      if (select) return json(cibles.map((c) => ({ id: c.id })))
       return json(undefined, 204)
     }
 

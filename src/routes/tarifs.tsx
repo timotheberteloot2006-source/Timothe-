@@ -5,6 +5,8 @@ import {
   estPro,
   LIMITE_GRATUITE,
   lireAbonnement,
+  ouvrirPortail,
+  paiementEnAttente,
   PRIX_PRO,
 } from '@/lib/abonnement'
 import { titrePage } from '@/lib/titre'
@@ -23,6 +25,8 @@ function Tarifs() {
   const { auth } = Route.useRouteContext()
   const connecte = auth.session !== null
   const pro = estPro(abonnement)
+  // Un abonnement existe déjà (paiement à régulariser) : on n'en ouvre pas un second
+  const enAttente = paiementEnAttente(abonnement)
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
@@ -30,7 +34,7 @@ function Tarifs() {
     setEnvoi(true)
     setErreur(null)
     try {
-      await demarrerPaiement()
+      await (enAttente ? ouvrirPortail() : demarrerPaiement())
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e))
       setEnvoi(false)
@@ -61,7 +65,7 @@ function Tarifs() {
           {!connecte ? (
             <BoutonLien to="/inscription">Commencer</BoutonLien>
           ) : (
-            !pro && <OffreActuelle />
+            !pro && !enAttente && <OffreActuelle />
           )}
         </Offre>
         <Offre
@@ -81,7 +85,7 @@ function Tarifs() {
               disabled={envoi}
               className="w-full rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
             >
-              {envoi ? 'Redirection…' : 'Passer à Pro'}
+              {envoi ? 'Redirection…' : enAttente ? 'Gérer mon abonnement' : 'Passer à Pro'}
             </button>
           )}
         </Offre>

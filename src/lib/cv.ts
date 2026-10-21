@@ -37,26 +37,34 @@ export async function deposerCv(
   const depot = await (await bucket()).upload(chemin, fichier, { contentType: 'application/pdf' })
   if (depot.error) throw new Error(`Dépôt du CV impossible : ${depot.error.message}`)
 
-  const { error } = await client()
+  // On ne supprime l'ancien fichier que si la candidature pointe bien vers le nouveau
+  // (une mise à jour peut ne toucher aucune ligne, ex. si l'espace actif a changé entre-temps)
+  const { data, error } = await client()
     .from('candidatures')
     .update({ cv_chemin: chemin })
     .eq('id', candidature.id)
-  if (error) {
+    .select('id')
+  if (error || data?.length !== 1) {
     await supprimerFichiersCv([chemin])
-    throw new Error(error.message)
+    throw new Error(error?.message ?? CANDIDATURE_INACCESSIBLE)
   }
   if (candidature.cv_chemin) await supprimerFichiersCv([candidature.cv_chemin])
 }
 
 export async function retirerCv(candidature: { id: string; cv_chemin: string | null }) {
   if (!candidature.cv_chemin) return
-  const { error } = await client()
+  const { data, error } = await client()
     .from('candidatures')
     .update({ cv_chemin: null })
     .eq('id', candidature.id)
+    .select('id')
   if (error) throw new Error(error.message)
+  if (data?.length !== 1) throw new Error(CANDIDATURE_INACCESSIBLE)
   await supprimerFichiersCv([candidature.cv_chemin])
 }
+
+const CANDIDATURE_INACCESSIBLE =
+  'Candidature introuvable dans l’espace actif : rechargez la page puis réessayez.'
 
 // Ouvre le CV dans un nouvel onglet grâce à un lien temporaire signé
 export async function ouvrirCv(chemin: string) {
@@ -71,19 +79,21 @@ export async function ouvrirCv(chemin: string) {
   else window.location.assign(data.signedUrl)
 }
 
+// Par lots, pour rester sous les limites de taille des requêtes de suppression
+const TAILLE_LOT = 100
+
 export async function supprimerFichiersCv(chemins: string[]) {
-  if (chemins.length === 0) return
-  const { error } = await (await bucket()).remove(chemins)
-  if (error) throw new Error(`Suppression du CV impossible : ${error.message}`)
+  for (let debut = 0; debut < chemins.length; debut += TAILLE_LOT) {
+    const { error } = await (await bucket()).remove(chemins.slice(debut, debut + TAILLE_LOT))
+    if (error) throw new Error(`Suppression du CV impossible : ${error.message}`)
+  }
 }
 
-// Avant la suppression du compte : les fichiers ne sont pas effacés avec l'utilisateur.
-// Porte sur l'espace actif : l'appelant choisit d'abord l'espace personnel.
+// Avant la suppression du compte : les fichiers ne sont pas effacés avec l'utilisateur. Porte sur
+// tous les espaces qu'il possède (supprimés avec lui), sans changer d'espace actif ; la fonction
+// renvoie un tableau, non soumis à la limite de lignes de l'API.
 export async function supprimerTousLesCv() {
-  const { data, error } = await client()
-    .from('candidatures')
-    .select('cv_chemin')
-    .not('cv_chemin', 'is', null)
+  const { data, error } = await client().rpc('cv_de_mes_espaces')
   if (error) throw new Error(error.message)
-  await supprimerFichiersCv(data.map((c) => c.cv_chemin as string))
+  await supprimerFichiersCv((data as string[] | null) ?? [])
 }

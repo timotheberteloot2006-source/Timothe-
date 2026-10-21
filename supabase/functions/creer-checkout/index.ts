@@ -20,6 +20,17 @@ Deno.serve(async (req) => {
   if (abonnement?.statut === 'active' || abonnement?.statut === 'trialing') {
     return json({ erreur: 'Vous avez déjà l’offre Pro.' }, 409)
   }
+  // Abonnement existant dont le paiement est à régulariser : un second serait aussi prélevé
+  // (mêmes statuts que public.abonnement_en_cours, supabase/migrations/0012_relecture_securite.sql)
+  if (['past_due', 'unpaid', 'incomplete'].includes(abonnement?.statut ?? '')) {
+    return json(
+      {
+        erreur:
+          'Un paiement de votre abonnement est en attente : régularisez-le depuis « Mon compte » (bouton « Gérer mon abonnement »).',
+      },
+      409,
+    )
+  }
 
   // Un seul client Stripe par utilisateur, créé au premier paiement
   let clientId = abonnement?.stripe_customer_id

@@ -3,6 +3,8 @@
 -- Actions sans utilisateur connecté (traitement serveur) : distinguées d'un compte supprimé
 alter table public.historique add column par_systeme boolean not null default false;
 update public.historique set par_systeme = true where user_id is null and email is null;
+-- Comptes déjà supprimés avant cette migration : leur e-mail n'a plus à figurer dans l'historique
+update public.historique set email = null where user_id is null and email is not null;
 
 -- Index des clés étrangères : suppressions en cascade (espace, compte) sans parcourir la table
 create index historique_espace_idx on public.historique (espace_id);

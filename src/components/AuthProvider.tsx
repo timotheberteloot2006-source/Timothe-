@@ -1,9 +1,7 @@
 import type { Session } from '@supabase/auth-js'
 import { useEffect, useState, type ReactNode } from 'react'
 import { AuthContext, type ResultatInscription } from '@/lib/auth'
-import { estPro, lireAbonnement } from '@/lib/abonnement'
 import { supprimerTousLesCv } from '@/lib/cv'
-import { choisirEspace, lireEspace, listerEspacesPossedes } from '@/lib/espace'
 import { SUPABASE_NON_CONFIGURE, supabase } from '@/lib/supabase'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -78,28 +76,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? traduireErreur(error.message) : null
   }
 
-  // Fonction SQL de supabase/migrations/0003_supprimer_mon_compte.sql
+  // Fonctions SQL de supabase/migrations/0012_relecture_securite.sql
   async function supprimerCompte() {
     if (!supabase) return SUPABASE_NON_CONFIGURE
-    // Refusé tant qu'un abonnement est actif : on vérifie avant d'effacer les CV
-    if (estPro(await lireAbonnement().catch(() => null))) {
-      return traduireErreur('abonnement_actif')
-    }
+    // Vérifications sans effet de bord (abonnement en cours, membres) avant d'effacer les CV
+    const verification = await supabase.rpc('verifier_suppression_compte')
+    if (verification.error) return traduireErreur(verification.error.message)
     try {
       // Les fichiers ne sont pas effacés avec l'utilisateur : on supprime d'abord les CV des
       // espaces dont il est propriétaire (supprimés avec lui), jamais ceux d'une autre équipe
-      const userId = session?.user.id
-      if (!userId) return 'Aucun utilisateur connecté.'
-      const possedes = await listerEspacesPossedes(userId)
-      // Refusé par la base si l'un d'eux a d'autres membres : vérifié avant d'effacer les CV
-      for (const espace of possedes) {
-        await choisirEspace(espace.espace_id)
-        if ((await lireEspace()).nb_membres > 1) return traduireErreur('equipe_non_vide')
-      }
-      for (const espace of possedes) {
-        await choisirEspace(espace.espace_id)
-        await supprimerTousLesCv()
-      }
+      await supprimerTousLesCv()
     } catch (e) {
       return e instanceof Error ? e.message : String(e)
     }

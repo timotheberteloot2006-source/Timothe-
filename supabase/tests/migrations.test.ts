@@ -400,7 +400,6 @@ describe('travail en équipe', () => {
     await db.exec(`
       grant usage on schema public to authenticated;
       grant select, insert, update, delete on all tables in schema public to authenticated;
-      grant execute on all functions in schema public to authenticated;
     `)
   })
 
@@ -642,7 +641,6 @@ describe('historique', () => {
     await db.exec(`
       grant usage on schema public to authenticated;
       grant select, insert, update, delete on all tables in schema public to authenticated;
-      grant execute on all functions in schema public to authenticated;
     `)
   })
 
@@ -798,5 +796,97 @@ describe('historique', () => {
     // La suppression en cascade des notes et entretiens ne doit pas bloquer
     await enTant(A, () => db.exec(`delete from public.candidatures where id = '${id}'`))
     expect(await journal()).toEqual([])
+  })
+})
+
+describe('relecture de sécurité', () => {
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to authenticated, anon;
+      grant select, insert, update, delete on all tables in schema public to authenticated;
+    `)
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  it('empêche de rattacher une note ou un entretien à la candidature d’un autre espace', async () => {
+    const [deA, deB] = (
+      await db.query<{ id: string }>(
+        `insert into public.candidatures (user_id, nom) values ('${A}', 'De A'), ('${B}', 'De B')
+         returning id`,
+      )
+    ).rows.map((r) => r.id)
+    await enTant(A, async () => {
+      await db.exec(`insert into public.notes (candidature_id, contenu) values ('${deA}', 'Note')`)
+      await db.exec(
+        `insert into public.entretiens (candidature_id, debut) values ('${deA}', '2026-11-03T14:00:00Z')`,
+      )
+    })
+    await expect(
+      enTant(A, () => db.exec(`update public.notes set candidature_id = '${deB}'`)),
+    ).rejects.toThrow(/row-level security/)
+    await expect(
+      enTant(A, () => db.exec(`update public.entretiens set candidature_id = '${deB}'`)),
+    ).rejects.toThrow(/row-level security/)
+    const { rows } = await db.query('select candidature_id from public.notes')
+    expect(rows).toEqual([{ candidature_id: deA }])
+  })
+
+  it('refuse la suppression du compte tant qu’un abonnement est en défaut de paiement', async () => {
+    await passerPro(A, 'past_due')
+    await expect(enTant(A, () => db.exec('select public.supprimer_mon_compte()'))).rejects.toThrow(
+      /^abonnement_actif/,
+    )
+    await expect(
+      enTant(A, () => db.exec('select public.verifier_suppression_compte()')),
+    ).rejects.toThrow(/^abonnement_actif/)
+    await passerPro(A, 'canceled')
+    await enTant(A, () => db.exec('select public.verifier_suppression_compte()'))
+  })
+
+  it('liste les CV des espaces possédés, quel que soit l’espace actif', async () => {
+    await db.exec(
+      `insert into public.candidatures (user_id, nom, cv_chemin) values
+         ('${A}', 'Avec CV', '${A}/c1/cv.pdf'), ('${A}', 'Sans CV', null),
+         ('${B}', 'De B', '${B}/c2/cv.pdf')`,
+    )
+    const { rows } = await enTant(A, () =>
+      db.query<{ chemins: string[] }>('select public.cv_de_mes_espaces() as chemins'),
+    )
+    expect(rows[0].chemins).toEqual([`${A}/c1/cv.pdf`])
+  })
+
+  it('ne laisse appeler aucune fonction sans compte, ni celles qui renseignent sur autrui', async () => {
+    await db.exec('set role anon')
+    try {
+      for (const appel of [
+        `select public.est_pro('${A}')`,
+        'select public.espace_actif()',
+        `select public.est_membre('${A}')`,
+        'select * from public.mon_espace()',
+        'select public.supprimer_mon_compte()',
+      ]) {
+        await expect(db.exec(appel)).rejects.toThrow(/permission denied/)
+      }
+    } finally {
+      await db.exec('reset role')
+    }
+    await expect(enTant(A, () => db.exec(`select public.est_pro('${B}')`))).rejects.toThrow(
+      /permission denied/,
+    )
+    await expect(enTant(A, () => db.exec(`select public.est_pro_espace('${B}')`))).rejects.toThrow(
+      /permission denied/,
+    )
+    // Les fonctions utiles au site restent appelables par un utilisateur connecté
+    await enTant(A, () => db.exec('select * from public.mon_espace()'))
   })
 })
