@@ -1,5 +1,6 @@
 import { telechargerFichier } from './telechargement'
-import { LIBELLES_STATUT, type Candidature } from './candidatures'
+import type { Candidature } from './candidatures'
+import { ETAPES_DE_BASE, nomsEtapes } from './etapes'
 
 const SEPARATEUR = ';'
 
@@ -15,10 +16,12 @@ const ENTETE = [
   'offre',
 ]
 
-// titresOffres : titre de chaque offre par identifiant, pour la colonne « offre »
+// titresOffres : titre de chaque offre par identifiant, pour la colonne « offre » ; etapes : nom
+// de chaque étape par clé, pour la colonne « statut »
 export function genererCsv(
   candidatures: Candidature[],
   titresOffres: Map<string, string> = new Map(),
+  etapes: Map<string, string> = nomsEtapes(ETAPES_DE_BASE),
 ): string {
   const lignes = candidatures.map((c) =>
     [
@@ -27,7 +30,7 @@ export function genererCsv(
       texte(c.poste ?? ''),
       texte(c.competences.join(', ')),
       String(c.experience),
-      LIBELLES_STATUT[c.statut],
+      texte(etapes.get(c.statut) ?? c.statut),
       new Date(c.created_at).toLocaleDateString('fr-FR'),
       texte((c.offre_id && titresOffres.get(c.offre_id)) || ''),
     ].map(echapper),

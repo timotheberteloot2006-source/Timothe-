@@ -17,20 +17,26 @@ import {
   revoquerInvitation,
   transfererPropriete,
 } from '@/lib/espace'
+import { compterParEtape, ETAPES_DE_BASE, listerEtapes } from '@/lib/etapes'
+import { GestionEtapes } from '@/components/GestionEtapes'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/equipe')({
   head: () => titrePage('Équipe'),
   loader: async ({ context }) => {
     const espace = await lireEspace()
-    const [membres, invitations, mesEspaces, notifications] = await Promise.all([
-      listerMembres(espace.id),
-      // Seul le propriétaire voit et gère les invitations
-      espace.role === 'proprietaire' ? listerInvitations(espace.id) : Promise.resolve([]),
-      listerMesEspaces(context.auth.user!.id),
-      lireNotifications(),
-    ])
-    return { espace, membres, invitations, mesEspaces, notifications }
+    const [membres, invitations, mesEspaces, notifications, etapes, nombresParEtape] =
+      await Promise.all([
+        listerMembres(espace.id),
+        // Seul le propriétaire voit et gère les invitations
+        espace.role === 'proprietaire' ? listerInvitations(espace.id) : Promise.resolve([]),
+        listerMesEspaces(context.auth.user!.id),
+        lireNotifications(),
+        // Base pas encore à jour (migration 0015) : les trois étapes habituelles
+        listerEtapes().catch(() => ETAPES_DE_BASE),
+        compterParEtape().catch(() => ({})),
+      ])
+    return { espace, membres, invitations, mesEspaces, notifications, etapes, nombresParEtape }
   },
   component: Equipe,
   errorComponent: ({ error }) => (
@@ -43,7 +49,8 @@ export const Route = createFileRoute('/_authentifie/equipe')({
 })
 
 function Equipe() {
-  const { espace, membres, invitations, mesEspaces, notifications } = Route.useLoaderData()
+  const { espace, membres, invitations, mesEspaces, notifications, etapes, nombresParEtape } =
+    Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
   const [erreur, setErreur] = useState<string | null>(null)
@@ -147,6 +154,15 @@ function Equipe() {
             </button>
           </form>
         )}
+      </Carte>
+
+      <Carte titre="Étapes de recrutement">
+        <GestionEtapes
+          etapes={etapes}
+          proprietaire={proprietaire}
+          nombres={nombresParEtape}
+          executer={executer}
+        />
       </Carte>
 
       <Carte titre="Notifications">

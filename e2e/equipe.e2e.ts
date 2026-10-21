@@ -16,7 +16,7 @@ test('le propriétaire renomme son espace et gère les liens d’invitation', as
   await expect(page.getByText('rh@exemple.fr (vous)')).toBeVisible()
 
   await page.getByLabel('Nom de l’espace').fill('Cabinet Martin')
-  await page.getByRole('button', { name: 'Renommer' }).click()
+  await page.getByRole('button', { name: 'Renommer', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Espace « Cabinet Martin »' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Créer un lien d’invitation' }).click()
@@ -200,4 +200,70 @@ test('notifications : un membre ne voit pas le réglage de l’accusé de récep
     carte.getByLabel('Me prévenir par e-mail des nouvelles candidatures de cet espace'),
   ).toBeChecked()
   await expect(carte.getByLabel('Envoyer un accusé de réception aux candidats')).toHaveCount(0)
+})
+
+test('étapes : le propriétaire ajoute, renomme, ordonne et supprime ses étapes', async ({
+  page,
+}) => {
+  faux.ajouter({ nom: 'Alice Martin' })
+  await seConnecter(page, faux)
+  await page.goto('/equipe')
+  const carte = page.getByRole('heading', { name: 'Étapes de recrutement' }).locator('xpath=..')
+  const noms = () => carte.getByRole('listitem').locator('span.font-medium')
+  await expect(noms()).toHaveText(['Nouveau', 'Retenu', 'Écarté'])
+  // Étapes de base : pas de suppression ; « Nouveau » ne bouge pas
+  await expect(carte.getByRole('button', { name: /^Supprimer/ })).toHaveCount(0)
+  await expect(carte.getByRole('button', { name: 'Monter l’étape « Nouveau »' })).toBeDisabled()
+
+  await carte.getByLabel('Nouvelle étape').fill('Entretien RH')
+  await carte.getByRole('button', { name: 'Ajouter l’étape' }).click()
+  await expect(noms()).toHaveText(['Nouveau', 'Entretien RH', 'Retenu', 'Écarté'])
+  await carte.getByLabel('Nouvelle étape').fill('entretien rh')
+  await carte.getByRole('button', { name: 'Ajouter l’étape' }).click()
+  await expect(page.getByRole('alert')).toHaveText('Une étape porte déjà ce nom.')
+
+  await carte.getByRole('button', { name: 'Renommer l’étape « Retenu »' }).click()
+  await carte.getByLabel('Nouveau nom de l’étape « Retenu »').fill('Embauché')
+  await carte.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(noms()).toHaveText(['Nouveau', 'Entretien RH', 'Embauché', 'Écarté'])
+
+  await carte.getByRole('button', { name: 'Descendre l’étape « Entretien RH »' }).click()
+  await expect(noms()).toHaveText(['Nouveau', 'Embauché', 'Entretien RH', 'Écarté'])
+
+  // La nouvelle étape est proposée sur la liste et dans la fiche
+  await page.goto('/tableau-de-bord')
+  await page.getByLabel('Statut de Alice Martin').selectOption({ label: 'Entretien RH' })
+  await expect.poll(() => faux.candidature('Alice Martin')!.statut).toMatch(/^e_/)
+
+  // Suppression : la candidature revient à la première étape
+  await page.goto('/equipe')
+  // Le message est vérifié ; la boîte est acceptée par le gestionnaire commun (beforeEach)
+  let message = ''
+  page.once('dialog', (d) => {
+    message = d.message()
+  })
+  await carte.getByRole('button', { name: 'Supprimer l’étape « Entretien RH »' }).click()
+  await expect(noms()).toHaveText(['Nouveau', 'Embauché', 'Écarté'])
+  expect(message).toContain('Ses 1 candidature reviendra à « Nouveau »')
+  expect(faux.candidature('Alice Martin')!.statut).toBe('nouveau')
+})
+
+test('étapes : un membre les voit sans pouvoir les modifier', async ({ page }) => {
+  const { espace } = faux.ajouterEspaceInvitant('Agence RH', 'patronne@agence.fr')
+  faux.membres.push({
+    espace_id: espace.id,
+    user_id: faux.utilisateur.id,
+    email: faux.utilisateur.email,
+    role: 'membre',
+    created_at: '2026-01-02T00:00:00Z',
+  })
+  faux.espaceActif = espace.id
+  faux.ajouterEtape('Présélection', espace.id)
+  await seConnecter(page, faux)
+  await page.goto('/equipe')
+  const carte = page.getByRole('heading', { name: 'Étapes de recrutement' }).locator('xpath=..')
+  await expect(carte).toContainText('Présélection')
+  await expect(carte).toContainText('Seul le propriétaire de l’espace peut les modifier.')
+  await expect(carte.getByRole('button')).toHaveCount(0)
+  await expect(carte.getByLabel('Nouvelle étape')).toHaveCount(0)
 })

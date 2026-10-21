@@ -6,15 +6,13 @@ import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandi
 import { classeChamp } from '@/components/candidatures/styles'
 import {
   changerStatut,
-  LIBELLES_STATUT,
   lireCandidature,
   modifierCandidature,
-  STATUTS,
   supprimerCandidature,
   type Candidature,
   type NouvelleCandidature,
-  type Statut,
 } from '@/lib/candidatures'
+import { ETAPES_DE_BASE, listerEtapes } from '@/lib/etapes'
 import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
 import { ajouterNote, listerNotes, supprimerNote, type Note } from '@/lib/notes'
 import { listerEntretiens } from '@/lib/entretiens'
@@ -25,16 +23,17 @@ import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/candidatures/$id')({
   loader: async ({ params }) => {
-    const [candidature, notes, offres, entretiens, historique] = await Promise.all([
+    const [candidature, notes, offres, entretiens, historique, etapes] = await Promise.all([
       lireCandidature(params.id),
       listerNotes(params.id),
       listerOffres(),
       listerEntretiens(params.id),
       // L'historique est secondaire : son échec ne doit pas empêcher d'afficher la fiche
       listerHistorique(params.id).catch(() => null),
+      listerEtapes().catch(() => ETAPES_DE_BASE),
     ])
     if (!candidature) throw notFound()
-    return { candidature, notes, offres, entretiens, historique }
+    return { candidature, notes, offres, entretiens, historique, etapes }
   },
   // Après loader : les types de loaderData en dépendent
   head: ({ loaderData }) => titrePage(loaderData?.candidature.nom ?? 'Candidature'),
@@ -50,7 +49,7 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
 })
 
 function FicheCandidature() {
-  const { candidature: c, notes, offres, entretiens, historique } = Route.useLoaderData()
+  const { candidature: c, notes, offres, entretiens, historique, etapes } = Route.useLoaderData()
   const { user } = useAuth()
   const offre = offres.find((o) => o.id === c.offre_id)
   const router = useRouter()
@@ -133,13 +132,13 @@ function FicheCandidature() {
             </div>
             <select
               value={c.statut}
-              onChange={(e) => executer(() => changerStatut(c.id, e.target.value as Statut))}
+              onChange={(e) => executer(() => changerStatut(c.id, e.target.value))}
               aria-label="Statut"
               className="rounded-md border border-slate-300 bg-surface px-3 py-2 text-sm font-medium"
             >
-              {STATUTS.map((statut) => (
-                <option key={statut} value={statut}>
-                  {LIBELLES_STATUT[statut]}
+              {etapes.map((etape) => (
+                <option key={etape.cle} value={etape.cle}>
+                  {etape.nom}
                 </option>
               ))}
             </select>

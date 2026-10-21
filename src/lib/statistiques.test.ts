@@ -33,7 +33,8 @@ describe('calculerStatistiques', () => {
     ])
     expect(stats).toMatchObject({
       total: 3,
-      parStatut: { nouveau: 0, retenu: 2, ecarte: 1 },
+      // Une étape sans candidature est absente
+      parStatut: { retenu: 2, ecarte: 1 },
       experienceMoyenne: 2.3,
       avecCv: 1,
     })

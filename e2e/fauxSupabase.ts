@@ -71,6 +71,14 @@ interface OffreFaux {
   jeton_public: string
 }
 
+interface EtapeFaux {
+  id: string
+  espace_id: string
+  cle: string
+  nom: string
+  position: number
+}
+
 interface NoteFaux {
   id: string
   candidature_id: string
@@ -121,6 +129,8 @@ export class FauxSupabase {
     },
   ]
   invitations: InvitationFaux[] = []
+  // Étapes de recrutement (supabase/migrations/0015_etapes.sql), créées à la demande par espace
+  private etapesCreees: EtapeFaux[] = []
   // Imite les déclencheurs de supabase/migrations/0010_historique.sql
   historique: {
     id: number
@@ -175,6 +185,53 @@ export class FauxSupabase {
       created_at: new Date().toISOString(),
     })
     return userId
+  }
+
+  // Étapes d'un espace, dans l'ordre ; les trois étapes de base existent toujours
+  etapes(espaceId = this.espaceActif) {
+    if (!this.etapesCreees.some((e) => e.espace_id === espaceId)) {
+      for (const [cle, nom, position] of [
+        ['nouveau', 'Nouveau', 0],
+        ['retenu', 'Retenu', 1000000],
+        ['ecarte', 'Écarté', 2000000],
+      ] as const)
+        this.etapesCreees.push({
+          id: `${espaceId}-${cle}`,
+          espace_id: espaceId,
+          cle,
+          nom,
+          position,
+        })
+    }
+    return this.etapesCreees
+      .filter((e) => e.espace_id === espaceId)
+      .sort((a, b) => a.position - b.position)
+  }
+
+  ajouterEtape(nom: string, espaceId = this.espaceActif) {
+    const existantes = this.etapes(espaceId)
+    const position =
+      Math.max(
+        ...existantes.filter((e) => !['retenu', 'ecarte'].includes(e.cle)).map((e) => e.position),
+      ) + 1
+    const etape = {
+      id: crypto.randomUUID(),
+      espace_id: espaceId,
+      cle: `e_${crypto.randomUUID().slice(0, 8)}`,
+      nom,
+      position,
+    }
+    this.etapesCreees.push(etape)
+    return etape
+  }
+
+  private estProprietaireActif() {
+    return this.membres.some(
+      (m) =>
+        m.espace_id === this.espaceActif &&
+        m.user_id === this.utilisateur.id &&
+        m.role === 'proprietaire',
+    )
   }
 
   // parSysteme : action sans utilisateur connecté (ex. formulaire public)
@@ -379,6 +436,33 @@ export class FauxSupabase {
       return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4' })
     }
 
+    // Étapes de recrutement (supabase/migrations/0015_etapes.sql)
+    if (chemin === '/rest/v1/etapes') return this.etapesRest(route, url, json)
+    if (chemin === '/rest/v1/rpc/supprimer_etape') {
+      const { eid } = corps(requete) as { eid: string }
+      const etape = this.etapes().find((e) => e.id === eid)
+      if (
+        !etape ||
+        !this.estProprietaireActif() ||
+        ['nouveau', 'retenu', 'ecarte'].includes(etape.cle)
+      )
+        return json({ code: 'P0001', message: 'etape_protegee: refusé' }, 400)
+      const deplacees = this.candidatures.filter(
+        (c) => c.espace_id === this.espaceActif && c.statut === etape.cle,
+      )
+      deplacees.forEach((c) => {
+        this.journaliser(c.id, 'statut', {
+          avant: c.statut,
+          apres: 'nouveau',
+          avant_nom: etape.nom,
+          apres_nom: 'Nouveau',
+        })
+        c.statut = 'nouveau'
+      })
+      this.etapesCreees = this.etapesCreees.filter((e) => e.id !== eid)
+      return json(deplacees.length)
+    }
+
     // Notifications (supabase/migrations/0014_notifications.sql)
     const moi = this.membres.find(
       (m) => m.espace_id === this.espaceActif && m.user_id === this.utilisateur.id,
@@ -492,7 +576,14 @@ export class FauxSupabase {
       }
       for (const c of cibles) {
         if (champs.statut !== undefined && champs.statut !== c.statut) {
-          this.journaliser(c.id, 'statut', { avant: c.statut, apres: champs.statut })
+          // Comme la base : nom des étapes au moment du changement
+          const nom = (cle: string) => this.etapes(c.espace_id).find((e) => e.cle === cle)?.nom
+          this.journaliser(c.id, 'statut', {
+            avant: c.statut,
+            apres: champs.statut,
+            avant_nom: nom(c.statut),
+            apres_nom: nom(champs.statut),
+          })
         }
         if (champs.cv_chemin !== undefined && champs.cv_chemin !== c.cv_chemin) {
           this.journaliser(
@@ -789,6 +880,69 @@ export class FauxSupabase {
         .filter((c) => ids?.includes(c.offre_id ?? ''))
         .forEach((c) => (c.offre_id = null))
       this.offres = this.offres.filter((o) => !ids?.includes(o.id))
+      return json(undefined, 204)
+    }
+    return json({}, 405)
+  }
+
+  private etapesRest(route: Route, url: URL, json: Repondre) {
+    const requete = route.request()
+    const methode = requete.method()
+    const ids = idsFiltres(url)
+    const refus = {
+      code: '42501',
+      message: 'new row violates row-level security policy for table "etapes"',
+    }
+    if (methode === 'GET') {
+      const avecNombres = (url.searchParams.get('select') ?? '').includes('candidatures(count)')
+      return json(
+        this.etapes().map((e) => ({
+          ...e,
+          ...(avecNombres && {
+            candidatures: [
+              {
+                count: this.candidatures.filter(
+                  (c) => c.espace_id === this.espaceActif && c.statut === e.cle,
+                ).length,
+              },
+            ],
+          }),
+        })),
+      )
+    }
+    if (methode === 'POST') {
+      const { nom } = corps(requete) as { nom: string }
+      if (!this.estProprietaireActif()) return json(refus, 403)
+      if (this.etapes().length >= 12)
+        return json({ code: 'P0001', message: 'trop_d_etapes: 12' }, 400)
+      if (this.etapes().some((e) => e.nom.toLowerCase() === nom.trim().toLowerCase()))
+        return json(
+          { code: '23505', message: 'duplicate key value violates "etapes_espace_nom_unique"' },
+          409,
+        )
+      this.ajouterEtape(nom.trim())
+      return json(undefined, 201)
+    }
+    if (methode === 'PATCH') {
+      const champs = corps(requete) as Partial<EtapeFaux>
+      // Règle RLS : sans droit, aucune ligne modifiée (pas d'erreur)
+      if (!this.estProprietaireActif()) return json(undefined, 204)
+      if (
+        champs.nom &&
+        this.etapes().some(
+          (e) => !ids?.includes(e.id) && e.nom.toLowerCase() === champs.nom!.trim().toLowerCase(),
+        )
+      )
+        return json(
+          { code: '23505', message: 'duplicate key value violates "etapes_espace_nom_unique"' },
+          409,
+        )
+      this.etapes()
+        .filter((e) => ids?.includes(e.id))
+        .forEach((e) => {
+          if (champs.nom !== undefined) e.nom = champs.nom.trim()
+          if (champs.position !== undefined) e.position = champs.position
+        })
       return json(undefined, 204)
     }
     return json({}, 405)

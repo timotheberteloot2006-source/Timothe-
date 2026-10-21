@@ -18,6 +18,15 @@ describe('decrireEvenement', () => {
     expect(decrire('cv_retire')).toBe('CV supprimé')
     expect(decrire('note_ajoutee')).toBe('Note ajoutée')
     expect(decrire('note_supprimee')).toBe('Note supprimée')
+    // Nom des étapes enregistré au moment du changement (étapes ajoutées ou renommées)
+    expect(
+      decrire('statut', {
+        avant: 'e_1',
+        apres: 'retenu',
+        avant_nom: 'Entretien RH',
+        apres_nom: 'Embauché',
+      }),
+    ).toBe('Statut : Entretien RH → Embauché')
     expect(decrire('reception')).toBe('Candidature reçue par le formulaire en ligne')
     expect(decrire('nouvelle_postulation', { offre: 'Data analyst' })).toBe(
       'A postulé à nouveau (offre : Data analyst)',

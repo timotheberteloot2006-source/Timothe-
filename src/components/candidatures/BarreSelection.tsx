@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { LIBELLES_STATUT, STATUTS, type Statut } from '@/lib/candidatures'
+import type { Statut } from '@/lib/candidatures'
+import type { Etape } from '@/lib/etapes'
 
 interface Props {
   // Nombre de candidatures cochées et de candidatures sur la page
@@ -9,6 +10,7 @@ interface Props {
   onChangerStatut: (statut: Statut) => void
   onSupprimer: () => void
   onAnnuler: () => void
+  etapes: Etape[]
 }
 
 // Case « tout sélectionner » de la page et actions sur les candidatures cochées
@@ -18,6 +20,7 @@ export function BarreSelection({
   onToutBasculer,
   onChangerStatut,
   onSupprimer,
+  etapes,
   onAnnuler,
 }: Props) {
   const caseTout = useRef<HTMLInputElement>(null)
@@ -52,9 +55,9 @@ export function BarreSelection({
             className="rounded-md border border-slate-300 bg-surface px-2 py-1 text-sm"
           >
             <option value="">Changer le statut…</option>
-            {STATUTS.map((statut) => (
-              <option key={statut} value={statut}>
-                {LIBELLES_STATUT[statut]}
+            {etapes.map((etape) => (
+              <option key={etape.cle} value={etape.cle}>
+                {etape.nom}
               </option>
             ))}
           </select>

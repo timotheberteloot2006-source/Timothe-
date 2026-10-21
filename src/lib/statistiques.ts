@@ -1,9 +1,10 @@
-import { normaliser, STATUTS, type Candidature, type Statut } from './candidatures'
+import { normaliser, type Candidature, type Statut } from './candidatures'
 
 export const NOMBRE_COMPETENCES = 8
 
 export interface Statistiques {
   total: number
+  // Nombre par clé d'étape (absente : aucune)
   parStatut: Record<Statut, number>
   // Moyenne arrondie au dixième, null sans candidature
   experienceMoyenne: number | null
@@ -13,13 +14,13 @@ export interface Statistiques {
 }
 
 export function calculerStatistiques(candidatures: Candidature[]): Statistiques {
-  const parStatut = Object.fromEntries(STATUTS.map((s) => [s, 0])) as Record<Statut, number>
+  const parStatut: Record<Statut, number> = {}
   // Regroupe « React » et « react » ; garde l'orthographe la plus utilisée
   const competences = new Map<string, { nombre: number; orthographes: Map<string, number> }>()
   let experienceTotale = 0
 
   for (const c of candidatures) {
-    parStatut[c.statut]++
+    parStatut[c.statut] = (parStatut[c.statut] ?? 0) + 1
     experienceTotale += c.experience
     for (const competence of c.competences) {
       const cle = normaliser(competence)
@@ -40,10 +41,7 @@ export function calculerStatistiques(candidatures: Candidature[]): Statistiques 
         : Math.round((experienceTotale / candidatures.length) * 10) / 10,
     avecCv: candidatures.filter((c) => c.cv_chemin).length,
     competences: [...competences.values()]
-      .map(({ nombre, orthographes }) => ({
-        nom: orthographePreferee(orthographes),
-        nombre,
-      }))
+      .map(({ nombre, orthographes }) => ({ nom: orthographePreferee(orthographes), nombre }))
       .sort((a, b) => b.nombre - a.nombre || trier(a.nom, b.nom))
       .slice(0, NOMBRE_COMPETENCES),
   }

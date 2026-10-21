@@ -22,6 +22,7 @@ import {
 } from '@/lib/candidatures'
 import { LIMITE_GRATUITE, placesRestantes } from '@/lib/abonnement'
 import { lireEspace } from '@/lib/espace'
+import { ETAPES_DE_BASE, listerEtapes, nomsEtapes } from '@/lib/etapes'
 import {
   filtrerCandidatures,
   lireFiltres,
@@ -39,13 +40,15 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   head: () => titrePage('Candidatures'),
   validateSearch: lireFiltres,
   loader: async () => {
-    const [candidatures, espace, offres, entretiens] = await Promise.all([
+    const [candidatures, espace, offres, entretiens, etapes] = await Promise.all([
       listerCandidatures(),
       lireEspace(),
       listerOffres(),
       listerEntretiensAVenir(),
+      // Base pas encore à jour (migration 0015) : les trois étapes habituelles
+      listerEtapes().catch(() => ETAPES_DE_BASE),
     ])
-    return { candidatures, espace, offres, entretiens }
+    return { candidatures, espace, offres, entretiens, etapes }
   },
   // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
   shouldReload: false,
@@ -62,7 +65,7 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
 })
 
 function TableauDeBord() {
-  const { candidatures, espace, offres, entretiens } = Route.useLoaderData()
+  const { candidatures, espace, offres, entretiens, etapes } = Route.useLoaderData()
   const prochainsEntretiens = prochainParCandidature(entretiens)
   const places = placesRestantes(espace.est_pro, candidatures.length)
   const filtres = Route.useSearch()
@@ -79,7 +82,11 @@ function TableauDeBord() {
   const [selection, setSelection] = useState({ cle: cleAffichage, ids: new Set<string>() })
 
   const enTableau = filtres.vue === 'tableau'
-  const resultats = trierCandidatures(filtrerCandidatures(candidatures, filtres), filtres.tri)
+  const resultats = trierCandidatures(
+    filtrerCandidatures(candidatures, filtres),
+    filtres.tri,
+    etapes.map((e) => e.cle),
+  )
   const pagination = paginer(resultats, filtres.page)
   // Affichage changé : on oublie la sélection (mise à jour pendant le rendu, motif React
   // « ajuster l'état quand une prop change »), elle ne réapparaîtra pas au retour
@@ -243,8 +250,18 @@ function TableauDeBord() {
       ) : (
         <>
           <EntretiensAVenir entretiens={entretiens} />
-          <Statistiques candidatures={candidatures} filtres={filtres} onChange={changerFiltres} />
-          <BarreFiltres filtres={filtres} onChange={changerFiltres} offres={offres} />
+          <Statistiques
+            candidatures={candidatures}
+            filtres={filtres}
+            onChange={changerFiltres}
+            etapes={etapes}
+          />
+          <BarreFiltres
+            filtres={filtres}
+            onChange={changerFiltres}
+            offres={offres}
+            etapes={etapes}
+          />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-slate-600">
               {resultats.length} candidature{resultats.length > 1 ? 's' : ''} sur{' '}
@@ -280,7 +297,10 @@ function TableauDeBord() {
                 type="button"
                 disabled={resultats.length === 0}
                 onClick={() =>
-                  telechargerCsv(genererCsv(resultats, titresParId(offres)), nomFichierExport())
+                  telechargerCsv(
+                    genererCsv(resultats, titresParId(offres), nomsEtapes(etapes)),
+                    nomFichierExport(),
+                  )
                 }
                 title="Exporte toutes les candidatures filtrées, toutes pages confondues"
                 className="rounded-md border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
@@ -293,6 +313,7 @@ function TableauDeBord() {
             <TableauKanban
               candidatures={resultats}
               titresOffres={titresParId(offres)}
+              etapes={etapes}
               onChangerStatut={(id, statut) => executer(() => changerStatut(id, statut))}
             />
           ) : (
@@ -305,12 +326,14 @@ function TableauDeBord() {
                   onChangerStatut={changerStatutSelection}
                   onSupprimer={supprimerSelection}
                   onAnnuler={() => selectionner([])}
+                  etapes={etapes}
                 />
               )}
               {resultats.length > 0 ? (
                 <ListeCandidatures
                   offres={offres}
                   prochainsEntretiens={prochainsEntretiens}
+                  etapes={etapes}
                   selection={idsSelectionnes}
                   onBasculerSelection={basculerSelection}
                   candidatures={pagination.elements}

@@ -171,6 +171,7 @@ describe('verifierSupabase', () => {
       if (url.includes('select=stripe_evenement_le')) return [400, { code: '42703' }]
       if (url.includes('/offres?select=jeton_public')) return [400, { code: '42703' }]
       if (url.includes('/membres?select=notifier')) return [400, { code: '42703' }]
+      if (url.includes('/etapes?select=cle')) return [404, { code: 'PGRST205' }]
       if (url.endsWith('/portail-client')) return [404, {}]
       if (url.endsWith('/webhook-stripe')) return [401, { msg: 'Missing authorization header' }]
       if (url.endsWith('/postuler')) return [401, { msg: 'Missing authorization header' }]
@@ -180,7 +181,7 @@ describe('verifierSupabase', () => {
     })
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
-      expect.stringContaining('à partir de 0011 : 0011, 0012, 0013, 0014 manquent'),
+      expect.stringContaining('à partir de 0011 : 0011, 0012, 0013, 0014, 0015 manquent'),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
       expect.stringContaining('postuler refuse'),
@@ -198,7 +199,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0014')
+    expect(MIGRATIONS.at(-1).numero).toBe('0015')
   })
 })
 

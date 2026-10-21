@@ -1,22 +1,18 @@
-import { LIBELLES_STATUT, STATUTS, type Candidature, type Statut } from '@/lib/candidatures'
+import type { Candidature } from '@/lib/candidatures'
+import { couleurEtape, type Etape } from '@/lib/etapes'
 import type { Filtres } from '@/lib/filtres'
 import { basculerCompetence, calculerStatistiques, competenceDansFiltre } from '@/lib/statistiques'
-
-// Même code couleur que les statuts de la liste, toujours accompagné du libellé
-const pastilleStatut: Record<Statut, string> = {
-  nouveau: 'bg-slate-400',
-  retenu: 'bg-green-500',
-  ecarte: 'bg-red-500',
-}
 
 interface Props {
   // Toutes les candidatures : vue d'ensemble indépendante des filtres
   candidatures: Candidature[]
   filtres: Filtres
   onChange: (filtres: Filtres) => void
+  // Une tuile par étape, même code couleur que la liste, toujours accompagné du nom
+  etapes: Etape[]
 }
 
-export function Statistiques({ candidatures, filtres, onChange }: Props) {
+export function Statistiques({ candidatures, filtres, onChange, etapes }: Props) {
   const stats = calculerStatistiques(candidatures)
 
   return (
@@ -26,30 +22,26 @@ export function Statistiques({ candidatures, filtres, onChange }: Props) {
       </h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Tuile libelle="Candidatures" valeur={stats.total} />
-        {STATUTS.map((statut) => {
+        {etapes.map(({ cle: statut, nom }) => {
           const actif = filtres.statut === statut
           return (
             <button
               key={statut}
               type="button"
               aria-pressed={actif}
-              title={
-                actif
-                  ? 'Retirer ce filtre'
-                  : `Afficher les candidatures « ${LIBELLES_STATUT[statut]} »`
-              }
+              title={actif ? 'Retirer ce filtre' : `Afficher les candidatures « ${nom} »`}
               onClick={() => onChange({ ...filtres, statut: actif ? undefined : statut })}
               className={`rounded-lg border p-3 text-left transition-colors hover:border-indigo-500 ${actif ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-surface'}`}
             >
               <span className="flex items-center gap-1.5 text-xs text-slate-600">
                 <span
                   aria-hidden="true"
-                  className={`size-2 rounded-full ${pastilleStatut[statut]}`}
+                  className={`size-2 rounded-full ${couleurEtape(statut).pastille}`}
                 />
-                {LIBELLES_STATUT[statut]}
+                {nom}
               </span>
               <span className="mt-1 block text-2xl font-semibold tabular-nums">
-                {stats.parStatut[statut]}
+                {stats.parStatut[statut] ?? 0}
               </span>
             </button>
           )

@@ -62,12 +62,21 @@ que les siennes). Les filtres (recherche, compétences requises, expérience min
 s'appliquent dans le navigateur et sont conservés dans l'URL, comme le tri (date, nom, expérience,
 statut) et la page (25 candidatures par page ; l'export contient toutes les pages).
 
-Le bouton **Tableau** affiche les candidatures en trois colonnes, une par statut (Nouveau,
-Retenu, Écarté), avec les mêmes filtres et le même tri, sans pagination (50 cartes par colonne,
-puis « Afficher les … autres »). On change le statut d'une candidature en glissant sa carte dans
-une autre colonne, ou au clavier avec ses boutons « Retenir », « Écarter », « Remettre en
-Nouveau » ; chaque déplacement est annoncé aux lecteurs d'écran, et une carte revient à sa place
-si la base refuse le changement. La vue choisie est gardée dans l'adresse (`?vue=tableau`).
+**Étapes de recrutement** : le statut d'une candidature est une étape de son espace. Chaque
+espace a trois étapes de base, « Nouveau » (toujours la première, où arrivent les candidatures),
+« Retenu » et « Écarté », que le propriétaire peut renommer ; il peut aussi en ajouter (12 au
+plus, ex. « Présélection », « Entretien RH », « Offre »), les ordonner et les supprimer (page
+**Équipe**, « Étapes de recrutement »). Supprimer une étape ramène ses candidatures à la
+première ; l'historique garde le nom des étapes au moment de chaque changement
+(`supabase/migrations/0015_etapes.sql`). Les étapes servent partout : liste, fiche, filtres, tri
+par statut, statistiques, export CSV et tableau.
+
+Le bouton **Tableau** affiche les candidatures en colonnes, une par étape, avec les mêmes filtres
+et le même tri, sans pagination (50 cartes par colonne, puis « Afficher les … autres » ; au-delà
+de quelques étapes, le tableau défile horizontalement). On change l'étape d'une candidature en
+glissant sa carte dans une autre colonne, ou au clavier avec le menu de la carte ; chaque
+déplacement est annoncé aux lecteurs d'écran, et une carte revient à sa place si la base refuse
+le changement. La vue choisie est gardée dans l'adresse (`?vue=tableau`).
 
 Les candidatures peuvent aussi être importées depuis un fichier CSV (bouton « Importer un CSV »,
 jusqu'à 1000 lignes) : colonnes `nom` (obligatoire), `email`, `poste`, `competences`, `experience`.

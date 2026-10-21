@@ -688,7 +688,11 @@ describe('historique', () => {
     })
     expect(await journal()).toEqual([
       { action: 'creation', details: {}, email: 'a@x.fr' },
-      { action: 'statut', details: { avant: 'nouveau', apres: 'retenu' }, email: 'a@x.fr' },
+      {
+        action: 'statut',
+        details: { avant: 'nouveau', apres: 'retenu', avant_nom: 'Nouveau', apres_nom: 'Retenu' },
+        email: 'a@x.fr',
+      },
       { action: 'modification', details: { champs: ['poste', 'competences'] }, email: 'a@x.fr' },
       { action: 'cv_ajoute', details: {}, email: 'a@x.fr' },
       { action: 'cv_remplace', details: {}, email: 'a@x.fr' },
@@ -1096,6 +1100,165 @@ describe('formulaire public', () => {
       } finally {
         await db.exec('reset role')
       }
+    })
+  })
+})
+
+describe('étapes de recrutement', () => {
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to authenticated;
+      grant select, insert, update, delete on public.etapes, public.candidatures to authenticated;
+    `)
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  const etapes = async (espace: string) =>
+    (
+      await db.query<{ cle: string; nom: string }>(
+        `select cle, nom from public.etapes where espace_id = $1 order by position`,
+        [espace],
+      )
+    ).rows
+
+  it('chaque espace a les trois étapes de base, dans l’ordre', async () => {
+    expect(await etapes(A)).toEqual([
+      { cle: 'nouveau', nom: 'Nouveau' },
+      { cle: 'retenu', nom: 'Retenu' },
+      { cle: 'ecarte', nom: 'Écarté' },
+    ])
+  })
+
+  it('le propriétaire ajoute une étape, placée avant « Retenu », et y range une candidature', async () => {
+    await ajouter(A, ['Alice'])
+    await enTant(A, async () => {
+      await db.exec(`insert into public.etapes (nom) values ('  Entretien RH ')`)
+      await db.exec(`insert into public.etapes (nom) values ('Offre')`)
+    })
+    expect((await etapes(A)).map((e) => e.nom)).toEqual([
+      'Nouveau',
+      'Entretien RH',
+      'Offre',
+      'Retenu',
+      'Écarté',
+    ])
+    const [entretien] = (
+      await db.query<{ cle: string }>(`select cle from public.etapes where nom = 'Entretien RH'`)
+    ).rows
+    expect(entretien.cle).toMatch(/^e_[0-9a-f]{32}$/)
+    await enTant(A, () =>
+      db.exec(`update public.candidatures set statut = '${entretien.cle}' where nom = 'Alice'`),
+    )
+    // L'historique garde le nom des étapes
+    const { rows } = await db.query(`select details from public.historique where action = 'statut'`)
+    expect(rows).toEqual([
+      {
+        details: {
+          avant: 'nouveau',
+          apres: entretien.cle,
+          avant_nom: 'Nouveau',
+          apres_nom: 'Entretien RH',
+        },
+      },
+    ])
+  })
+
+  it('refuse une étape d’un autre espace, ou inconnue, pour une candidature', async () => {
+    await ajouter(A, ['Alice'])
+    await enTant(B, () => db.exec(`insert into public.etapes (nom) values ('Chez B')`))
+    const [deB] = (
+      await db.query<{ cle: string }>(`select cle from public.etapes where nom = 'Chez B'`)
+    ).rows
+    await expect(
+      db.exec(`update public.candidatures set statut = '${deB.cle}' where nom = 'Alice'`),
+    ).rejects.toThrow(/candidatures_etape_fk/)
+    await expect(
+      db.exec(`update public.candidatures set statut = 'inconnue' where nom = 'Alice'`),
+    ).rejects.toThrow(/candidatures_etape_fk/)
+  })
+
+  it('protège les étapes de base et réserve les modifications au propriétaire', async () => {
+    await db.exec(`
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+      update public.profils set espace_actif = '${A}' where user_id = '${B}';
+    `)
+    // Un membre lit les étapes, sans pouvoir en ajouter
+    expect(
+      await enTant(B, async () => (await db.query('select cle from public.etapes')).rows),
+    ).toHaveLength(3)
+    await expect(
+      enTant(B, () => db.exec(`insert into public.etapes (nom) values ('Pirate')`)),
+    ).rejects.toThrow(/row-level security/)
+    await enTant(B, () => db.exec(`update public.etapes set nom = 'Piraté'`))
+    expect((await etapes(A))[0].nom).toBe('Nouveau')
+
+    await enTant(A, async () => {
+      // Renommer une étape de base : oui ; la supprimer ou changer sa clé : non
+      await db.exec(`update public.etapes set nom = 'Embauché' where cle = 'retenu'`)
+      await db.exec(`delete from public.etapes where cle = 'ecarte'`)
+      await expect(
+        db.exec(`update public.etapes set cle = 'autre' where cle = 'ecarte'`),
+      ).rejects.toThrow(/^etape_figee/)
+      // « Nouveau » reste la première
+      await expect(
+        db.exec(`update public.etapes set position = 5 where cle = 'nouveau'`),
+      ).rejects.toThrow(/row-level security/)
+      await expect(
+        db.exec(`update public.etapes set position = 0 where cle = 'retenu'`),
+      ).rejects.toThrow(/row-level security/)
+      // Deux étapes du même nom (majuscules ignorées) : non
+      await expect(db.exec(`insert into public.etapes (nom) values ('embauché')`)).rejects.toThrow(
+        /etapes_espace_nom_unique/,
+      )
+    })
+    expect((await etapes(A)).map((e) => e.nom)).toEqual(['Nouveau', 'Embauché', 'Écarté'])
+  })
+
+  it('supprimer une étape ramène ses candidatures à « Nouveau »', async () => {
+    await ajouter(A, ['Alice', 'Bruno'])
+    const cle = await enTant(A, async () => {
+      const { rows } = await db.query<{ cle: string; id: string }>(
+        `insert into public.etapes (nom) values ('Présélection') returning cle, id`,
+      )
+      await db.exec(`update public.candidatures set statut = '${rows[0].cle}'`)
+      const supprimees = await db.query<{ n: number }>(
+        `select public.supprimer_etape('${rows[0].id}') as n`,
+      )
+      expect(supprimees.rows[0].n).toBe(2)
+      return rows[0].cle
+    })
+    const { rows } = await db.query<{ statut: string }>(
+      'select distinct statut from public.candidatures',
+    )
+    expect(rows).toEqual([{ statut: 'nouveau' }])
+    expect((await etapes(A)).map((e) => e.cle)).not.toContain(cle)
+    // Étape de base : refusé
+    const base = (
+      await db.query<{ id: string }>(
+        `select id from public.etapes where espace_id = '${A}' and cle = 'retenu'`,
+      )
+    ).rows[0]
+    await expect(
+      enTant(A, () => db.exec(`select public.supprimer_etape('${base.id}')`)),
+    ).rejects.toThrow(/^etape_protegee/)
+  })
+
+  it('12 étapes au plus par espace', async () => {
+    await enTant(A, async () => {
+      for (let i = 1; i <= 9; i++) await db.exec(`insert into public.etapes (nom) values ('É${i}')`)
+      await expect(
+        db.exec(`insert into public.etapes (nom) values ('Une de trop')`),
+      ).rejects.toThrow(/^trop_d_etapes/)
     })
   })
 })

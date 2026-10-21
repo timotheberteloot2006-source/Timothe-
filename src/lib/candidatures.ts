@@ -2,14 +2,9 @@ import type { PostgrestError } from '@supabase/postgrest-js'
 import { supprimerFichiersCv } from './cv'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 
-export const STATUTS = ['nouveau', 'retenu', 'ecarte'] as const
-export type Statut = (typeof STATUTS)[number]
-
-export const LIBELLES_STATUT: Record<Statut, string> = {
-  nouveau: 'Nouveau',
-  retenu: 'Retenu',
-  ecarte: 'Écarté',
-}
+// Clé de l'étape de recrutement (src/lib/etapes.ts) : « nouveau », « retenu », « ecarte » ou une
+// étape ajoutée par l'espace
+export type Statut = string
 
 export interface Candidature {
   id: string

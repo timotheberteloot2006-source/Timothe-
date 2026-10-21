@@ -1,4 +1,5 @@
-import { STATUTS, normaliser, type Candidature, type Statut } from './candidatures'
+import { normaliser, type Candidature, type Statut } from './candidatures'
+import { CLES_DE_BASE } from './etapes'
 
 export interface Filtres {
   // Recherche dans le nom, l'e-mail et le poste
@@ -40,7 +41,9 @@ export function lireFiltres(search: Record<string, unknown>): Filtres {
   const experience = Number(search.experienceMin)
   if (search.experienceMin !== undefined && Number.isInteger(experience) && experience > 0)
     filtres.experienceMin = experience
-  if (STATUTS.includes(search.statut as Statut)) filtres.statut = search.statut as Statut
+  // Clé d'étape (vérifiée ensuite contre les étapes de l'espace : une clé inconnue ne filtre rien)
+  if (typeof search.statut === 'string' && /^[a-z0-9_]{1,40}$/.test(search.statut))
+    filtres.statut = search.statut
   if (typeof search.offre === 'string' && /^[\w-]{1,64}$/.test(search.offre))
     filtres.offre = search.offre
   // « recent » est l'ordre par défaut : inutile de le garder dans l'adresse
@@ -71,8 +74,17 @@ export function filtrerCandidatures(candidatures: Candidature[], filtres: Filtre
 
 const comparerNoms = new Intl.Collator('fr', { sensitivity: 'base' }).compare
 
-// Renvoie une copie triée ; à égalité, les plus récentes d'abord
-export function trierCandidatures(candidatures: Candidature[], tri: Tri = 'recent') {
+// Renvoie une copie triée ; à égalité, les plus récentes d'abord. ordreEtapes : clés des
+// étapes dans leur ordre (tri par statut)
+export function trierCandidatures(
+  candidatures: Candidature[],
+  tri: Tri = 'recent',
+  ordreEtapes: readonly string[] = CLES_DE_BASE,
+) {
+  const rang = (statut: string) => {
+    const i = ordreEtapes.indexOf(statut)
+    return i === -1 ? ordreEtapes.length : i
+  }
   const plusRecente = (a: Candidature, b: Candidature) => b.created_at.localeCompare(a.created_at)
   const comparaisons: Record<Tri, (a: Candidature, b: Candidature) => number> = {
     recent: () => 0,
@@ -81,19 +93,20 @@ export function trierCandidatures(candidatures: Candidature[], tri: Tri = 'recen
     'nom-desc': (a, b) => comparerNoms(b.nom, a.nom),
     experience: (a, b) => b.experience - a.experience,
     'experience-asc': (a, b) => a.experience - b.experience,
-    statut: (a, b) => STATUTS.indexOf(a.statut) - STATUTS.indexOf(b.statut),
+    statut: (a, b) => rang(a.statut) - rang(b.statut),
   }
   const comparer = comparaisons[tri]
   return [...candidatures].sort((a, b) => comparer(a, b) || plusRecente(a, b))
 }
 
-// Colonnes du tableau : une par statut, dans l'ordre des statuts, en gardant l'ordre reçu
-export function regrouperParStatut(candidatures: Candidature[]) {
-  const colonnes = Object.fromEntries(STATUTS.map((s) => [s, [] as Candidature[]])) as Record<
-    Statut,
-    Candidature[]
-  >
-  for (const c of candidatures) colonnes[c.statut].push(c)
+// Colonnes du tableau : une par étape (clés dans l'ordre), en gardant l'ordre reçu ; une
+// candidature d'étape inconnue va dans la première colonne
+export function regrouperParStatut(
+  candidatures: Candidature[],
+  cles: readonly string[] = CLES_DE_BASE,
+) {
+  const colonnes = new Map<Statut, Candidature[]>(cles.map((c) => [c, []]))
+  for (const c of candidatures) (colonnes.get(c.statut) ?? colonnes.get(cles[0]))?.push(c)
   return colonnes
 }
 

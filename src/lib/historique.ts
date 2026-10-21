@@ -1,4 +1,4 @@
-import { LIBELLES_STATUT, type Statut } from './candidatures'
+import { ETAPES_DE_BASE, nomsEtapes } from './etapes'
 import { formaterDate } from './entretiens'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 
@@ -47,6 +47,8 @@ export function auteur(
   return evenement.email ?? 'compte supprimé'
 }
 
+const NOMS_DE_BASE = nomsEtapes(ETAPES_DE_BASE)
+
 const ACTIONS_CANDIDAT = new Set(['reception', 'nouvelle_postulation'])
 
 const LIBELLES_CHAMPS: Record<string, string> = {
@@ -71,8 +73,10 @@ export function decrireEvenement(evenement: Pick<Evenement, 'action' | 'details'
         ? `A postulé à nouveau (offre : ${details.offre})`
         : 'A postulé à nouveau'
     case 'statut': {
-      const libelle = (s: unknown) => LIBELLES_STATUT[s as Statut] ?? String(s)
-      return `Statut : ${libelle(details.avant)} → ${libelle(details.apres)}`
+      // Nom de l'étape au moment du changement (depuis la migration 0015), sinon celui de base
+      const libelle = (cle: unknown, nom: unknown) =>
+        typeof nom === 'string' ? nom : (NOMS_DE_BASE.get(String(cle)) ?? String(cle))
+      return `Statut : ${libelle(details.avant, details.avant_nom)} → ${libelle(details.apres, details.apres_nom)}`
     }
     case 'modification': {
       const champs = Array.isArray(details.champs) ? (details.champs as string[]) : []

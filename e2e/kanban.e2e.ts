@@ -39,12 +39,12 @@ test('affiche les candidatures en colonnes et garde la vue dans l’adresse', as
   await expect(page.getByLabel('Statut de Alice Martin')).toBeVisible()
 })
 
-test('déplace une candidature au clavier, avec annonce pour les lecteurs d’écran', async ({
+test('déplace une candidature sans la souris, avec annonce pour les lecteurs d’écran', async ({
   page,
 }) => {
   await page.goto('/tableau-de-bord?vue=tableau')
-  await page.getByRole('button', { name: 'Retenir Alice Martin' }).focus()
-  await page.keyboard.press('Enter')
+  // Menu de la carte, utilisable au clavier
+  await page.getByLabel('Étape de Alice Martin').selectOption({ label: 'Déplacer vers « Retenu »' })
   await expect(colonne(page, 'Retenu')).toContainText('Alice Martin')
   await expect(colonne(page, 'Nouveau')).toContainText('Aucune candidature')
   await expect(page.getByText('Alice Martin : Retenu.')).toBeAttached()
@@ -80,8 +80,22 @@ test('un déplacement refusé par la base remet la carte à sa place', async ({ 
       : route.fallback(),
   )
   await page.goto('/tableau-de-bord?vue=tableau')
-  await page.getByRole('button', { name: 'Écarter Alice Martin' }).click()
+  await page.getByLabel('Étape de Alice Martin').selectOption('ecarte')
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(colonne(page, 'Nouveau')).toContainText('Alice Martin')
   expect(faux.candidature('Alice Martin')!.statut).toBe('nouveau')
+})
+
+test('les étapes ajoutées deviennent des colonnes, dans leur ordre', async ({ page }) => {
+  faux.ajouterEtape('Entretien RH')
+  await page.goto('/tableau-de-bord?vue=tableau')
+  await expect(
+    page
+      .getByRole('group', { name: 'Tableau des candidatures par étape' })
+      .getByRole('heading', { level: 2 }),
+  ).toHaveText(['Nouveau1', 'Entretien RH0', 'Retenu1', 'Écarté1'])
+  const carte = colonne(page, 'Nouveau').getByRole('listitem').filter({ hasText: 'Alice Martin' })
+  await carte.dragTo(colonne(page, 'Entretien RH'))
+  await expect(colonne(page, 'Entretien RH')).toContainText('Alice Martin')
+  await expect.poll(() => faux.candidature('Alice Martin')!.statut).toMatch(/^e_/)
 })

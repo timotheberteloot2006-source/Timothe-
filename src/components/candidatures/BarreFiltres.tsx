@@ -1,4 +1,4 @@
-import { LIBELLES_STATUT, STATUTS, type Statut } from '@/lib/candidatures'
+import type { Etape } from '@/lib/etapes'
 import { TRIS, type Filtres, type Tri } from '@/lib/filtres'
 import type { Offre } from '@/lib/offres'
 import { classeChamp } from './styles'
@@ -7,9 +7,10 @@ interface Props {
   filtres: Filtres
   onChange: (filtres: Filtres) => void
   offres: Offre[]
+  etapes: Etape[]
 }
 
-export function BarreFiltres({ filtres, onChange, offres }: Props) {
+export function BarreFiltres({ filtres, onChange, offres, etapes }: Props) {
   function modifier(champs: Partial<Filtres>) {
     onChange({ ...filtres, ...champs })
   }
@@ -57,15 +58,13 @@ export function BarreFiltres({ filtres, onChange, offres }: Props) {
         <span className="text-sm font-medium">Statut</span>
         <select
           value={filtres.statut ?? ''}
-          onChange={(e) =>
-            modifier({ statut: (e.target.value || undefined) as Statut | undefined })
-          }
+          onChange={(e) => modifier({ statut: e.target.value || undefined })}
           className={classeChamp}
         >
           <option value="">Tous</option>
-          {STATUTS.map((statut) => (
-            <option key={statut} value={statut}>
-              {LIBELLES_STATUT[statut]}
+          {etapes.map((etape) => (
+            <option key={etape.cle} value={etape.cle}>
+              {etape.nom}
             </option>
           ))}
         </select>

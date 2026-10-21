@@ -1,23 +1,11 @@
 import { Link } from '@tanstack/react-router'
 import { useState, type DragEvent } from 'react'
-import { LIBELLES_STATUT, STATUTS, type Candidature, type Statut } from '@/lib/candidatures'
+import type { Candidature, Statut } from '@/lib/candidatures'
+import { couleurEtape, nomsEtapes, type Etape } from '@/lib/etapes'
 import { regrouperParStatut } from '@/lib/filtres'
 
 // Cartes affichées d'emblée par colonne (le reste s'affiche à la demande)
 const CARTES_PAR_COLONNE = 50
-
-const bordureStatut: Record<Statut, string> = {
-  nouveau: 'border-t-slate-400',
-  retenu: 'border-t-green-600',
-  ecarte: 'border-t-red-600',
-}
-
-// Verbe du bouton qui envoie une carte dans la colonne
-const ACTIONS: Record<Statut, string> = {
-  nouveau: 'Remettre en Nouveau',
-  retenu: 'Retenir',
-  ecarte: 'Écarter',
-}
 
 interface Props {
   // Déjà filtrées et triées ; chaque colonne garde cet ordre
@@ -26,9 +14,12 @@ interface Props {
   titresOffres: Map<string, string>
   // Résout une fois le changement enregistré (ou refusé, l'erreur est affichée par la page)
   onChangerStatut: (id: string, statut: Statut) => Promise<void>
+  // Une colonne par étape, dans leur ordre
+  etapes: Etape[]
 }
 
-export function TableauKanban({ candidatures, titresOffres, onChangerStatut }: Props) {
+export function TableauKanban({ candidatures, titresOffres, onChangerStatut, etapes }: Props) {
+  const noms = nomsEtapes(etapes)
   // Statut affiché tout de suite, le temps que la base confirme
   const [deplacees, setDeplacees] = useState(new Map<string, Statut>())
   const [survolee, setSurvolee] = useState<Statut | null>(null)
@@ -38,12 +29,15 @@ export function TableauKanban({ candidatures, titresOffres, onChangerStatut }: P
   const affichees = candidatures.map((c) =>
     deplacees.has(c.id) ? { ...c, statut: deplacees.get(c.id)! } : c,
   )
-  const colonnes = regrouperParStatut(affichees)
+  const colonnes = regrouperParStatut(
+    affichees,
+    etapes.map((e) => e.cle),
+  )
 
   async function deplacer(candidature: Candidature, statut: Statut) {
     if (candidature.statut === statut) return
     setDeplacees((d) => new Map(d).set(candidature.id, statut))
-    setAnnonce(`${candidature.nom} : ${LIBELLES_STATUT[statut]}.`)
+    setAnnonce(`${candidature.nom} : ${noms.get(statut) ?? statut}.`)
     await onChangerStatut(candidature.id, statut)
     // Données rechargées : le statut vient de nouveau de la base (inchangé si refusé)
     setDeplacees((d) => {
@@ -63,13 +57,19 @@ export function TableauKanban({ candidatures, titresOffres, onChangerStatut }: P
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    // Défilement horizontal au-delà de quelques étapes ; la zone se fait défiler au clavier
+    <div
+      tabIndex={0}
+      role="group"
+      aria-label="Tableau des candidatures par étape"
+      className="flex gap-4 overflow-x-auto pb-2"
+    >
       {/* Annonce des déplacements pour les lecteurs d'écran */}
       <p aria-live="polite" className="sr-only">
         {annonce}
       </p>
-      {STATUTS.map((statut) => {
-        const cartes = colonnes[statut]
+      {etapes.map(({ cle: statut, nom }) => {
+        const cartes = colonnes.get(statut) ?? []
         const visibles = developpees.has(statut) ? cartes : cartes.slice(0, CARTES_PAR_COLONNE)
         return (
           <section
@@ -86,13 +86,13 @@ export function TableauKanban({ candidatures, titresOffres, onChangerStatut }: P
               if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSurvolee(null)
             }}
             onDrop={(e) => deposer(e, statut)}
-            className={`flex min-h-40 flex-col gap-3 rounded-lg border border-t-4 border-slate-200 p-3 ${bordureStatut[statut]} ${survolee === statut ? 'bg-indigo-50' : 'bg-slate-50'}`}
+            className={`flex min-h-40 w-72 min-w-64 shrink-0 grow flex-col gap-3 rounded-lg border border-t-4 border-slate-200 p-3 ${couleurEtape(statut).bordure} ${survolee === statut ? 'bg-indigo-50' : 'bg-slate-50'}`}
           >
             <h2
               id={`colonne-${statut}`}
               className="flex items-baseline justify-between font-semibold"
             >
-              {LIBELLES_STATUT[statut]}
+              {nom}
               <span className="text-sm font-normal text-slate-600">{cartes.length}</span>
             </h2>
             {cartes.length === 0 && (
@@ -132,19 +132,18 @@ export function TableauKanban({ candidatures, titresOffres, onChangerStatut }: P
                     </p>
                   )}
                   {/* Déplacement au clavier (et sans glisser-déposer) */}
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {STATUTS.filter((s) => s !== c.statut).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => deplacer(c, s)}
-                        aria-label={`${ACTIONS[s]} ${c.nom}`}
-                        className="rounded px-1.5 py-0.5 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                      >
-                        {ACTIONS[s]}
-                      </button>
+                  <select
+                    value={c.statut}
+                    onChange={(e) => deplacer(c, e.target.value)}
+                    aria-label={`Étape de ${c.nom}`}
+                    className="mt-2 w-full rounded border border-slate-300 bg-surface px-1.5 py-0.5 text-xs"
+                  >
+                    {etapes.map((etape) => (
+                      <option key={etape.cle} value={etape.cle}>
+                        {etape.cle === c.statut ? etape.nom : `Déplacer vers « ${etape.nom} »`}
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 </li>
               ))}
             </ul>

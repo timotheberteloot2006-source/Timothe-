@@ -98,7 +98,7 @@ describe('lireFiltres', () => {
 
   it('ignore les valeurs invalides', () => {
     expect(
-      lireFiltres({ q: '  ', competences: 42, experienceMin: 'abc', statut: 'inconnu' }),
+      lireFiltres({ q: '  ', competences: 42, experienceMin: 'abc', statut: 'Inconnu !' }),
     ).toEqual({})
     expect(lireFiltres({ experienceMin: -2 })).toEqual({})
   })
@@ -224,6 +224,9 @@ describe('vue tableau', () => {
     expect(lireFiltres({ vue: 'tableau' })).toEqual({ vue: 'tableau' })
     expect(lireFiltres({ vue: 'liste' })).toEqual({})
     expect(lireFiltres({ vue: ['tableau'] })).toEqual({})
+    // Statut : n'importe quelle clé d'étape bien formée
+    expect(lireFiltres({ statut: 'e_0f3a' })).toEqual({ statut: 'e_0f3a' })
+    expect(lireFiltres({ statut: 'Pas une clé' })).toEqual({})
   })
 
   it('regroupe par statut, dans l’ordre des statuts et en gardant l’ordre reçu', () => {
@@ -231,9 +234,25 @@ describe('vue tableau', () => {
     const b = candidature({ nom: 'B', statut: 'nouveau' })
     const c = candidature({ nom: 'C', statut: 'retenu' })
     const colonnes = regrouperParStatut([a, b, c])
-    expect(Object.keys(colonnes)).toEqual(['nouveau', 'retenu', 'ecarte'])
-    expect(colonnes.nouveau).toEqual([b])
-    expect(colonnes.retenu).toEqual([a, c])
-    expect(colonnes.ecarte).toEqual([])
+    expect([...colonnes.keys()]).toEqual(['nouveau', 'retenu', 'ecarte'])
+    expect(colonnes.get('nouveau')).toEqual([b])
+    expect(colonnes.get('retenu')).toEqual([a, c])
+    expect(colonnes.get('ecarte')).toEqual([])
+  })
+
+  it('étapes ajoutées : leurs colonnes, et la première pour une étape inconnue', () => {
+    const a = candidature({ nom: 'A', statut: 'e_rh' })
+    const b = candidature({ nom: 'B', statut: 'supprimee' })
+    const colonnes = regrouperParStatut([a, b], ['nouveau', 'e_rh', 'retenu'])
+    expect(colonnes.get('e_rh')).toEqual([a])
+    expect(colonnes.get('nouveau')).toEqual([b])
+  })
+
+  it('le tri par statut suit l’ordre des étapes', () => {
+    const a = candidature({ nom: 'A', statut: 'retenu' })
+    const b = candidature({ nom: 'B', statut: 'e_rh' })
+    const c = candidature({ nom: 'C', statut: 'nouveau' })
+    const ordre = trierCandidatures([a, b, c], 'statut', ['nouveau', 'e_rh', 'retenu', 'ecarte'])
+    expect(ordre.map((x) => x.nom)).toEqual(['C', 'B', 'A'])
   })
 })

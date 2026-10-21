@@ -1,20 +1,9 @@
 import { Link } from '@tanstack/react-router'
-import {
-  LIBELLES_STATUT,
-  STATUTS,
-  type Candidature,
-  type NouvelleCandidature,
-  type Statut,
-} from '@/lib/candidatures'
+import type { Candidature, NouvelleCandidature, Statut } from '@/lib/candidatures'
+import { couleurEtape, type Etape } from '@/lib/etapes'
 import type { EntretienAVenir } from '@/lib/entretiens'
 import type { Offre } from '@/lib/offres'
 import { FormulaireCandidature } from './FormulaireCandidature'
-
-const couleursStatut: Record<Statut, string> = {
-  nouveau: 'bg-slate-100 text-slate-700',
-  retenu: 'bg-green-100 text-green-800',
-  ecarte: 'bg-red-100 text-red-800',
-}
 
 interface Props {
   candidatures: Candidature[]
@@ -31,6 +20,7 @@ interface Props {
   offres: Offre[]
   // Prochain entretien de chaque candidature (par identifiant)
   prochainsEntretiens: Map<string, EntretienAVenir>
+  etapes: Etape[]
 }
 
 export function ListeCandidatures({
@@ -45,6 +35,7 @@ export function ListeCandidatures({
   onBasculerSelection,
   offres,
   prochainsEntretiens,
+  etapes,
 }: Props) {
   const titres = new Map(offres.map((o) => [o.id, o.titre]))
   return (
@@ -131,11 +122,11 @@ export function ListeCandidatures({
                   value={c.statut}
                   onChange={(e) => onChangerStatut(c.id, e.target.value as Statut)}
                   aria-label={`Statut de ${c.nom}`}
-                  className={`rounded-md border-0 px-2 py-1 text-sm font-medium ${couleursStatut[c.statut]}`}
+                  className={`rounded-md border-0 px-2 py-1 text-sm font-medium ${couleurEtape(c.statut).badge}`}
                 >
-                  {STATUTS.map((statut) => (
-                    <option key={statut} value={statut}>
-                      {LIBELLES_STATUT[statut]}
+                  {etapes.map((etape) => (
+                    <option key={etape.cle} value={etape.cle}>
+                      {etape.nom}
                     </option>
                   ))}
                 </select>
