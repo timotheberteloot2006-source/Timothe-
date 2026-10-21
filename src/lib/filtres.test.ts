@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { decouperCompetences, type Candidature } from './candidatures'
-import { filtrerCandidatures, lireFiltres, paginer, PAR_PAGE, trierCandidatures } from './filtres'
+import {
+  filtrerCandidatures,
+  lireFiltres,
+  paginer,
+  PAR_PAGE,
+  regrouperParStatut,
+  trierCandidatures,
+} from './filtres'
 
 function candidature(champs: Partial<Candidature>): Candidature {
   return {
@@ -209,5 +216,24 @@ describe('filtre par offre', () => {
   it('lit l’offre depuis l’adresse', () => {
     expect(lireFiltres({ offre: '3f1c-ab' })).toEqual({ offre: '3f1c-ab' })
     expect(lireFiltres({ offre: 'a b' })).toEqual({})
+  })
+})
+
+describe('vue tableau', () => {
+  it('lireFiltres ne garde que la vue « tableau »', () => {
+    expect(lireFiltres({ vue: 'tableau' })).toEqual({ vue: 'tableau' })
+    expect(lireFiltres({ vue: 'liste' })).toEqual({})
+    expect(lireFiltres({ vue: ['tableau'] })).toEqual({})
+  })
+
+  it('regroupe par statut, dans l’ordre des statuts et en gardant l’ordre reçu', () => {
+    const a = candidature({ nom: 'A', statut: 'retenu' })
+    const b = candidature({ nom: 'B', statut: 'nouveau' })
+    const c = candidature({ nom: 'C', statut: 'retenu' })
+    const colonnes = regrouperParStatut([a, b, c])
+    expect(Object.keys(colonnes)).toEqual(['nouveau', 'retenu', 'ecarte'])
+    expect(colonnes.nouveau).toEqual([b])
+    expect(colonnes.retenu).toEqual([a, c])
+    expect(colonnes.ecarte).toEqual([])
   })
 })

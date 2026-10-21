@@ -32,7 +32,14 @@ const PAGES_PUBLIQUES = [
 ]
 
 // « fiche » : remplacée par l'adresse de la fiche d'Alice Martin
-const PAGES_CONNECTE = ['/tableau-de-bord', 'fiche', '/offres', '/compte', '/equipe']
+const PAGES_CONNECTE = [
+  '/tableau-de-bord',
+  '/tableau-de-bord?vue=tableau',
+  'fiche',
+  '/offres',
+  '/compte',
+  '/equipe',
+]
 
 function donneesDeDemonstration(faux: FauxSupabase) {
   const offre = faux.ajouterOffre('Développeur front')

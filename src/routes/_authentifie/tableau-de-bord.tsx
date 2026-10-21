@@ -6,6 +6,7 @@ import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandi
 import { ImportCsv } from '@/components/candidatures/ImportCsv'
 import { ListeCandidatures } from '@/components/candidatures/ListeCandidatures'
 import { Statistiques } from '@/components/candidatures/Statistiques'
+import { TableauKanban } from '@/components/candidatures/TableauKanban'
 import {
   ajouterCandidature,
   ajouterCandidatures,
@@ -77,6 +78,7 @@ function TableauDeBord() {
   const cleAffichage = JSON.stringify(filtres)
   const [selection, setSelection] = useState({ cle: cleAffichage, ids: new Set<string>() })
 
+  const enTableau = filtres.vue === 'tableau'
   const resultats = trierCandidatures(filtrerCandidatures(candidatures, filtres), filtres.tri)
   const pagination = paginer(resultats, filtres.page)
   // Affichage changé : on oublie la sélection (mise à jour pendant le rendu, motif React
@@ -121,6 +123,11 @@ function TableauDeBord() {
   // Changer un filtre ou le tri ramène à la première page
   function changerFiltres(nouveaux: Filtres) {
     navigate({ search: { ...nouveaux, page: undefined }, replace: true })
+  }
+
+  // Liste ou tableau par statut ; la page ne vaut que pour la liste
+  function changerVue(vue: Filtres['vue']) {
+    navigate({ search: { ...filtres, vue, page: undefined }, replace: true })
   }
 
   function allerPage(page: number) {
@@ -242,58 +249,93 @@ function TableauDeBord() {
             <p className="text-sm text-slate-600">
               {resultats.length} candidature{resultats.length > 1 ? 's' : ''} sur{' '}
               {candidatures.length}
-              {pagination.totalPages > 1 &&
+              {!enTableau &&
+                pagination.totalPages > 1 &&
                 ` · affichées : ${pagination.premier} à ${pagination.dernier}`}
             </p>
-            <button
-              type="button"
-              disabled={resultats.length === 0}
-              onClick={() =>
-                telechargerCsv(genererCsv(resultats, titresParId(offres)), nomFichierExport())
-              }
-              title="Exporte toutes les candidatures filtrées, toutes pages confondues"
-              className="rounded-md border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
-            >
-              Exporter en CSV
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                role="group"
+                aria-label="Affichage"
+                className="inline-flex overflow-hidden rounded-md border border-slate-300"
+              >
+                {(
+                  [
+                    [undefined, 'Liste'],
+                    ['tableau', 'Tableau'],
+                  ] as const
+                ).map(([vue, libelle]) => (
+                  <button
+                    key={libelle}
+                    type="button"
+                    aria-pressed={filtres.vue === vue}
+                    onClick={() => changerVue(vue)}
+                    className={`px-3 py-1.5 text-sm font-medium ${filtres.vue === vue ? 'bg-indigo-600 text-white' : 'bg-surface hover:bg-slate-100'}`}
+                  >
+                    {libelle}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled={resultats.length === 0}
+                onClick={() =>
+                  telechargerCsv(genererCsv(resultats, titresParId(offres)), nomFichierExport())
+                }
+                title="Exporte toutes les candidatures filtrées, toutes pages confondues"
+                className="rounded-md border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
+              >
+                Exporter en CSV
+              </button>
+            </div>
           </div>
-          {resultats.length > 0 && (
-            <BarreSelection
-              nombre={selectionnees.length}
-              total={pagination.elements.length}
-              onToutBasculer={toutBasculer}
-              onChangerStatut={changerStatutSelection}
-              onSupprimer={supprimerSelection}
-              onAnnuler={() => selectionner([])}
-            />
-          )}
-          {resultats.length > 0 ? (
-            <ListeCandidatures
-              offres={offres}
-              prochainsEntretiens={prochainsEntretiens}
-              selection={idsSelectionnes}
-              onBasculerSelection={basculerSelection}
-              candidatures={pagination.elements}
-              idEnEdition={idEnEdition}
-              onChangerStatut={(id: string, statut: Statut) =>
-                executer(() => changerStatut(id, statut))
-              }
-              onModifier={(c) => setIdEnEdition(c.id)}
-              onEnregistrer={handleModification}
-              onAnnulerEdition={() => setIdEnEdition(null)}
-              onSupprimer={handleSupprimer}
+          {enTableau ? (
+            <TableauKanban
+              candidatures={resultats}
+              titresOffres={titresParId(offres)}
+              onChangerStatut={(id, statut) => executer(() => changerStatut(id, statut))}
             />
           ) : (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-surface p-12 text-center text-slate-500">
-              Aucune candidature ne correspond à ces filtres.
-            </div>
-          )}
-          {pagination.totalPages > 1 && (
-            <Pagination
-              page={pagination.page}
-              totalPages={pagination.totalPages}
-              onChange={allerPage}
-            />
+            <>
+              {resultats.length > 0 && (
+                <BarreSelection
+                  nombre={selectionnees.length}
+                  total={pagination.elements.length}
+                  onToutBasculer={toutBasculer}
+                  onChangerStatut={changerStatutSelection}
+                  onSupprimer={supprimerSelection}
+                  onAnnuler={() => selectionner([])}
+                />
+              )}
+              {resultats.length > 0 ? (
+                <ListeCandidatures
+                  offres={offres}
+                  prochainsEntretiens={prochainsEntretiens}
+                  selection={idsSelectionnes}
+                  onBasculerSelection={basculerSelection}
+                  candidatures={pagination.elements}
+                  idEnEdition={idEnEdition}
+                  onChangerStatut={(id: string, statut: Statut) =>
+                    executer(() => changerStatut(id, statut))
+                  }
+                  onModifier={(c) => setIdEnEdition(c.id)}
+                  onEnregistrer={handleModification}
+                  onAnnulerEdition={() => setIdEnEdition(null)}
+                  onSupprimer={handleSupprimer}
+                />
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-surface p-12 text-center text-slate-500">
+                  Aucune candidature ne correspond à ces filtres.
+                </div>
+              )}
+              {pagination.totalPages > 1 && (
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onChange={allerPage}
+                />
+              )}
+            </>
           )}
         </>
       )}

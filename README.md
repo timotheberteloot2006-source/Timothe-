@@ -62,6 +62,13 @@ que les siennes). Les filtres (recherche, compétences requises, expérience min
 s'appliquent dans le navigateur et sont conservés dans l'URL, comme le tri (date, nom, expérience,
 statut) et la page (25 candidatures par page ; l'export contient toutes les pages).
 
+Le bouton **Tableau** affiche les candidatures en trois colonnes, une par statut (Nouveau,
+Retenu, Écarté), avec les mêmes filtres et le même tri, sans pagination (50 cartes par colonne,
+puis « Afficher les … autres »). On change le statut d'une candidature en glissant sa carte dans
+une autre colonne, ou au clavier avec ses boutons « Retenir », « Écarter », « Remettre en
+Nouveau » ; chaque déplacement est annoncé aux lecteurs d'écran, et une carte revient à sa place
+si la base refuse le changement. La vue choisie est gardée dans l'adresse (`?vue=tableau`).
+
 Les candidatures peuvent aussi être importées depuis un fichier CSV (bouton « Importer un CSV »,
 jusqu'à 1000 lignes) : colonnes `nom` (obligatoire), `email`, `poste`, `competences`, `experience`.
 Le séparateur (`;`, `,` ou tabulation) et l'encodage (UTF-8 ou celui d'Excel) sont détectés.
@@ -212,9 +219,9 @@ ne remplace pas un test avec un lecteur d'écran.
 `npm run test:e2e` construit le site en le branchant sur un **faux Supabase**
 (`e2e/fauxSupabase.ts`, qui simule authentification, base, stockage et fonctions de paiement en
 mémoire), puis joue les parcours de `e2e/*.e2e.ts` dans Chromium : connexion, ajout et
-modification, doublons, filtres, tri, pagination, actions groupées, statistiques, offres,
-entretiens, import/export CSV, fiche
-(notes, CV) et abonnement. En local, installer le navigateur une fois avec
+modification, doublons, filtres, tri, pagination, actions groupées, vue tableau (Kanban),
+statistiques, offres, entretiens, import/export CSV, fiche (notes, CV), équipe, formulaire
+public, en-têtes de sécurité et abonnement. En local, installer le navigateur une fois avec
 `npx playwright install chromium`.
 
 ## Mise en production

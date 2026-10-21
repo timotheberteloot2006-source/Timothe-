@@ -13,6 +13,8 @@ export interface Filtres {
   tri?: Tri
   // Absent : première page
   page?: number
+  // Absent : liste ; « tableau » : colonnes par statut (sans pagination)
+  vue?: 'tableau'
 }
 
 export const PAR_PAGE = 25
@@ -46,6 +48,7 @@ export function lireFiltres(search: Record<string, unknown>): Filtres {
     filtres.tri = search.tri as Tri
   const page = Number(search.page)
   if (Number.isInteger(page) && page > 1) filtres.page = page
+  if (search.vue === 'tableau') filtres.vue = 'tableau'
   return filtres
 }
 
@@ -82,6 +85,16 @@ export function trierCandidatures(candidatures: Candidature[], tri: Tri = 'recen
   }
   const comparer = comparaisons[tri]
   return [...candidatures].sort((a, b) => comparer(a, b) || plusRecente(a, b))
+}
+
+// Colonnes du tableau : une par statut, dans l'ordre des statuts, en gardant l'ordre reçu
+export function regrouperParStatut(candidatures: Candidature[]) {
+  const colonnes = Object.fromEntries(STATUTS.map((s) => [s, [] as Candidature[]])) as Record<
+    Statut,
+    Candidature[]
+  >
+  for (const c of candidatures) colonnes[c.statut].push(c)
+  return colonnes
 }
 
 // Découpe la liste en pages ; une page trop grande (filtres modifiés…) devient la dernière

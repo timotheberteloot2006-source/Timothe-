@@ -14,8 +14,8 @@ export function BarreFiltres({ filtres, onChange, offres }: Props) {
     onChange({ ...filtres, ...champs })
   }
 
-  // La page n'est pas un filtre : elle seule ne justifie pas de « Réinitialiser »
-  const { page: _page, ...criteres } = filtres
+  // La page et la vue ne sont pas des filtres : elles seules ne justifient pas de « Réinitialiser »
+  const { page: _page, vue, ...criteres } = filtres
   const actif = Object.values(criteres).some((v) => v !== undefined)
 
   return (
@@ -108,7 +108,7 @@ export function BarreFiltres({ filtres, onChange, offres }: Props) {
       {actif && (
         <button
           type="button"
-          onClick={() => onChange({})}
+          onClick={() => onChange({ vue })}
           className="justify-self-start text-sm text-accent hover:underline sm:col-span-2 lg:col-span-4"
         >
           Réinitialiser les filtres
