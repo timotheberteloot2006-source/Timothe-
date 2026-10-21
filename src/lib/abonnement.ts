@@ -17,9 +17,11 @@ export function estPro(abonnement: Abonnement | null) {
   return abonnement?.statut === 'active' || abonnement?.statut === 'trialing'
 }
 
-// Paiement échoué ou incomplet : à régulariser dans le portail Stripe
+// Paiement échoué : à régulariser dans le portail Stripe (même liste que STATUTS_A_REGULARISER,
+// supabase/functions/_shared/stripe.ts). Un premier paiement non abouti (« incomplete ») ne se
+// règle pas dans le portail : on peut alors simplement repasser à Pro.
 export function paiementEnAttente(abonnement: Abonnement | null) {
-  return ['past_due', 'unpaid', 'incomplete'].includes(abonnement?.statut ?? '')
+  return ['past_due', 'unpaid'].includes(abonnement?.statut ?? '')
 }
 
 // pro : l'espace est couvert par l'offre Pro de son propriétaire

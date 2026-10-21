@@ -1,11 +1,11 @@
 // Reçoit le formulaire de candidature public d'une offre (page /postuler/<jeton> du site).
 // À déployer sans vérification de jeton Supabase : le candidat n'a pas de compte.
-// Le dépôt lui-même (offre publiée, limite d'envois, doublons, limite Gratuite) est fait par la
-// fonction SQL deposer_candidature_publique (supabase/migrations/0013_formulaire_public.sql).
+// Le dépôt lui-même (offre publiée, limites d'envois, doublons, limite Gratuite) est fait par la
+// fonction SQL deposer_candidature_publique (supabase/migrations/0017_relecture_2.sql).
 import { envoyerCourriels } from '../_shared/courriel.ts'
 import { corsHeaders, json, SITE_URL, supabaseAdmin } from '../_shared/http.ts'
 import { preparerCourriels, type Depot } from './courriels.ts'
-import { estRobot, lireFormulaire, traduireErreur, verifierCv } from './validation.ts'
+import { adresseIp, estRobot, lireFormulaire, traduireErreur, verifierCv } from './validation.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -38,27 +38,7 @@ Deno.serve(async (req) => {
   }
 
   const admin = supabaseAdmin()
-  const { data: offre } = await admin
-    .from('offres')
-    .select('espace_id')
-    .eq('jeton_public', candidature.jeton)
-    .eq('publique', true)
-    .maybeSingle()
-  if (!offre) {
-    const { erreur, status } = traduireErreur('offre_fermee')
-    return json({ erreur }, status)
-  }
-
-  // CV rangé comme ceux déposés par l'équipe : <espace_id>/<candidature_id>/<fichier>.pdf
   const id = crypto.randomUUID()
-  const chemin = cv ? `${offre.espace_id}/${id}/${crypto.randomUUID()}.pdf` : null
-  if (cv && chemin) {
-    const depot = await admin.storage
-      .from('cv')
-      .upload(chemin, cv, { contentType: 'application/pdf' })
-    if (depot.error) return json({ erreur: traduireErreur(depot.error.message).erreur }, 500)
-  }
-
   const { data, error } = await admin.rpc('deposer_candidature_publique', {
     code: candidature.jeton,
     empreinte_ip: await empreinte(req),
@@ -67,14 +47,28 @@ Deno.serve(async (req) => {
     email_candidat: candidature.email,
     liste_competences: candidature.competences,
     annees_experience: candidature.experience,
-    chemin_cv: chemin,
   })
   const depot = (data as Depot[] | null)?.[0]
-  // CV inutile si la candidature n'a pas été créée (refus, ou candidat déjà présent)
-  if (chemin && depot?.resultat !== 'creee') await admin.storage.from('cv').remove([chemin])
   if (error || !depot) {
     const { erreur, status } = traduireErreur(error?.message ?? '')
     return json({ erreur }, status)
+  }
+
+  // CV joint seulement à une candidature créée (refus, ou candidat déjà présent : aucun fichier),
+  // rangé comme ceux déposés par l'équipe : <espace_id>/<candidature_id>/<fichier>.pdf. Un échec
+  // ici laisse la candidature, sans CV : elle n'est pas perdue.
+  if (cv && depot.resultat === 'creee') {
+    const chemin = `${depot.espace}/${id}/${crypto.randomUUID()}.pdf`
+    const envoi = await admin.storage
+      .from('cv')
+      .upload(chemin, cv, { contentType: 'application/pdf' })
+    const lien = envoi.error
+      ? envoi
+      : await admin.from('candidatures').update({ cv_chemin: chemin }).eq('id', id)
+    if (lien.error) {
+      console.error('CV non joint :', lien.error.message)
+      if (!envoi.error) await admin.storage.from('cv').remove([chemin])
+    }
   }
 
   // Équipe et accusé de réception : un échec d'envoi ne doit pas faire échouer la candidature
@@ -90,7 +84,7 @@ Deno.serve(async (req) => {
 // Empreinte de l'adresse IP, non réversible (salée par un secret du projet) : seule cette valeur
 // est conservée, une journée au plus, pour limiter les envois répétés
 async function empreinte(req: Request) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'inconnue'
+  const ip = adresseIp(req.headers)
   const sel = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   const octets = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${sel}:${ip}`))
   return Array.from(new Uint8Array(octets), (o) => o.toString(16).padStart(2, '0')).join('')

@@ -169,7 +169,10 @@ export async function lireNotifications(): Promise<ReglagesNotifications> {
   return lignes[0]
 }
 
-// accuse : seulement pour le propriétaire (sinon laissé tel quel)
-export function reglerNotifications(pourMoi: boolean, accuse?: boolean) {
-  return rpc<void>('regler_notifications', { pour_moi: pourMoi, accuse: accuse ?? null })
+// Un réglage à la fois (l'autre reste tel quel) ; accuse : propriétaire seulement
+export function reglerNotifications(reglage: { pourMoi: boolean } | { accuse: boolean }) {
+  return rpc<void>(
+    'regler_notifications',
+    'pourMoi' in reglage ? { pour_moi: reglage.pourMoi } : { accuse: reglage.accuse },
+  )
 }

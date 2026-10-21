@@ -18,6 +18,12 @@ export const MIGRATIONS = [
   { numero: '0014', table: 'membres', colonne: 'notifier' },
   { numero: '0015', table: 'etapes', colonne: 'cle' },
   { numero: '0016', table: 'espaces', colonne: 'slug' },
+  // Sans nouvelle colonne visible : une fonction ajoutée, appelée sans droit (refus attendu)
+  {
+    numero: '0017',
+    fonction: 'deplacer_etape',
+    arguments: { eid: '00000000-0000-0000-0000-000000000000', sens: 0 },
+  },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite
@@ -168,7 +174,7 @@ export function verifierFonctions(env, { production = false } = {}) {
 }
 
 // Erreurs PostgREST signifiant que la table ou la colonne n'existe pas
-const CODES_ABSENT = new Set(['42P01', '42703', 'PGRST204', 'PGRST205'])
+const CODES_ABSENT = new Set(['42P01', '42703', 'PGRST202', 'PGRST204', 'PGRST205'])
 
 // Base, authentification et fonctions du projet Supabase, avec la clé publique
 export async function verifierSupabase(env, fetch) {
@@ -190,10 +196,15 @@ async function interrogerSupabase(url, entetes, fetch) {
   // Migrations : la dernière doit être la plus récente du dépôt
   const manquantes = []
   for (const migration of MIGRATIONS) {
-    const reponse = await fetch(
-      `${url}/rest/v1/${migration.table}?select=${migration.colonne}&limit=0`,
-      { headers: entetes },
-    )
+    const reponse = migration.fonction
+      ? await fetch(`${url}/rest/v1/rpc/${migration.fonction}`, {
+          method: 'POST',
+          headers: { ...entetes, 'Content-Type': 'application/json' },
+          body: JSON.stringify(migration.arguments),
+        })
+      : await fetch(`${url}/rest/v1/${migration.table}?select=${migration.colonne}&limit=0`, {
+          headers: entetes,
+        })
     if (reponse.ok) continue
     const corps = await reponse.json().catch(() => ({}))
     // Refus d'accès (règles RLS, droits) : la table existe bien

@@ -55,7 +55,9 @@ export async function listerCandidatures(): Promise<Candidature[]> {
         nb_notes: notes?.[0]?.count ?? 0,
       })),
     )
-    if (data.length < TRANCHE) return lignes
+    // Une candidature ajoutée pendant la lecture décale les tranches suivantes : la dernière
+    // d'une tranche peut revenir en tête de la suivante
+    if (data.length < TRANCHE) return [...new Map(lignes.map((c) => [c.id, c])).values()]
   }
 }
 

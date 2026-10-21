@@ -68,6 +68,7 @@ describe('auteur', () => {
 
   it('attribue au candidat ce qu’il a envoyé par le formulaire en ligne', () => {
     expect(auteur(evenement({ par_systeme: true, action: 'reception' }))).toBe('le candidat')
+    expect(auteur(evenement({ par_systeme: true, action: 'cv_ajoute' }))).toBe('le candidat')
     expect(auteur(evenement({ par_systeme: true, action: 'nouvelle_postulation' }))).toBe(
       'le candidat',
     )

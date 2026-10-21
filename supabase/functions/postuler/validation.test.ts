@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  adresseIp,
   estRobot,
   lireFormulaire,
   traduireErreur,
@@ -87,5 +88,19 @@ describe('traduireErreur', () => {
       erreur: 'Envoi impossible pour le moment : réessayez plus tard.',
       status: 500,
     })
+  })
+})
+
+describe('adresseIp', () => {
+  const entetes = (valeurs: Record<string, string>) => new Headers(valeurs)
+  it('préfère les en-têtes posés par l’infrastructure à X-Forwarded-For', () => {
+    expect(
+      adresseIp(entetes({ 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '1.2.3.4' })),
+    ).toBe('203.0.113.7')
+    expect(adresseIp(entetes({ 'x-real-ip': '203.0.113.8', 'x-forwarded-for': '1.2.3.4' }))).toBe(
+      '203.0.113.8',
+    )
+    expect(adresseIp(entetes({ 'x-forwarded-for': '198.51.100.1, 10.0.0.1' }))).toBe('198.51.100.1')
+    expect(adresseIp(entetes({}))).toBe('inconnue')
   })
 })

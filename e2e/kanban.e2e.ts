@@ -99,3 +99,12 @@ test('les étapes ajoutées deviennent des colonnes, dans leur ordre', async ({ 
   await expect(colonne(page, 'Entretien RH')).toContainText('Alice Martin')
   await expect.poll(() => faux.candidature('Alice Martin')!.statut).toMatch(/^e_/)
 })
+
+test('une étape inconnue dans l’adresse (supprimée, ancien favori) ne vide pas la liste', async ({
+  page,
+}) => {
+  await page.goto('/tableau-de-bord?statut=e_supprimee')
+  await expect(page.getByText('3 candidatures sur 3')).toBeVisible()
+  await page.goto('/tableau-de-bord?statut=retenu')
+  await expect(page.getByText('1 candidature sur 3')).toBeVisible()
+})

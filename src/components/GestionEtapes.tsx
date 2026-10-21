@@ -104,7 +104,7 @@ export function GestionEtapes({ etapes, proprietaire, nombres, executer }: Props
                     <button
                       type="button"
                       disabled={i <= 1}
-                      onClick={() => executer(() => deplacerEtape(etapes, etape.id, -1))}
+                      onClick={() => executer(() => deplacerEtape(etape.id, -1))}
                       aria-label={`Monter l’étape « ${etape.nom} »`}
                       className={classeBouton}
                     >
@@ -113,7 +113,7 @@ export function GestionEtapes({ etapes, proprietaire, nombres, executer }: Props
                     <button
                       type="button"
                       disabled={i === 0 || i === etapes.length - 1}
-                      onClick={() => executer(() => deplacerEtape(etapes, etape.id, 1))}
+                      onClick={() => executer(() => deplacerEtape(etape.id, 1))}
                       aria-label={`Descendre l’étape « ${etape.nom} »`}
                       className={classeBouton}
                     >

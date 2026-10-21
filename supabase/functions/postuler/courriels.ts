@@ -2,10 +2,11 @@
 // testé par Vitest dans courriels.test.ts)
 import type { Courriel } from '../_shared/courriel.ts'
 
-// Ligne renvoyée par deposer_candidature_publique (supabase/migrations/0014_notifications.sql)
+// Ligne renvoyée par deposer_candidature_publique (supabase/migrations/0017_relecture_2.sql)
 export interface Depot {
   resultat: 'creee' | 'deja_recue'
   candidature: string
+  espace: string
   offre_titre: string
   espace_nom: string
   accuse_reception: boolean

@@ -49,7 +49,8 @@ export function auteur(
 
 const NOMS_DE_BASE = nomsEtapes(ETAPES_DE_BASE)
 
-const ACTIONS_CANDIDAT = new Set(['reception', 'nouvelle_postulation'])
+// cv_ajoute sans utilisateur : le CV joint au formulaire en ligne (supabase/functions/postuler)
+const ACTIONS_CANDIDAT = new Set(['reception', 'nouvelle_postulation', 'cv_ajoute'])
 
 const LIBELLES_CHAMPS: Record<string, string> = {
   nom: 'nom',

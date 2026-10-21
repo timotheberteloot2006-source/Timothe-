@@ -459,6 +459,18 @@ export class FauxSupabase {
 
     // Étapes de recrutement (supabase/migrations/0015_etapes.sql)
     if (chemin === '/rest/v1/etapes') return this.etapesRest(route, url, json)
+    if (chemin === '/rest/v1/rpc/deplacer_etape') {
+      const { eid, sens } = corps(requete) as { eid: string; sens: number }
+      const etapes = this.etapes()
+      const i = etapes.findIndex((e) => e.id === eid)
+      if (i === -1 || !this.estProprietaireActif())
+        return json({ code: 'P0001', message: 'etape_introuvable: rechargez' }, 400)
+      const voisine = etapes[i + Math.sign(sens)]
+      if (voisine && etapes[i].cle !== 'nouveau' && voisine.cle !== 'nouveau') {
+        ;[etapes[i].position, voisine.position] = [voisine.position, etapes[i].position]
+      }
+      return json(undefined, 204)
+    }
     if (chemin === '/rest/v1/rpc/supprimer_etape') {
       const { eid } = corps(requete) as { eid: string }
       const etape = this.etapes().find((e) => e.id === eid)
@@ -499,12 +511,13 @@ export class FauxSupabase {
       ])
     }
     if (chemin === '/rest/v1/rpc/regler_notifications' && moi && espaceActif) {
-      const { pour_moi, accuse } = corps(requete) as { pour_moi: boolean; accuse: boolean | null }
-      if (accuse !== null && moi.role !== 'proprietaire') {
+      // Comme la base (migration 0017) : un réglage absent reste tel quel
+      const { pour_moi, accuse } = corps(requete) as { pour_moi?: boolean; accuse?: boolean }
+      if (accuse != null && moi.role !== 'proprietaire') {
         return json({ code: 'P0001', message: 'reserve_proprietaire: refusé' }, 400)
       }
-      moi.notifier = pour_moi
-      if (accuse !== null) espaceActif.accuse_reception = accuse
+      if (pour_moi != null) moi.notifier = pour_moi
+      if (accuse != null) espaceActif.accuse_reception = accuse
       return json(undefined, 204)
     }
 

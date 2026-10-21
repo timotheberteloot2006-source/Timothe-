@@ -4,6 +4,7 @@ import { preparerCourriels, type Depot } from './courriels.ts'
 const DEPOT: Depot = {
   resultat: 'creee',
   candidature: 'c1',
+  espace: 'e1',
   offre_titre: 'Développeur front',
   espace_nom: 'Agence RH',
   accuse_reception: true,

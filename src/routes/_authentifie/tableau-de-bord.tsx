@@ -68,7 +68,12 @@ function TableauDeBord() {
   const { candidatures, espace, offres, entretiens, etapes } = Route.useLoaderData()
   const prochainsEntretiens = prochainParCandidature(entretiens)
   const places = placesRestantes(espace.est_pro, candidatures.length)
-  const filtres = Route.useSearch()
+  const recherche = Route.useSearch()
+  // Étape inconnue dans l'adresse (supprimée, favori ancien, autre espace) : filtre ignoré
+  const filtres =
+    recherche.statut && !etapes.some((e) => e.cle === recherche.statut)
+      ? { ...recherche, statut: undefined }
+      : recherche
   // Offre du filtre en cours, présélectionnée à l'ajout et à l'import
   const offreFiltree = filtres.offre && filtres.offre !== 'aucune' ? filtres.offre : null
   const navigate = Route.useNavigate()

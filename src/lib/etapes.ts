@@ -64,6 +64,8 @@ function erreurEtape(error: Pick<PostgrestError, 'code' | 'message'>) {
   if (error.code === '23505') return new Error('Une étape porte déjà ce nom.')
   if (error.message.startsWith('trop_d_etapes'))
     return new Error(`${NOMBRE_MAX_ETAPES} étapes au plus par espace.`)
+  if (error.message.startsWith('etape_introuvable'))
+    return new Error('Cette étape a changé entre-temps : rechargez la page.')
   if (error.message.startsWith('etape_protegee'))
     return new Error('Seules les étapes ajoutées peuvent être supprimées, par le propriétaire.')
   if (error.code === '42501')
@@ -99,19 +101,12 @@ export async function renommerEtape(id: string, nom: string) {
   if (error) throw erreurEtape(error)
 }
 
-// Échange la place d'une étape avec sa voisine (« Nouveau » reste toujours la première)
-export async function deplacerEtape(etapes: Etape[], id: string, sens: -1 | 1) {
-  const index = etapes.findIndex((e) => e.id === id)
-  const voisine = etapes[index + sens]
-  const etape = etapes[index]
-  if (!etape || !voisine || etape.cle === 'nouveau' || voisine.cle === 'nouveau') return
-  for (const [cible, position] of [
-    [etape, voisine.position],
-    [voisine, etape.position],
-  ] as const) {
-    const { error } = await table().update({ position }).eq('id', cible.id)
-    if (error) throw erreurEtape(error)
-  }
+// Échange la place d'une étape avec sa voisine, en une seule opération de la base (« Nouveau »
+// reste toujours la première)
+export async function deplacerEtape(id: string, sens: -1 | 1) {
+  if (!supabase) throw new Error(SUPABASE_NON_CONFIGURE)
+  const { error } = await supabase.rpc('deplacer_etape', { eid: id, sens })
+  if (error) throw erreurEtape(error)
 }
 
 // Renvoie le nombre de candidatures revenues à « Nouveau »

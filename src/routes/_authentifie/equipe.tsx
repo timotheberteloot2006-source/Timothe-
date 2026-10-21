@@ -33,7 +33,8 @@ export const Route = createFileRoute('/_authentifie/equipe')({
         // Seul le propriétaire voit et gère les invitations
         espace.role === 'proprietaire' ? listerInvitations(espace.id) : Promise.resolve([]),
         listerMesEspaces(context.auth.user!.id),
-        lireNotifications(),
+        // null : base pas encore à jour (migration 0014), la rubrique est masquée
+        lireNotifications().catch(() => null),
         // Base pas encore à jour (migration 0015) : les trois étapes habituelles
         listerEtapes().catch(() => ETAPES_DE_BASE),
         compterParEtape().catch(() => ({})),
@@ -197,26 +198,26 @@ function Equipe() {
         />
       </Carte>
 
-      <Carte titre="Notifications">
-        <p className="text-sm text-slate-600">
-          E-mails envoyés quand un candidat postule par le formulaire en ligne d’une offre (page «
-          Offres »).
-        </p>
-        <CaseReglage
-          libelle="Me prévenir par e-mail des nouvelles candidatures de cet espace"
-          valeur={notifications.notifier}
-          enregistrer={(valeur) => executer(() => reglerNotifications(valeur))}
-        />
-        {proprietaire && (
+      {notifications && (
+        <Carte titre="Notifications">
+          <p className="text-sm text-slate-600">
+            E-mails envoyés quand un candidat postule par le formulaire en ligne d’une offre (page «
+            Offres »).
+          </p>
           <CaseReglage
-            libelle="Envoyer un accusé de réception aux candidats"
-            valeur={notifications.accuse_reception}
-            enregistrer={(valeur) =>
-              executer(() => reglerNotifications(notifications.notifier, valeur))
-            }
+            libelle="Me prévenir par e-mail des nouvelles candidatures de cet espace"
+            valeur={notifications.notifier}
+            enregistrer={(valeur) => executer(() => reglerNotifications({ pourMoi: valeur }))}
           />
-        )}
-      </Carte>
+          {proprietaire && (
+            <CaseReglage
+              libelle="Envoyer un accusé de réception aux candidats"
+              valeur={notifications.accuse_reception}
+              enregistrer={(valeur) => executer(() => reglerNotifications({ accuse: valeur }))}
+            />
+          )}
+        </Carte>
+      )}
 
       <Carte titre="Membres">
         <ul className="divide-y divide-slate-100">

@@ -15,7 +15,10 @@ describe('abonnement', () => {
 
   it('signale un paiement à régulariser', () => {
     expect(paiementEnAttente(avec('past_due'))).toBe(true)
+    expect(paiementEnAttente(avec('unpaid'))).toBe(true)
     expect(paiementEnAttente(avec('active'))).toBe(false)
+    // Premier paiement non abouti : rien à régler dans le portail, on peut repasser à Pro
+    expect(paiementEnAttente(avec('incomplete'))).toBe(false)
     expect(paiementEnAttente(null)).toBe(false)
   })
 

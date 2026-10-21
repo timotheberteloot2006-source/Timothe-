@@ -1,16 +1,13 @@
 // Reçoit les événements Stripe et met à jour la table abonnements.
 // À déployer sans vérification de jeton Supabase : l'authenticité vient de la signature Stripe.
 import type Stripe from 'npm:stripe@17.7.0'
-import { json, stripe, supabaseAdmin } from '../_shared/stripe.ts'
+import { json, STATUTS_EN_COURS, stripe, supabaseAdmin } from '../_shared/stripe.ts'
 
 const EVENEMENTS = new Set([
   'customer.subscription.created',
   'customer.subscription.updated',
   'customer.subscription.deleted',
 ])
-
-// Abonnement qui prélève ou va prélever (mêmes statuts que public.abonnement_en_cours)
-const EN_COURS = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete'])
 
 Deno.serve(async (req) => {
   const signature = req.headers.get('Stripe-Signature')
@@ -29,13 +26,28 @@ Deno.serve(async (req) => {
 
   if (!EVENEMENTS.has(evenement.type)) return json({ recu: true })
 
-  const abonnement = evenement.data.object as Stripe.Subscription
+  // Stripe ne garantit pas l'ordre des notifications, et deux événements d'une même seconde ont
+  // la même date : on ne se fie pas au contenu de l'événement, on relit l'abonnement chez Stripe.
+  // L'heure de cette lecture départage deux notifications traitées en même temps.
+  const luLe = new Date().toISOString()
+  let abonnement: Stripe.Subscription
+  try {
+    abonnement = await stripe.subscriptions.retrieve(
+      (evenement.data.object as Stripe.Subscription).id,
+    )
+  } catch (e) {
+    // Stripe renverra l'événement plus tard
+    return json(
+      { erreur: `Lecture de l'abonnement impossible : ${e instanceof Error ? e.message : e}` },
+      500,
+    )
+  }
   const clientId =
     typeof abonnement.customer === 'string' ? abonnement.customer : abonnement.customer.id
   const admin = supabaseAdmin()
 
-  // Stripe ne garantit pas l'ordre des notifications : la fin d'un ancien abonnement ne doit pas
-  // écraser celui qui l'a remplacé et qui est toujours en cours
+  // La fin d'un ancien abonnement ne doit pas écraser celui qui l'a remplacé et qui est toujours
+  // en cours
   const { data: actuel, error: erreurLecture } = await admin
     .from('abonnements')
     .select('stripe_subscription_id, statut')
@@ -45,26 +57,25 @@ Deno.serve(async (req) => {
   if (
     actuel?.stripe_subscription_id &&
     actuel.stripe_subscription_id !== abonnement.id &&
-    EN_COURS.has(actuel.statut ?? '') &&
-    !EN_COURS.has(abonnement.status)
+    STATUTS_EN_COURS.has(actuel.statut ?? '') &&
+    !STATUTS_EN_COURS.has(abonnement.status)
   ) {
     return json({ recu: true, ignore: 'ancien abonnement' })
   }
 
-  // Un événement plus ancien que le dernier appliqué est ignoré (condition vérifiée par la base,
-  // au moment même de la mise à jour)
-  const dateEvenement = new Date(evenement.created * 1000).toISOString()
+  // Un état lu avant celui déjà enregistré est ignoré (condition vérifiée par la base, au moment
+  // même de la mise à jour)
   const { error } = await admin
     .from('abonnements')
     .update({
       stripe_subscription_id: abonnement.id,
       statut: abonnement.status,
       fin_periode: new Date(finPeriode(abonnement) * 1000).toISOString(),
-      stripe_evenement_le: dateEvenement,
+      stripe_evenement_le: luLe,
       updated_at: new Date().toISOString(),
     })
     .eq('stripe_customer_id', clientId)
-    .or(`stripe_evenement_le.is.null,stripe_evenement_le.lte."${dateEvenement}"`)
+    .or(`stripe_evenement_le.is.null,stripe_evenement_le.lt."${luLe}"`)
 
   // Une erreur 500 fait renvoyer l'événement par Stripe plus tard
   if (error) return json({ erreur: error.message }, 500)

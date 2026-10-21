@@ -1,5 +1,13 @@
 // Crée une session de paiement Stripe Checkout pour l'offre Pro et renvoie son URL
-import { corsHeaders, json, SITE_URL, stripe, supabaseAdmin, utilisateur } from '../_shared/stripe.ts'
+import {
+  corsHeaders,
+  json,
+  SITE_URL,
+  STATUTS_A_REGULARISER,
+  stripe,
+  supabaseAdmin,
+  utilisateur,
+} from '../_shared/stripe.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -21,8 +29,7 @@ Deno.serve(async (req) => {
     return json({ erreur: 'Vous avez déjà l’offre Pro.' }, 409)
   }
   // Abonnement existant dont le paiement est à régulariser : un second serait aussi prélevé
-  // (mêmes statuts que public.abonnement_en_cours, supabase/migrations/0012_relecture_securite.sql)
-  if (['past_due', 'unpaid', 'incomplete'].includes(abonnement?.statut ?? '')) {
+  if (STATUTS_A_REGULARISER.has(abonnement?.statut ?? '')) {
     return json(
       {
         erreur:

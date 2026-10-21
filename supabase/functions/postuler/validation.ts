@@ -81,3 +81,16 @@ export function traduireErreur(message: string): { erreur: string; status: numbe
     }
   return { erreur: 'Envoi impossible pour le moment : réessayez plus tard.', status: 500 }
 }
+
+// Adresse de l'appelant, pour la limite d'envois par connexion : d'abord les en-têtes posés par
+// l'infrastructure (Cloudflare, proxy), que l'appelant ne peut pas imposer ; à défaut, la première
+// adresse de X-Forwarded-For, qu'il peut maquiller (la limite par espace, dans la base, tient
+// quand même)
+export function adresseIp(entetes: Headers) {
+  return (
+    entetes.get('cf-connecting-ip')?.trim() ||
+    entetes.get('x-real-ip')?.trim() ||
+    entetes.get('x-forwarded-for')?.split(',')[0].trim() ||
+    'inconnue'
+  )
+}

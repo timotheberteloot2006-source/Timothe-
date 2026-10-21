@@ -149,8 +149,10 @@ describe('verifierSupabase', () => {
       'ok',
       'ok',
     ])
-    // Seulement des lectures, et l'appel au webhook sans signature (refusé par la fonction)
+    // Seulement des lectures, et des appels refusés : fonction de la migration 0017 sans droit
+    // ni étape existante, webhook sans signature, formulaire vide
     expect(appels.filter((a) => !a.startsWith('GET ') && !a.startsWith('OPTIONS '))).toEqual([
+      `POST ${URL_PROJET}/rest/v1/rpc/deplacer_etape`,
       `POST ${URL_PROJET}/functions/v1/webhook-stripe`,
       `POST ${URL_PROJET}/functions/v1/postuler`,
     ])
@@ -173,6 +175,7 @@ describe('verifierSupabase', () => {
       if (url.includes('/membres?select=notifier')) return [400, { code: '42703' }]
       if (url.includes('/etapes?select=cle')) return [404, { code: 'PGRST205' }]
       if (url.includes('/espaces?select=slug')) return [400, { code: '42703' }]
+      if (url.endsWith('/rpc/deplacer_etape')) return [404, { code: 'PGRST202' }]
       if (url.endsWith('/portail-client')) return [404, {}]
       if (url.endsWith('/webhook-stripe')) return [401, { msg: 'Missing authorization header' }]
       if (url.endsWith('/postuler')) return [401, { msg: 'Missing authorization header' }]
@@ -182,7 +185,9 @@ describe('verifierSupabase', () => {
     })
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
-      expect.stringContaining('à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016 manquent'),
+      expect.stringContaining(
+        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017 manquent',
+      ),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
       expect.stringContaining('postuler refuse'),
@@ -200,7 +205,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0016')
+    expect(MIGRATIONS.at(-1).numero).toBe('0017')
   })
 })
 

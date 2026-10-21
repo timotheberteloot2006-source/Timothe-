@@ -835,10 +835,11 @@ describe('relecture de sécurité', () => {
     })
     await expect(
       enTant(A, () => db.exec(`update public.notes set candidature_id = '${deB}'`)),
-    ).rejects.toThrow(/row-level security/)
+      // Refus par la règle d'accès (0012), et désormais dès le changement de candidature (0017)
+    ).rejects.toThrow(/row-level security|^candidature_figee/)
     await expect(
       enTant(A, () => db.exec(`update public.entretiens set candidature_id = '${deB}'`)),
-    ).rejects.toThrow(/row-level security/)
+    ).rejects.toThrow(/row-level security|^candidature_figee/)
     const { rows } = await db.query('select candidature_id from public.notes')
     expect(rows).toEqual([{ candidature_id: deA }])
   })
@@ -870,10 +871,14 @@ describe('relecture de sécurité', () => {
   it('ne laisse appeler aucune fonction sans compte, ni celles qui renseignent sur autrui', async () => {
     await db.exec('set role anon')
     try {
+      // Utilisées par les règles d'accès : appelables, mais elles ne révèlent rien sans compte
+      // (migration 0017)
+      const { rows } = await db.query(
+        `select public.espace_actif() as espace, public.est_membre('${A}') as membre`,
+      )
+      expect(rows).toEqual([{ espace: null, membre: false }])
       for (const appel of [
         `select public.est_pro('${A}')`,
-        'select public.espace_actif()',
-        `select public.est_membre('${A}')`,
         'select * from public.mon_espace()',
         'select public.supprimer_mon_compte()',
       ]) {
@@ -920,7 +925,7 @@ describe('formulaire public', () => {
     try {
       const { rows } = await db.query<Depot>(
         `select * from public.deposer_candidature_publique($1, $2, gen_random_uuid(),
-           'Alice Martin', $3, array['React'], 4, null)`,
+           'Alice Martin', $3, array['React'], 4)`,
         [code, empreinte, email],
       )
       return rows[0]
@@ -961,7 +966,7 @@ describe('formulaire public', () => {
       try {
         await expect(
           db.exec(`select public.deposer_candidature_publique('${JETON}', 'x', gen_random_uuid(),
-            'Pirate', 'p@x.fr', '{}', 0, null)`),
+            'Pirate', 'p@x.fr', '{}', 0)`),
         ).rejects.toThrow(/permission denied/)
       } finally {
         await db.exec('reset role')
@@ -1346,5 +1351,148 @@ describe('page carrières', () => {
     await regler(B, `update public.espaces set slug = 'piratee' where id = '${A}'`)
     const { rows } = await db.query(`select slug from public.espaces where id = '${A}'`)
     expect(rows).toEqual([{ slug: null }])
+  })
+})
+
+describe('relecture 2', () => {
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated, service_role;
+      grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+    `)
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  it('sans compte, les tables protégées ne renvoient rien, sans erreur', async () => {
+    await ajouter(A, ['Alice'])
+    await db.exec('set role anon')
+    try {
+      for (const table of ['candidatures', 'offres', 'espaces', 'membres', 'etapes', 'notes']) {
+        const { rows } = await db.query(`select * from public.${table}`)
+        expect(rows, table).toEqual([])
+      }
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+
+  it('une note ne change pas de candidature', async () => {
+    await ajouter(A, ['Alice', 'Bruno'])
+    const [alice, bruno] = (
+      await db.query<{ id: string }>(`select id from public.candidatures order by nom`)
+    ).rows.map((r) => r.id)
+    await enTant(A, async () => {
+      await db.exec(
+        `insert into public.notes (candidature_id, contenu) values ('${alice}', 'Note')`,
+      )
+      await expect(db.exec(`update public.notes set candidature_id = '${bruno}'`)).rejects.toThrow(
+        /^candidature_figee/,
+      )
+      // Modifier le contenu reste possible
+      await db.exec(`update public.notes set contenu = 'Note corrigée'`)
+    })
+  })
+
+  it('formulaire public : limite par espace, quelle que soit la connexion', async () => {
+    const jeton = '33333333-3333-3333-3333-333333333333'
+    await db.exec(`
+      delete from prive.envois_formulaire;
+      insert into public.offres (user_id, titre, publique, jeton_public)
+        values ('${A}', 'Dev', true, '${jeton}');
+      insert into prive.envois_formulaire (empreinte, espace_id)
+        select 'connexion-' || i, '${A}' from generate_series(1, 60) i;
+    `)
+    await db.exec('set role service_role')
+    try {
+      await expect(
+        db.exec(`select * from public.deposer_candidature_publique('${jeton}', 'nouvelle',
+          gen_random_uuid(), 'X', 'x@x.fr', '{}', 0)`),
+      ).rejects.toThrow(/^trop_de_candidatures/)
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+
+  it('notifications : chaque réglage s’enregistre seul', async () => {
+    await enTant(A, async () => {
+      await db.exec('select public.regler_notifications(pour_moi => false)')
+      await db.exec('select public.regler_notifications(accuse => false)')
+      const { rows } = await db.query('select * from public.mes_notifications()')
+      expect(rows).toEqual([{ notifier: false, accuse_reception: false, proprietaire: true }])
+    })
+  })
+
+  const ordre = async () =>
+    (
+      await db.query<{ nom: string }>(
+        `select nom from public.etapes where espace_id = '${A}' order by position`,
+      )
+    ).rows.map((r) => r.nom)
+
+  it('étapes : une nouvelle étape va avant « Retenu », même après réordonnancement', async () => {
+    await enTant(A, async () => {
+      await db.exec(`insert into public.etapes (nom) values ('Entretien')`)
+      const { rows } = await db.query<{ id: string }>(
+        `select id from public.etapes where cle = 'retenu' and espace_id = '${A}'`,
+      )
+      // « Retenu » remonte au-dessus d'« Entretien »
+      await db.exec(`select public.deplacer_etape('${rows[0].id}', -1)`)
+      await db.exec(`insert into public.etapes (nom) values ('Offre')`)
+    })
+    expect(await ordre()).toEqual(['Nouveau', 'Offre', 'Retenu', 'Entretien', 'Écarté'])
+  })
+
+  it('étapes : déplacement d’un seul tenant, « Nouveau » reste première, propriétaire seul', async () => {
+    const id = (nom: string) =>
+      db
+        .query<{ id: string }>(
+          `select id from public.etapes where espace_id = '${A}' and nom = $1`,
+          [nom],
+        )
+        .then((r) => r.rows[0].id)
+    await enTant(A, () => db.exec(`insert into public.etapes (nom) values ('Entretien')`))
+    const entretien = await id('Entretien')
+    await enTant(A, async () => {
+      await db.exec(`select public.deplacer_etape('${entretien}', -1)`)
+      await db.exec(`select public.deplacer_etape('${entretien}', 1)`)
+    })
+    expect(await ordre()).toEqual(['Nouveau', 'Retenu', 'Entretien', 'Écarté'])
+    // Vers « Nouveau » : sans effet ; à la fin : sans effet
+    const retenu = await id('Retenu')
+    const ecarte = await id('Écarté')
+    await enTant(A, () => db.exec(`select public.deplacer_etape('${retenu}', -1)`))
+    await enTant(A, () => db.exec(`select public.deplacer_etape('${ecarte}', 1)`))
+    expect(await ordre()).toEqual(['Nouveau', 'Retenu', 'Entretien', 'Écarté'])
+    // Positions toujours distinctes
+    const { rows } = await db.query<{ n: number }>(
+      `select count(distinct position)::int as n from public.etapes where espace_id = '${A}'`,
+    )
+    expect(rows[0].n).toBe(4)
+
+    // Un membre ne peut pas déplacer
+    await db.exec(`
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+      update public.profils set espace_actif = '${A}' where user_id = '${B}';
+    `)
+    await expect(
+      enTant(B, () => db.exec(`select public.deplacer_etape('${entretien}', -1)`)),
+    ).rejects.toThrow(/^etape_introuvable/)
+  })
+
+  it('historique : correction des e-mails reprise pour les bases déjà migrées', async () => {
+    const sql = readFileSync(join(DOSSIER, '0017_relecture_2.sql'), 'utf8')
+    expect(sql).toContain(
+      'update public.historique set email = null where user_id is null and email is not null',
+    )
   })
 })
