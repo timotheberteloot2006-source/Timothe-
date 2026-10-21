@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from '@tanstack/react-router'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { CarteEntretiens } from '@/components/candidatures/CarteEntretiens'
+import { CarteHistorique } from '@/components/candidatures/CarteHistorique'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
 import { classeChamp } from '@/components/candidatures/styles'
 import {
@@ -17,19 +18,22 @@ import {
 import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
 import { ajouterNote, listerNotes, supprimerNote, type Note } from '@/lib/notes'
 import { listerEntretiens } from '@/lib/entretiens'
+import { listerHistorique } from '@/lib/historique'
 import { listerOffres } from '@/lib/offres'
+import { useAuth } from '@/lib/auth'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/candidatures/$id')({
   loader: async ({ params }) => {
-    const [candidature, notes, offres, entretiens] = await Promise.all([
+    const [candidature, notes, offres, entretiens, historique] = await Promise.all([
       lireCandidature(params.id),
       listerNotes(params.id),
       listerOffres(),
       listerEntretiens(params.id),
+      listerHistorique(params.id),
     ])
     if (!candidature) throw notFound()
-    return { candidature, notes, offres, entretiens }
+    return { candidature, notes, offres, entretiens, historique }
   },
   // Après loader : les types de loaderData en dépendent
   head: ({ loaderData }) => titrePage(loaderData?.candidature.nom ?? 'Candidature'),
@@ -45,7 +49,8 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
 })
 
 function FicheCandidature() {
-  const { candidature: c, notes, offres, entretiens } = Route.useLoaderData()
+  const { candidature: c, notes, offres, entretiens, historique } = Route.useLoaderData()
+  const { user } = useAuth()
   const offre = offres.find((o) => o.id === c.offre_id)
   const router = useRouter()
   const navigate = useNavigate()
@@ -185,6 +190,7 @@ function FicheCandidature() {
         executer={executer}
       />
       <CarteNotes candidatureId={c.id} notes={notes} executer={executer} />
+      <CarteHistorique evenements={historique} userId={user?.id} />
     </section>
   )
 }

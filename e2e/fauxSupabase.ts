@@ -112,6 +112,16 @@ export class FauxSupabase {
     },
   ]
   invitations: InvitationFaux[] = []
+  // Imite les déclencheurs de supabase/migrations/0010_historique.sql
+  historique: {
+    id: number
+    candidature_id: string
+    user_id: string | null
+    email: string | null
+    action: string
+    details: Record<string, unknown>
+    created_at: string
+  }[] = []
   espaceActif = UTILISATEUR.id
   // Adresse de retour demandée à l'inscription (lien de confirmation de l'e-mail)
   redirectionInscription: string | null = null
@@ -155,6 +165,18 @@ export class FauxSupabase {
       created_at: new Date().toISOString(),
     })
     return userId
+  }
+
+  journaliser(candidatureId: string, action: string, details: Record<string, unknown> = {}) {
+    this.historique.push({
+      id: this.historique.length + 1,
+      candidature_id: candidatureId,
+      user_id: this.utilisateur.id,
+      email: this.utilisateur.email,
+      action,
+      details,
+      created_at: new Date().toISOString(),
+    })
   }
 
   private estMembre(espaceId: string) {
@@ -260,6 +282,15 @@ export class FauxSupabase {
     if (chemin === '/rest/v1/notes') return this.notesRest(route, url, json)
     if (chemin === '/rest/v1/offres') return this.offresRest(route, url, json)
     if (chemin === '/rest/v1/entretiens') return this.entretiensRest(route, url, json)
+    if (chemin === '/rest/v1/historique') {
+      const id = url.searchParams.get('candidature_id')?.replace(/^eq[.]/, '')
+      return json(
+        this.historique
+          .filter((h) => h.candidature_id === id)
+          .sort((a, b) => b.id - a.id)
+          .map(({ candidature_id: _c, ...h }) => h),
+      )
+    }
     if (chemin === '/rest/v1/abonnements') {
       const objet = (requete.headers()['accept'] ?? '').includes('vnd.pgrst.object')
       return json(objet ? this.abonnement : this.abonnement ? [this.abonnement] : [])
@@ -343,7 +374,9 @@ export class FauxSupabase {
       if (!pro && this.candidatures.length + nouvelles.length > 50) {
         return json({ code: 'P0001', message: 'limite_gratuite: 50 candidatures au plus' }, 400)
       }
+      const avant = this.candidatures.length
       this.ajouter(...nouvelles)
+      this.candidatures.slice(avant).forEach((c) => this.journaliser(c.id, 'creation'))
       return json(undefined, 201)
     }
 
@@ -359,7 +392,24 @@ export class FauxSupabase {
       ) {
         return json(violationUnicite(), 409)
       }
-      cibles.forEach((c) => Object.assign(c, champs))
+      for (const c of cibles) {
+        if (champs.statut !== undefined && champs.statut !== c.statut) {
+          this.journaliser(c.id, 'statut', { avant: c.statut, apres: champs.statut })
+        }
+        if (champs.cv_chemin !== undefined && champs.cv_chemin !== c.cv_chemin) {
+          this.journaliser(
+            c.id,
+            !c.cv_chemin ? 'cv_ajoute' : !champs.cv_chemin ? 'cv_retire' : 'cv_remplace',
+          )
+        }
+        const modifies = (
+          ['nom', 'email', 'poste', 'competences', 'experience', 'offre_id'] as const
+        )
+          .filter((k) => k in champs && JSON.stringify(champs[k]) !== JSON.stringify(c[k]))
+          .map((k) => (k === 'offre_id' ? 'offre' : k))
+        if (modifies.length > 0) this.journaliser(c.id, 'modification', { champs: modifies })
+        Object.assign(c, champs)
+      }
       return json(undefined, 204)
     }
 
@@ -385,6 +435,10 @@ export class FauxSupabase {
     }
     if (methode === 'POST') {
       this.compteur++
+      this.journaliser(
+        (corps(requete) as { candidature_id: string }).candidature_id,
+        'note_ajoutee',
+      )
       this.notes.push({
         id: `n${this.compteur}`,
         created_at: new Date(Date.UTC(2026, 1, 1, 0, this.compteur)).toISOString(),
@@ -394,6 +448,9 @@ export class FauxSupabase {
     }
     if (methode === 'DELETE') {
       const ids = idsFiltres(url)
+      this.notes
+        .filter((n) => ids?.includes(n.id))
+        .forEach((n) => this.journaliser(n.candidature_id, 'note_supprimee'))
       this.notes = this.notes.filter((n) => !ids?.includes(n.id))
       return json(undefined, 204)
     }
@@ -422,10 +479,16 @@ export class FauxSupabase {
     if (methode === 'POST') {
       const champs = corps(requete) as Omit<EntretienFaux, 'id' | 'user_id'>
       this.ajouterEntretien(champs.candidature_id, new Date(champs.debut), champs)
+      this.journaliser(champs.candidature_id, 'entretien_planifie', { debut: champs.debut })
       return json(undefined, 201)
     }
     if (methode === 'DELETE') {
       const ids = idsFiltres(url)
+      this.entretiens
+        .filter((e) => ids?.includes(e.id))
+        .forEach((e) =>
+          this.journaliser(e.candidature_id, 'entretien_supprime', { debut: e.debut }),
+        )
       this.entretiens = this.entretiens.filter((e) => !ids?.includes(e.id))
       return json(undefined, 204)
     }

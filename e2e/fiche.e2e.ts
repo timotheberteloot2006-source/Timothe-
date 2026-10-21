@@ -49,3 +49,22 @@ test('ajouter et supprimer des notes, puis supprimer la candidature', async ({ p
   expect(faux.candidatures).toHaveLength(0)
   expect(faux.notes).toHaveLength(0)
 })
+
+test('l’historique retrace les actions sur la candidature', async ({ page }) => {
+  await page.getByRole('combobox', { name: 'Statut' }).selectOption('retenu')
+  await page.getByLabel('Nouvelle note').fill('Bon profil')
+  await page.getByRole('button', { name: 'Ajouter la note' }).click()
+  await page.getByLabel('Fichier PDF du CV').setInputFiles(pdf)
+  await expect(page.getByRole('button', { name: 'Ouvrir le CV' })).toBeVisible()
+  await page.getByRole('button', { name: 'Modifier' }).click()
+  await page.getByLabel('Poste visé').fill('Développeuse senior')
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+
+  const historique = page.getByRole('heading', { name: 'Historique' }).locator('xpath=..')
+  await expect(historique.getByRole('listitem')).toHaveText([
+    /^Fiche modifiée \(poste\) · vous/,
+    /^CV ajouté · vous/,
+    /^Note ajoutée · vous/,
+    /^Statut : Nouveau → Retenu · vous/,
+  ])
+})

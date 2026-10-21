@@ -22,7 +22,7 @@ npm run dev
    `http://localhost:5173/**`, qui couvre aussi le retour aux invitations après l'inscription.
 
 4. Créer la base (candidatures, notes, stockage des CV, abonnements, offres, entretiens,
-   espaces d'équipe, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
+   espaces d'équipe, historique, suppression de compte) : dans *SQL Editor*, exécuter dans l'ordre les fichiers de
    `supabase/migrations/` (ou `supabase db push` avec la CLI Supabase).
 
 Les pages placées dans `src/routes/_authentifie/` exigent une session :
@@ -88,6 +88,11 @@ Sur la fiche d'une candidature, on planifie des **entretiens** (date, durée, li
 visio) et on les ajoute à son agenda grâce à un fichier `.ics` (Google Agenda, Outlook, Apple
 Calendrier…). Le tableau de bord affiche les entretiens à venir et la date du prochain sur chaque
 candidature concernée.
+
+La fiche affiche aussi l'**historique** de la candidature : création, changements de statut,
+modifications, CV, notes et entretiens, avec l'auteur et la date. Il est enregistré par la base
+elle-même (déclencheurs, `supabase/migrations/0010_historique.sql`) : le site peut le lire mais
+ni l'écrire, ni le modifier, ni l'effacer.
 
 La « Vue d'ensemble » en haut du tableau de bord résume toutes les candidatures (nombre par statut,
 expérience moyenne, CV, compétences les plus fréquentes) ; un clic sur un statut ou une compétence

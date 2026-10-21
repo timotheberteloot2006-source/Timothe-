@@ -636,3 +636,118 @@ describe('travail en équipe', () => {
 function noms50() {
   return Array.from({ length: 50 }, (_, i) => `C${i + 1}`)
 }
+
+describe('historique', () => {
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to authenticated;
+      grant select, insert, update, delete on all tables in schema public to authenticated;
+      grant execute on all functions in schema public to authenticated;
+    `)
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  const journal = async () =>
+    (
+      await db.query<{ action: string; details: unknown; email: string | null }>(
+        'select action, details, email from public.historique order by id',
+      )
+    ).rows
+
+  it('enregistre chaque action, avec son auteur', async () => {
+    const id = await enTant(A, async () => {
+      const { rows } = await db.query<{ id: string }>(
+        `insert into public.candidatures (nom, statut) values ('Alice', 'nouveau') returning id`,
+      )
+      const c = rows[0].id
+      await db.exec(`update public.candidatures set statut = 'retenu' where id = '${c}'`)
+      await db.exec(
+        `update public.candidatures set poste = 'Dev', competences = '{React}' where id = '${c}'`,
+      )
+      await db.exec(`update public.candidatures set cv_chemin = 'a/1.pdf' where id = '${c}'`)
+      await db.exec(`update public.candidatures set cv_chemin = 'a/2.pdf' where id = '${c}'`)
+      await db.exec(`update public.candidatures set cv_chemin = null where id = '${c}'`)
+      await db.exec(`insert into public.notes (candidature_id, contenu) values ('${c}', 'Bien')`)
+      await db.exec(`delete from public.notes where candidature_id = '${c}'`)
+      await db.exec(
+        `insert into public.entretiens (candidature_id, debut) values ('${c}', '2026-11-03T14:00:00Z')`,
+      )
+      // Une mise à jour sans changement n'est pas journalisée
+      await db.exec(`update public.candidatures set statut = 'retenu' where id = '${c}'`)
+      return c
+    })
+    expect(await journal()).toEqual([
+      { action: 'creation', details: {}, email: 'a@x.fr' },
+      { action: 'statut', details: { avant: 'nouveau', apres: 'retenu' }, email: 'a@x.fr' },
+      { action: 'modification', details: { champs: ['poste', 'competences'] }, email: 'a@x.fr' },
+      { action: 'cv_ajoute', details: {}, email: 'a@x.fr' },
+      { action: 'cv_remplace', details: {}, email: 'a@x.fr' },
+      { action: 'cv_retire', details: {}, email: 'a@x.fr' },
+      { action: 'note_ajoutee', details: {}, email: 'a@x.fr' },
+      { action: 'note_supprimee', details: {}, email: 'a@x.fr' },
+      {
+        action: 'entretien_planifie',
+        details: { debut: '2026-11-03T14:00:00Z' },
+        email: 'a@x.fr',
+      },
+    ])
+    const lu = await enTant(A, () =>
+      db.query(`select count(*)::int as n from public.historique where candidature_id = '${id}'`),
+    )
+    expect(lu.rows).toEqual([{ n: 9 }])
+  })
+
+  it('ne peut être ni écrit, ni modifié, ni effacé par un utilisateur', async () => {
+    const [{ id }] = (
+      await db.query<{ id: string }>(
+        `insert into public.candidatures (user_id, nom) values ('${A}', 'Alice') returning id`,
+      )
+    ).rows
+    await expect(
+      enTant(A, () =>
+        db.exec(
+          `insert into public.historique (candidature_id, espace_id, action) values ('${id}', '${A}', 'creation')`,
+        ),
+      ),
+    ).rejects.toThrow(/row-level security/)
+    await enTant(A, () => db.exec(`update public.historique set email = 'faux'`))
+    await enTant(A, () => db.exec(`delete from public.historique`))
+    await expect(
+      enTant(A, () => db.exec(`select prive.journaliser('${id}', 'creation')`)),
+    ).rejects.toThrow(/permission denied/)
+    expect(await journal()).toEqual([{ action: 'creation', details: {}, email: null }])
+  })
+
+  it('n’est visible que dans l’espace de la candidature', async () => {
+    await db.exec(`insert into public.candidatures (user_id, nom) values ('${A}', 'De A')`)
+    const vuParB = await enTant(B, () => db.query('select * from public.historique'))
+    expect(vuParB.rows).toEqual([])
+  })
+
+  it('disparaît avec la candidature, notes et entretiens compris', async () => {
+    const id = await enTant(A, async () => {
+      const { rows } = await db.query<{ id: string }>(
+        `insert into public.candidatures (nom) values ('Alice') returning id`,
+      )
+      const c = rows[0].id
+      await db.exec(`insert into public.notes (candidature_id, contenu) values ('${c}', 'Note')`)
+      await db.exec(
+        `insert into public.entretiens (candidature_id, debut) values ('${c}', '2026-11-03T14:00:00Z')`,
+      )
+      return c
+    })
+    // La suppression en cascade des notes et entretiens ne doit pas bloquer
+    await enTant(A, () => db.exec(`delete from public.candidatures where id = '${id}'`))
+    expect(await journal()).toEqual([])
+  })
+})

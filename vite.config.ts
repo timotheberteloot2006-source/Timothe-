@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
@@ -19,5 +20,9 @@ export default defineConfig({
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),
     },
+  },
+  test: {
+    // Même fuseau sur toutes les machines (dates affichées en heure de Paris)
+    env: { TZ: 'Europe/Paris' },
   },
 })
