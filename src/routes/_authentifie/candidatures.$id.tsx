@@ -2,6 +2,7 @@ import { createFileRoute, Link, notFound, useNavigate, useRouter } from '@tansta
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { CarteEntretiens } from '@/components/candidatures/CarteEntretiens'
 import { CarteHistorique } from '@/components/candidatures/CarteHistorique'
+import { CarteReponse } from '@/components/candidatures/CarteReponse'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
 import { classeChamp } from '@/components/candidatures/styles'
 import {
@@ -12,7 +13,9 @@ import {
   type Candidature,
   type NouvelleCandidature,
 } from '@/lib/candidatures'
+import { lireEspace } from '@/lib/espace'
 import { ETAPES_DE_BASE, listerEtapes } from '@/lib/etapes'
+import { listerModeles } from '@/lib/modeles'
 import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
 import { ajouterNote, listerNotes, supprimerNote, type Note } from '@/lib/notes'
 import { listerEntretiens } from '@/lib/entretiens'
@@ -23,17 +26,21 @@ import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/candidatures/$id')({
   loader: async ({ params }) => {
-    const [candidature, notes, offres, entretiens, historique, etapes] = await Promise.all([
-      lireCandidature(params.id),
-      listerNotes(params.id),
-      listerOffres(),
-      listerEntretiens(params.id),
-      // L'historique est secondaire : son échec ne doit pas empêcher d'afficher la fiche
-      listerHistorique(params.id).catch(() => null),
-      listerEtapes().catch(() => ETAPES_DE_BASE),
-    ])
+    const [candidature, notes, offres, entretiens, historique, etapes, modeles, espace] =
+      await Promise.all([
+        lireCandidature(params.id),
+        listerNotes(params.id),
+        listerOffres(),
+        listerEntretiens(params.id),
+        // L'historique est secondaire : son échec ne doit pas empêcher d'afficher la fiche
+        listerHistorique(params.id).catch(() => null),
+        listerEtapes().catch(() => ETAPES_DE_BASE),
+        // Base pas encore à jour (migration 0019) : aucun modèle, message libre seulement
+        listerModeles().catch(() => []),
+        lireEspace().catch(() => null),
+      ])
     if (!candidature) throw notFound()
-    return { candidature, notes, offres, entretiens, historique, etapes }
+    return { candidature, notes, offres, entretiens, historique, etapes, modeles, espace }
   },
   // Après loader : les types de loaderData en dépendent
   head: ({ loaderData }) => titrePage(loaderData?.candidature.nom ?? 'Candidature'),
@@ -49,7 +56,16 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
 })
 
 function FicheCandidature() {
-  const { candidature: c, notes, offres, entretiens, historique, etapes } = Route.useLoaderData()
+  const {
+    candidature: c,
+    notes,
+    offres,
+    entretiens,
+    historique,
+    etapes,
+    modeles,
+    espace,
+  } = Route.useLoaderData()
   const { user } = useAuth()
   const offre = offres.find((o) => o.id === c.offre_id)
   const router = useRouter()
@@ -190,6 +206,13 @@ function FicheCandidature() {
         executer={executer}
       />
       <CarteNotes candidatureId={c.id} notes={notes} executer={executer} />
+      <CarteReponse
+        candidature={c}
+        offreTitre={offre?.titre ?? null}
+        espaceNom={espace?.nom ?? ''}
+        modeles={modeles}
+        onEnvoye={() => router.invalidate()}
+      />
       <CarteHistorique historique={historique} userId={user?.id} />
     </section>
   )

@@ -2,7 +2,10 @@ import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 
 // Appelle une fonction Supabase (supabase/functions/<nom>) ; en cas d'échec, lève une erreur dont
 // le message est celui renvoyé par la fonction ({ erreur }), lisible par l'utilisateur
-export async function appelerFonction<T>(nom: string, body?: FormData): Promise<T | null> {
+export async function appelerFonction<T>(
+  nom: string,
+  body?: FormData | Record<string, unknown>,
+): Promise<T | null> {
   if (!supabase) throw new Error(SUPABASE_NON_CONFIGURE)
   const { data, error } = await (await supabase.fonctions()).invoke<T>(nom, { body })
   if (error) {

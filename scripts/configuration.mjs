@@ -25,6 +25,7 @@ export const MIGRATIONS = [
     arguments: { eid: '00000000-0000-0000-0000-000000000000', sens: 0 },
   },
   { numero: '0018', table: 'entretiens', colonne: 'rappel_envoye_le' },
+  { numero: '0019', table: 'modeles_reponse', colonne: 'nom' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite
@@ -238,7 +239,7 @@ async function interrogerSupabase(url, entetes, fetch) {
   }
 
   // Fonctions : déployées, et le webhook sans vérification de jeton (Stripe n'en envoie pas)
-  for (const fonction of ['creer-checkout', 'portail-client']) {
+  for (const fonction of ['creer-checkout', 'portail-client', 'envoyer-reponse']) {
     const reponse = await fetch(`${url}/functions/v1/${fonction}`, {
       method: 'OPTIONS',
       headers: entetes,

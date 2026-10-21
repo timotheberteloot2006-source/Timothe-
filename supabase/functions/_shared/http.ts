@@ -24,6 +24,13 @@ export function supabaseAdmin(): SupabaseClient {
   )
 }
 
+// Client avec les droits de l'utilisateur à l'origine de la requête (règles d'accès appliquées)
+export function clientUtilisateur(req: Request): SupabaseClient {
+  return createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+  })
+}
+
 // Utilisateur à l'origine de la requête, d'après son jeton de session
 export async function utilisateur(req: Request) {
   const jeton = req.headers.get('Authorization')?.replace('Bearer ', '')

@@ -27,6 +27,9 @@ describe('decrireEvenement', () => {
         apres_nom: 'Embauché',
       }),
     ).toBe('Statut : Entretien RH → Embauché')
+    expect(decrire('reponse_envoyee', { sujet: 'Proposition d’entretien' })).toBe(
+      'Réponse envoyée au candidat : « Proposition d’entretien »',
+    )
     expect(decrire('reception')).toBe('Candidature reçue par le formulaire en ligne')
     expect(decrire('nouvelle_postulation', { offre: 'Data analyst' })).toBe(
       'A postulé à nouveau (offre : Data analyst)',

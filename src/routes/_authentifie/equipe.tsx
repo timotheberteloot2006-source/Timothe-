@@ -19,7 +19,9 @@ import {
 } from '@/lib/espace'
 import { compterParEtape, ETAPES_DE_BASE, listerEtapes } from '@/lib/etapes'
 import { GestionEtapes } from '@/components/GestionEtapes'
+import { GestionModeles } from '@/components/GestionModeles'
 import { ReglagesPageCarrieres } from '@/components/ReglagesPageCarrieres'
+import { listerModeles } from '@/lib/modeles'
 import { lireReglagesCarrieres } from '@/lib/carrieres'
 import { titrePage } from '@/lib/titre'
 
@@ -27,20 +29,30 @@ export const Route = createFileRoute('/_authentifie/equipe')({
   head: () => titrePage('Équipe'),
   loader: async ({ context }) => {
     const espace = await lireEspace()
-    const [membres, invitations, mesEspaces, notifications, etapes, nombresParEtape, carrieres] =
-      await Promise.all([
-        listerMembres(espace.id),
-        // Seul le propriétaire voit et gère les invitations
-        espace.role === 'proprietaire' ? listerInvitations(espace.id) : Promise.resolve([]),
-        listerMesEspaces(context.auth.user!.id),
-        // null : base pas encore à jour (migration 0014), la rubrique est masquée
-        lireNotifications().catch(() => null),
-        // Base pas encore à jour (migration 0015) : les trois étapes habituelles
-        listerEtapes().catch(() => ETAPES_DE_BASE),
-        compterParEtape().catch(() => ({})),
-        // null : base pas encore à jour (migration 0016), la rubrique est masquée
-        lireReglagesCarrieres(espace.id).catch(() => null),
-      ])
+    const [
+      membres,
+      invitations,
+      mesEspaces,
+      notifications,
+      etapes,
+      nombresParEtape,
+      carrieres,
+      modeles,
+    ] = await Promise.all([
+      listerMembres(espace.id),
+      // Seul le propriétaire voit et gère les invitations
+      espace.role === 'proprietaire' ? listerInvitations(espace.id) : Promise.resolve([]),
+      listerMesEspaces(context.auth.user!.id),
+      // null : base pas encore à jour (migration 0014), la rubrique est masquée
+      lireNotifications().catch(() => null),
+      // Base pas encore à jour (migration 0015) : les trois étapes habituelles
+      listerEtapes().catch(() => ETAPES_DE_BASE),
+      compterParEtape().catch(() => ({})),
+      // null : base pas encore à jour (migration 0016), la rubrique est masquée
+      lireReglagesCarrieres(espace.id).catch(() => null),
+      // null : base pas encore à jour (migration 0019), la rubrique est masquée
+      listerModeles().catch(() => null),
+    ])
     return {
       espace,
       membres,
@@ -50,6 +62,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
       etapes,
       nombresParEtape,
       carrieres,
+      modeles,
     }
   },
   component: Equipe,
@@ -72,6 +85,7 @@ function Equipe() {
     etapes,
     nombresParEtape,
     carrieres,
+    modeles,
   } = Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
@@ -186,6 +200,12 @@ function Equipe() {
             proprietaire={proprietaire}
             executer={executer}
           />
+        </Carte>
+      )}
+
+      {modeles && (
+        <Carte titre="Modèles de réponse">
+          <GestionModeles modeles={modeles} executer={executer} />
         </Carte>
       )}
 

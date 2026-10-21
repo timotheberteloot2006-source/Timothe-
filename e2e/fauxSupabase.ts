@@ -1,6 +1,7 @@
 // Faux Supabase pour les tests de bout en bout : intercepte les appels du navigateur vers
 // l'URL configurée au build (VITE_SUPABASE_URL) et répond depuis un état en mémoire.
 // Seules les requêtes réellement émises par le site sont simulées.
+import { remplirModele, valeursModele } from '../supabase/functions/_shared/modeles.ts'
 import type { BrowserContext, Page, Request, Route } from '@playwright/test'
 
 export const URL_SUPABASE = 'http://faux-supabase.test'
@@ -84,6 +85,14 @@ interface EtapeFaux {
   position: number
 }
 
+interface ModeleFaux {
+  id: string
+  espace_id: string
+  nom: string
+  sujet: string
+  corps: string
+}
+
 interface NoteFaux {
   id: string
   candidature_id: string
@@ -134,6 +143,13 @@ export class FauxSupabase {
     },
   ]
   invitations: InvitationFaux[] = []
+  // Modèles de réponse (supabase/migrations/0019_modeles_reponse.sql), proposés à la demande
+  private modelesCrees = new Set<string>()
+  modelesListe: ModeleFaux[] = []
+  // E-mails envoyés par la fonction envoyer-reponse
+  reponsesEnvoyees: { to: string; sujet: string; corps: string }[] = []
+  // Erreur renvoyée par la fonction au prochain envoi
+  erreurReponse: { erreur: string; status: number } | null = null
   // Étapes de recrutement (supabase/migrations/0015_etapes.sql), créées à la demande par espace
   private etapesCreees: EtapeFaux[] = []
   // Imite les déclencheurs de supabase/migrations/0010_historique.sql
@@ -190,6 +206,28 @@ export class FauxSupabase {
       created_at: new Date().toISOString(),
     })
     return userId
+  }
+
+  modeles(espaceId = this.espaceActif) {
+    if (!this.modelesCrees.has(espaceId)) {
+      this.modelesCrees.add(espaceId)
+      for (const [nom, sujet, corps] of [
+        [
+          'Convocation à un entretien',
+          'Votre candidature : proposition d’entretien',
+          'Bonjour {nom},\n\nVotre candidature au poste « {offre} » a retenu notre attention.\n\n{espace}',
+        ],
+        [
+          'Réponse négative',
+          'Votre candidature au poste « {offre} »',
+          'Bonjour {nom},\n\nNous ne donnerons pas suite.\n\n{espace}',
+        ],
+      ])
+        this.modelesListe.push({ id: crypto.randomUUID(), espace_id: espaceId, nom, sujet, corps })
+    }
+    return this.modelesListe
+      .filter((m) => m.espace_id === espaceId)
+      .sort((a, b) => a.nom.localeCompare(b.nom))
   }
 
   // Étapes d'un espace, dans l'ordre ; les trois étapes de base existent toujours
@@ -456,6 +494,71 @@ export class FauxSupabase {
           .sort((a, b) => a.titre.localeCompare(b.titre, 'fr', { sensitivity: 'base' }))
           .map((o) => ({ titre: o.titre, description: o.description, jeton: o.jeton_public })),
       })
+    }
+
+    // Modèles de réponse (supabase/migrations/0019_modeles_reponse.sql)
+    if (chemin === '/rest/v1/modeles_reponse') {
+      const ids = idsFiltres(url)
+      if (methode === 'GET') return json(this.modeles())
+      const champs = (corps(requete) ?? {}) as Partial<ModeleFaux>
+      const doublon = (sauf?: string) =>
+        this.modeles().some(
+          (m) => m.id !== sauf && m.nom.toLowerCase() === champs.nom?.toLowerCase(),
+        )
+      const refus = { code: '23505', message: 'duplicate key "modeles_reponse_nom_unique"' }
+      if (methode === 'POST') {
+        if (doublon()) return json(refus, 409)
+        this.modelesListe.push({
+          id: crypto.randomUUID(),
+          espace_id: this.espaceActif,
+          nom: champs.nom!,
+          sujet: champs.sujet!,
+          corps: champs.corps!,
+        })
+        return json(undefined, 201)
+      }
+      if (methode === 'PATCH') {
+        if (doublon(ids?.[0])) return json(refus, 409)
+        this.modeles()
+          .filter((m) => ids?.includes(m.id))
+          .forEach((m) => Object.assign(m, champs))
+        return json(undefined, 204)
+      }
+      if (methode === 'DELETE') {
+        this.modelesListe = this.modelesListe.filter((m) => !ids?.includes(m.id))
+        return json(undefined, 204)
+      }
+    }
+    if (chemin === '/functions/v1/envoyer-reponse' && methode === 'POST') {
+      if (this.erreurReponse)
+        return json({ erreur: this.erreurReponse.erreur }, this.erreurReponse.status)
+      const demande = corps(requete) as {
+        candidature: string
+        sujet: string
+        corps: string
+        modele: string | null
+      }
+      const c = this.candidatures.find(
+        (x) => x.id === demande.candidature && x.espace_id === this.espaceActif,
+      )
+      if (!c?.email) return json({ erreur: 'Cette candidature n’a pas d’adresse e-mail.' }, 400)
+      const valeurs = valeursModele({
+        nom: c.nom,
+        offre_titre: this.offres.find((o) => o.id === c.offre_id)?.titre ?? null,
+        poste: c.poste,
+        espace_nom: this.espaces.find((e) => e.id === c.espace_id)?.nom ?? '',
+      })
+      const envoi = {
+        to: c.email,
+        sujet: remplirModele(demande.sujet, valeurs),
+        corps: remplirModele(demande.corps, valeurs),
+      }
+      this.reponsesEnvoyees.push(envoi)
+      this.journaliser(c.id, 'reponse_envoyee', {
+        sujet: envoi.sujet,
+        ...(demande.modele && { modele: demande.modele }),
+      })
+      return json({ envoye: true })
     }
 
     // Étapes de recrutement (supabase/migrations/0015_etapes.sql)

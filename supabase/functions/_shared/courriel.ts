@@ -6,6 +6,14 @@ export interface Courriel {
   subject: string
   text: string
   html: string
+  // Expéditeur affiché (sinon EMAIL_EXPEDITEUR) et adresse de réponse
+  from?: string
+  reply_to?: string
+}
+
+// Envoi possible : clé et expéditeur configurés
+export function courrielsActives() {
+  return !!Deno.env.get('RESEND_API_KEY') && !!Deno.env.get('EMAIL_EXPEDITEUR')
 }
 
 // L'API d'envoi groupé accepte 100 e-mails par appel

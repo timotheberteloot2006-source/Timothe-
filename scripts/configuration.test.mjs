@@ -143,9 +143,7 @@ function supabaseComplet(methode, url) {
 describe('verifierSupabase', () => {
   it('projet prêt', async () => {
     const { fetch, appels } = fauxFetch(supabaseComplet)
-    expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual([
-      ...Array(7).fill('ok'),
-    ])
+    expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual([...Array(8).fill('ok')])
     // Seulement des lectures, et des appels refusés : fonction de la migration 0017 sans droit
     // ni étape existante, webhook sans signature, formulaire vide
     expect(appels.filter((a) => !a.startsWith('GET ') && !a.startsWith('OPTIONS '))).toEqual([
@@ -175,6 +173,7 @@ describe('verifierSupabase', () => {
       if (url.includes('/espaces?select=slug')) return [400, { code: '42703' }]
       if (url.endsWith('/rpc/deplacer_etape')) return [404, { code: 'PGRST202' }]
       if (url.includes('/entretiens?select=rappel_envoye_le')) return [400, { code: '42703' }]
+      if (url.includes('/modeles_reponse?select=nom')) return [404, { code: 'PGRST205' }]
       if (url.endsWith('/rappels-entretiens'))
         return [500, { erreur: 'RAPPELS_SECRET non configuré.' }]
       if (url.endsWith('/portail-client')) return [404, {}]
@@ -187,7 +186,7 @@ describe('verifierSupabase', () => {
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
       expect.stringContaining(
-        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018 manquent',
+        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019 manquent',
       ),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
@@ -206,7 +205,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0018')
+    expect(MIGRATIONS.at(-1).numero).toBe('0019')
   })
 })
 

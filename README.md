@@ -122,6 +122,14 @@ l'offre, et son historique indique « Candidature reçue par le formulaire en li
   e-mail reprenant ses entretiens des 30 prochaines heures, à l'heure de `FUSEAU_HORAIRE`. Un
   entretien n'est rappelé qu'une fois, de nouveau s'il est déplacé ; un envoi échoué est retenté
   au passage suivant. La fonction n'accepte que les appels portant son secret (`RAPPELS_SECRET`).
+- **Modèles de réponse** (`supabase/migrations/0019_modeles_reponse.sql`,
+  `supabase/functions/envoyer-reponse`) : depuis la fiche, « Répondre au candidat » envoie un
+  e-mail à partir d'un modèle de l'espace (trois proposés : convocation, réponse négative, demande
+  de pièces), retouchable avant l'envoi, avec aperçu ; `{nom}`, `{offre}` et `{espace}` sont
+  remplacés. L'e-mail part au nom de l'espace, le candidat répond directement au recruteur, et
+  l'envoi est noté dans l'historique. Les membres gèrent les modèles (page **Équipe**) ; la
+  fonction applique leurs droits (candidature de leur espace) et limite les envois à 100 par
+  heure et par espace. Il faut les e-mails Resend configurés.
 - **Page carrières** (`/carrieres/<adresse>`, `supabase/migrations/0016_page_carrieres.sql`) :
   le propriétaire choisit l'adresse (proposée à partir du nom de l'espace), écrit une
   présentation et met la page en ligne (page **Équipe**, « Page carrières »). Elle liste, sans

@@ -45,7 +45,9 @@ function Confidentialite() {
       </p>
       <p>
         Si le recruteur l’a activé, un accusé de réception vous est envoyé par e-mail ; ses membres
-        peuvent aussi être prévenus de votre candidature par e-mail (votre nom et le poste visé).
+        peuvent aussi être prévenus de votre candidature par e-mail (votre nom et le poste visé). Le
+        recruteur peut vous répondre par e-mail depuis le service ; vos réponses lui parviennent
+        directement.
       </p>
 
       <h2>Données collectées sur votre compte</h2>

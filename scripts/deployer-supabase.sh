@@ -49,6 +49,8 @@ echo
 echo "3/3 Fonctions (sans Docker)"
 "${SUPABASE[@]}" functions deploy creer-checkout --use-api
 "${SUPABASE[@]}" functions deploy portail-client --use-api
+# Réponses aux candidats : appelée par un membre connecté (jeton vérifié)
+"${SUPABASE[@]}" functions deploy envoyer-reponse --use-api
 # Stripe n'envoie pas de jeton Supabase : l'authenticité vient de la signature du webhook
 "${SUPABASE[@]}" functions deploy webhook-stripe --no-verify-jwt --use-api
 # Formulaire public : le candidat n'a pas de compte (contrôles faits par la fonction et la base)

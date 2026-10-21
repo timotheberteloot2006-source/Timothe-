@@ -12,7 +12,7 @@ Deux commandes accompagnent le guide :
 |---|---|
 | `npm run verifier:config` | Contrôle les fichiers `.env` et `supabase/functions/.env` : valeurs manquantes, clé secrète publiée par erreur, clé d'un autre projet… |
 | `npm run verifier:config -- --distant` | Interroge aussi Supabase et Stripe, en lecture seule : migrations appliquées, fonctions déployées, webhook, prix, portail client |
-| `npm run deployer:supabase` | Applique les migrations manquantes, envoie les secrets et déploie les cinq fonctions (paiement, webhook, formulaire public, rappels d'entretien). Peut être relancée sans risque |
+| `npm run deployer:supabase` | Applique les migrations manquantes, envoie les secrets et déploie les six fonctions (paiement, webhook, formulaire public, réponses aux candidats, rappels d'entretien). Peut être relancée sans risque |
 | `npm run planifier:rappels` | Affiche la requête qui planifie les rappels d'entretien, à exécuter une fois dans le *SQL Editor* |
 
 Elles s'utilisent depuis le dossier du projet, avec Node 22 (`npm install` fait une fois).
@@ -137,7 +137,7 @@ Le script affiche les migrations qu'il va appliquer et demande confirmation.
    ```bash
    npm run verifier:config -- --distant
    ```
-   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0018 »,
+   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0019 »,
    « webhook-stripe déployée et joignable par Stripe » et « postuler déployée et ouverte aux
    candidats », puis, si les e-mails sont configurés, « Domaine … vérifié chez Resend ». Si une
    fonction « refuse les appels sans jeton », elle a été déployée sans
@@ -204,6 +204,9 @@ Avec une vraie adresse e-mail, sur le site en ligne :
       membres reçoivent l'e-mail « Nouvelle candidature », le candidat l'accusé de réception
       (vérifier qu'ils n'arrivent pas en indésirables) ; *Équipe > Notifications* permet de les
       couper.
+- [ ] Réponse au candidat : sur la fiche d'une candidature reçue à votre adresse, « Répondre au
+      candidat », modèle « Convocation à un entretien », envoyer. L'e-mail arrive au nom de
+      l'espace ; y répondre arrive dans votre boîte, et l'envoi figure dans l'historique.
 - [ ] Page carrières : sur *Équipe*, « Page carrières », choisir l'adresse, cocher « Page en
       ligne » et ouvrir le lien dans une fenêtre privée : l'offre en ligne y figure, avec son
       bouton « Postuler ».

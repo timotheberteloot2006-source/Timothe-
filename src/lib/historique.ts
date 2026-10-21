@@ -69,6 +69,10 @@ export function decrireEvenement(evenement: Pick<Evenement, 'action' | 'details'
       return 'Candidature créée'
     case 'reception':
       return 'Candidature reçue par le formulaire en ligne'
+    case 'reponse_envoyee':
+      return typeof details.sujet === 'string'
+        ? `Réponse envoyée au candidat : « ${details.sujet} »`
+        : 'Réponse envoyée au candidat'
     case 'nouvelle_postulation':
       return typeof details.offre === 'string'
         ? `A postulé à nouveau (offre : ${details.offre})`

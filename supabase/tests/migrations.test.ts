@@ -1606,3 +1606,134 @@ describe('rappels d’entretien', () => {
     }
   })
 })
+
+describe('modèles de réponse', () => {
+  let alice: string
+
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated;
+      grant select, insert, update, delete on public.modeles_reponse to authenticated;
+      update public.espaces set nom = 'Agence RH' where id = '${A}';
+    `)
+    await db.exec(
+      `insert into public.candidatures (user_id, nom, email) values ('${A}', 'Alice', 'alice@x.fr')`,
+    )
+    alice = (await db.query<{ id: string }>(`select id from public.candidatures`)).rows[0].id
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  it('chaque espace reçoit les trois modèles proposés', async () => {
+    const { rows } = await db.query<{ nom: string }>(
+      `select nom from public.modeles_reponse where espace_id = '${A}' order by nom`,
+    )
+    expect(rows.map((r) => r.nom)).toEqual([
+      'Convocation à un entretien',
+      'Demande de pièces',
+      'Réponse négative',
+    ])
+    const { rows: corps } = await db.query<{ corps: string }>(
+      `select corps from public.modeles_reponse where espace_id = '${A}' and nom = 'Réponse négative'`,
+    )
+    expect(corps[0].corps).toContain('Bonjour {nom},\n\n')
+  })
+
+  it('un membre ne voit et ne modifie que les modèles de son espace actif', async () => {
+    await enTant(A, async () => {
+      await db.exec(
+        `insert into public.modeles_reponse (nom, sujet, corps) values ('Relance', 'Sujet', 'Texte')`,
+      )
+      const { rows } = await db.query('select espace_id from public.modeles_reponse')
+      expect(new Set(rows.map((r) => r.espace_id))).toEqual(new Set([A]))
+    })
+    await enTant(B, async () => {
+      await db.exec(`delete from public.modeles_reponse where nom = 'Relance'`)
+      await expect(
+        db.exec(
+          `insert into public.modeles_reponse (espace_id, nom, sujet, corps) values ('${A}', 'Pirate', 's', 'c')`,
+        ),
+      ).rejects.toThrow(/row-level security/)
+    })
+    const { rows } = await db.query(`select 1 from public.modeles_reponse where nom = 'Relance'`)
+    expect(rows).toHaveLength(1)
+  })
+
+  it('préparer : données du modèle pour un membre, refus sinon', async () => {
+    const preparation = await enTant(A, () =>
+      db.query(`select * from public.preparer_reponse('${alice}')`),
+    )
+    expect(preparation.rows).toEqual([
+      {
+        email: 'alice@x.fr',
+        nom: 'Alice',
+        offre_titre: null,
+        poste: null,
+        espace_nom: 'Agence RH',
+        envoyeur: 'a@x.fr',
+      },
+    ])
+    await expect(
+      enTant(B, () => db.query(`select * from public.preparer_reponse('${alice}')`)),
+    ).rejects.toThrow(/^candidature_inaccessible/)
+    await db.exec(`update public.candidatures set email = null`)
+    await expect(
+      enTant(A, () => db.query(`select * from public.preparer_reponse('${alice}')`)),
+    ).rejects.toThrow(/^sans_email/)
+  })
+
+  it('noter : trace dans l’historique, au nom de l’utilisateur ; limite d’envois par heure', async () => {
+    await enTant(A, () =>
+      db.exec(
+        `select public.noter_reponse_envoyee('${alice}', 'Proposition d''entretien', 'Convocation à un entretien')`,
+      ),
+    )
+    const { rows } = await db.query(
+      `select action, details, email from public.historique where action = 'reponse_envoyee'`,
+    )
+    expect(rows).toEqual([
+      {
+        action: 'reponse_envoyee',
+        details: {
+          sujet: 'Proposition d’entretien'.replace('’', "'"),
+          modele: 'Convocation à un entretien',
+        },
+        email: 'a@x.fr',
+      },
+    ])
+    await expect(
+      enTant(B, () => db.exec(`select public.noter_reponse_envoyee('${alice}', 'x')`)),
+    ).rejects.toThrow(/^candidature_inaccessible/)
+
+    await db.exec(`
+      insert into public.historique (candidature_id, espace_id, action)
+        select '${alice}', '${A}', 'reponse_envoyee' from generate_series(1, 99);
+    `)
+    await expect(
+      enTant(A, () => db.query(`select * from public.preparer_reponse('${alice}')`)),
+    ).rejects.toThrow(/^trop_de_reponses/)
+  })
+
+  it('sans compte : rien', async () => {
+    await db.exec('set role anon')
+    try {
+      await expect(db.query(`select * from public.preparer_reponse('${alice}')`)).rejects.toThrow(
+        /permission denied/,
+      )
+      await expect(db.exec(`select public.noter_reponse_envoyee('${alice}', 'x')`)).rejects.toThrow(
+        /permission denied/,
+      )
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+})
