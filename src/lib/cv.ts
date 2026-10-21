@@ -11,8 +11,9 @@ function client() {
   return supabase
 }
 
-function bucket() {
-  return client().storage.from('cv')
+// Le client de stockage est téléchargé à la première utilisation
+async function bucket() {
+  return (await client().stockage()).from('cv')
 }
 
 // Renvoie un message d'erreur si le fichier ne peut pas être déposé
@@ -33,7 +34,7 @@ export async function deposerCv(
 
   // Nom unique : évite qu'un ancien fichier reste en cache sous le même nom
   const chemin = `${candidature.espace_id}/${candidature.id}/${crypto.randomUUID()}.pdf`
-  const depot = await bucket().upload(chemin, fichier, { contentType: 'application/pdf' })
+  const depot = await (await bucket()).upload(chemin, fichier, { contentType: 'application/pdf' })
   if (depot.error) throw new Error(`Dépôt du CV impossible : ${depot.error.message}`)
 
   const { error } = await client()
@@ -61,7 +62,7 @@ export async function retirerCv(candidature: { id: string; cv_chemin: string | n
 export async function ouvrirCv(chemin: string) {
   // L'onglet est ouvert tout de suite (sinon le navigateur bloque la fenêtre surgissante)
   const onglet = window.open('', '_blank')
-  const { data, error } = await bucket().createSignedUrl(chemin, DUREE_LIEN_SECONDES)
+  const { data, error } = await (await bucket()).createSignedUrl(chemin, DUREE_LIEN_SECONDES)
   if (error || !data) {
     onglet?.close()
     throw new Error(`Ouverture du CV impossible : ${error?.message ?? 'lien manquant'}`)
@@ -72,7 +73,7 @@ export async function ouvrirCv(chemin: string) {
 
 export async function supprimerFichiersCv(chemins: string[]) {
   if (chemins.length === 0) return
-  const { error } = await bucket().remove(chemins)
+  const { error } = await (await bucket()).remove(chemins)
   if (error) throw new Error(`Suppression du CV impossible : ${error.message}`)
 }
 

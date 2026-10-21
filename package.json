@@ -12,10 +12,14 @@
     "lint": "oxlint",
     "test": "vitest run",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "budget": "node scripts/budget.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.118.0",
+    "@supabase/auth-js": "^2.118.0",
+    "@supabase/functions-js": "^2.118.0",
+    "@supabase/postgrest-js": "^2.118.0",
+    "@supabase/storage-js": "^2.118.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.45",
     "react": "^19.3.1",

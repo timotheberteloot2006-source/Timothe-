@@ -19,6 +19,8 @@ jobs:
       # Inclut les tests des migrations SQL (Postgres en mémoire via PGlite)
       - run: npm test
       - run: npm run build
+      # Poids du code chargé au démarrage (scripts/budget.mjs)
+      - run: npm run budget
 
   e2e:
     name: Parcours dans le navigateur (Playwright)

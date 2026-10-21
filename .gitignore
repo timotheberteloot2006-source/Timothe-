@@ -35,3 +35,4 @@ supabase/functions/deno.lock
 dist-e2e
 test-results
 playwright-report
+dist-budget

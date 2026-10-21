@@ -1,4 +1,4 @@
-import type { PostgrestError } from '@supabase/supabase-js'
+import type { PostgrestError } from '@supabase/postgrest-js'
 import { supprimerFichiersCv } from './cv'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 

@@ -157,6 +157,16 @@ Les tests des migrations appliquent les fichiers de `supabase/migrations/` sur u
 mémoire (PGlite) et vérifient la limite Gratuite, les doublons, la suppression de compte, les
 notes, le stockage des CV et les règles de sécurité (RLS).
 
+### Performance
+
+`npm run budget` construit le site comme en production et vérifie le poids compressé du code
+chargé à l'ouverture d'une page : 140 Ko de JavaScript et 8 Ko de CSS au plus
+(`scripts/budget.mjs`, lancé par la vérification automatique). Pour tenir ce budget :
+
+- chaque page est un morceau séparé, chargé à la visite (découpage automatique de TanStack Router) ;
+- `src/lib/clientSupabase.ts` assemble un client Supabase sans le temps réel (inutilisé), et ne
+  télécharge le stockage des CV et les fonctions de paiement qu'à leur première utilisation.
+
 ### Accessibilité
 
 `e2e/accessibilite.e2e.ts` passe chaque page (publique et connectée, panneaux ouverts) à l'audit

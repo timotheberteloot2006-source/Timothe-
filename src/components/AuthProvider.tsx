@@ -1,4 +1,4 @@
-import type { Session } from '@supabase/supabase-js'
+import type { Session } from '@supabase/auth-js'
 import { useEffect, useState, type ReactNode } from 'react'
 import { AuthContext, type ResultatInscription } from '@/lib/auth'
 import { estPro, lireAbonnement } from '@/lib/abonnement'

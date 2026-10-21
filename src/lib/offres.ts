@@ -1,4 +1,4 @@
-import type { PostgrestError } from '@supabase/supabase-js'
+import type { PostgrestError } from '@supabase/postgrest-js'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 
 // Table créée par supabase/migrations/0006_offres.sql
