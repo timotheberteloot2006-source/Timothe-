@@ -23,6 +23,7 @@ import { Route as AuthentifieCompteRouteImport } from './routes/_authentifie/com
 import { Route as AuthentifieEquipeRouteImport } from './routes/_authentifie/equipe'
 import { Route as AuthentifieOffresRouteImport } from './routes/_authentifie/offres'
 import { Route as AuthentifieTableauDeBordRouteImport } from './routes/_authentifie/tableau-de-bord'
+import { Route as CarrieresAdresseRouteImport } from './routes/carrieres.$adresse'
 import { Route as PostulerJetonRouteImport } from './routes/postuler.$jeton'
 import { Route as AuthentifieCandidaturesIdRouteImport } from './routes/_authentifie/candidatures.$id'
 import { Route as AuthentifieInvitationJetonRouteImport } from './routes/_authentifie/invitation.$jeton'
@@ -97,6 +98,11 @@ const AuthentifieTableauDeBordRoute =
     path: '/tableau-de-bord',
     getParentRoute: () => AuthentifieRoute,
   } as any)
+const CarrieresAdresseRoute = CarrieresAdresseRouteImport.update({
+  id: '/carrieres/$adresse',
+  path: '/carrieres/$adresse',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PostulerJetonRoute = PostulerJetonRouteImport.update({
   id: '/postuler/$jeton',
   path: '/postuler/$jeton',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof AuthentifieEquipeRoute
   '/offres': typeof AuthentifieOffresRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
+  '/carrieres/$adresse': typeof CarrieresAdresseRoute
   '/postuler/$jeton': typeof PostulerJetonRoute
   '/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
   '/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/equipe': typeof AuthentifieEquipeRoute
   '/offres': typeof AuthentifieOffresRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
+  '/carrieres/$adresse': typeof CarrieresAdresseRoute
   '/postuler/$jeton': typeof PostulerJetonRoute
   '/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
   '/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/_authentifie/equipe': typeof AuthentifieEquipeRoute
   '/_authentifie/offres': typeof AuthentifieOffresRoute
   '/_authentifie/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
+  '/carrieres/$adresse': typeof CarrieresAdresseRoute
   '/postuler/$jeton': typeof PostulerJetonRoute
   '/_authentifie/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
   '/_authentifie/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
@@ -187,6 +196,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/offres'
     | '/tableau-de-bord'
+    | '/carrieres/$adresse'
     | '/postuler/$jeton'
     | '/candidatures/$id'
     | '/invitation/$jeton'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/offres'
     | '/tableau-de-bord'
+    | '/carrieres/$adresse'
     | '/postuler/$jeton'
     | '/candidatures/$id'
     | '/invitation/$jeton'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '/_authentifie/equipe'
     | '/_authentifie/offres'
     | '/_authentifie/tableau-de-bord'
+    | '/carrieres/$adresse'
     | '/postuler/$jeton'
     | '/_authentifie/candidatures/$id'
     | '/_authentifie/invitation/$jeton'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   MotDePasseOublieRoute: typeof MotDePasseOublieRoute
   NouveauMotDePasseRoute: typeof NouveauMotDePasseRoute
   TarifsRoute: typeof TarifsRoute
+  CarrieresAdresseRoute: typeof CarrieresAdresseRoute
   PostulerJetonRoute: typeof PostulerJetonRoute
 }
 
@@ -343,6 +356,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthentifieTableauDeBordRouteImport
       parentRoute: typeof AuthentifieRoute
     }
+    '/carrieres/$adresse': {
+      id: '/carrieres/$adresse'
+      path: '/carrieres/$adresse'
+      fullPath: '/carrieres/$adresse'
+      preLoaderRoute: typeof CarrieresAdresseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/postuler/$jeton': {
       id: '/postuler/$jeton'
       path: '/postuler/$jeton'
@@ -400,6 +420,7 @@ const rootRouteChildren: RootRouteChildren = {
   MotDePasseOublieRoute: MotDePasseOublieRoute,
   NouveauMotDePasseRoute: NouveauMotDePasseRoute,
   TarifsRoute: TarifsRoute,
+  CarrieresAdresseRoute: CarrieresAdresseRoute,
   PostulerJetonRoute: PostulerJetonRoute,
 }
 export const routeTree = rootRouteImport

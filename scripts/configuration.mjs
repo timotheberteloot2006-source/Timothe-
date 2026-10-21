@@ -17,6 +17,7 @@ export const MIGRATIONS = [
   { numero: '0013', table: 'offres', colonne: 'jeton_public' },
   { numero: '0014', table: 'membres', colonne: 'notifier' },
   { numero: '0015', table: 'etapes', colonne: 'cle' },
+  { numero: '0016', table: 'espaces', colonne: 'slug' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite

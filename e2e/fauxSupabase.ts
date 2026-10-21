@@ -31,6 +31,10 @@ interface EspaceFaux {
   pro?: boolean
   // Accusé de réception aux candidats (absent : activé)
   accuse_reception?: boolean
+  // Page carrières (supabase/migrations/0016_page_carrieres.sql)
+  slug?: string | null
+  carrieres_publiques?: boolean
+  presentation?: string | null
 }
 
 interface MembreFaux {
@@ -436,6 +440,23 @@ export class FauxSupabase {
       return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4' })
     }
 
+    // Page carrières (supabase/migrations/0016_page_carrieres.sql)
+    if (chemin === '/rest/v1/rpc/lire_page_carrieres') {
+      const { adresse } = corps(requete) as { adresse: string }
+      const espace = this.espaces.find(
+        (e) => e.slug === adresse.toLowerCase() && e.carrieres_publiques,
+      )
+      if (!espace) return json(null)
+      return json({
+        nom: espace.nom,
+        presentation: espace.presentation ?? null,
+        offres: this.offres
+          .filter((o) => o.espace_id === espace.id && o.publique)
+          .sort((a, b) => a.titre.localeCompare(b.titre, 'fr', { sensitivity: 'base' }))
+          .map((o) => ({ titre: o.titre, description: o.description, jeton: o.jeton_public })),
+      })
+    }
+
     // Étapes de recrutement (supabase/migrations/0015_etapes.sql)
     if (chemin === '/rest/v1/etapes') return this.etapesRest(route, url, json)
     if (chemin === '/rest/v1/rpc/supprimer_etape') {
@@ -810,9 +831,33 @@ export class FauxSupabase {
         return { corps: undefined, status: 204 }
       }
     }
+    if (chemin === '/rest/v1/espaces' && methode === 'GET') {
+      const espace = this.espaces.find((e) => e.id === filtre('id') && this.estMembre(e.id))
+      if (!espace) return { corps: { code: 'PGRST116', message: 'no rows' }, status: 406 }
+      return {
+        corps: {
+          slug: espace.slug ?? null,
+          carrieres_publiques: espace.carrieres_publiques ?? false,
+          presentation: espace.presentation ?? null,
+        },
+        status: 200,
+      }
+    }
     if (chemin === '/rest/v1/espaces' && methode === 'PATCH') {
       const espace = this.espaces.find((e) => e.id === filtre('id'))
-      if (espace) espace.nom = parametres.nom
+      const champs = parametres as Partial<EspaceFaux>
+      // Contraintes de la base : adresse unique et bien formée, page publiée avec une adresse
+      if (champs.slug && this.espaces.some((e) => e !== espace && e.slug === champs.slug))
+        return {
+          corps: { code: '23505', message: 'duplicate key "espaces_slug_unique"' },
+          status: 409,
+        }
+      if (
+        (champs.slug && !/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(champs.slug)) ||
+        (champs.carrieres_publiques && !champs.slug)
+      )
+        return { corps: { code: '23514', message: 'violates check constraint' }, status: 400 }
+      if (espace) Object.assign(espace, champs)
       return { corps: undefined, status: 204 }
     }
     if (chemin === '/rest/v1/invitations') {

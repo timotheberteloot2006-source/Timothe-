@@ -116,6 +116,11 @@ l'offre, et son historique indique « Candidature reçue par le formulaire en li
 - En offre Gratuite, le formulaire indique qu'il n'accepte plus de candidatures quand l'espace
   atteint 50 candidatures.
 - « Nouveau lien » désactive l'ancien, s'il a été trop diffusé.
+- **Page carrières** (`/carrieres/<adresse>`, `supabase/migrations/0016_page_carrieres.sql`) :
+  le propriétaire choisit l'adresse (proposée à partir du nom de l'espace), écrit une
+  présentation et met la page en ligne (page **Équipe**, « Page carrières »). Elle liste, sans
+  compte, les offres dont le formulaire est en ligne, chacune avec un bouton « Postuler ». Seules
+  les offres publiées sont exposées, par la fonction `lire_page_carrieres`.
 - **Notifications par e-mail** (facultatives, par [Resend](https://resend.com) : secrets
   `RESEND_API_KEY` et `EMAIL_EXPEDITEUR`) : chaque membre est prévenu d'une nouvelle candidature,
   avec le lien vers sa fiche, et le candidat reçoit un accusé de réception. Page **Équipe**,

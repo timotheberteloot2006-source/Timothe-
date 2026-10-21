@@ -120,6 +120,21 @@ for (const schema of ['light', 'dark'] as const) {
       expect(await auditer(page)).toEqual([])
     })
 
+    test('page carrières publique', async ({ page }) => {
+      const faux = new FauxSupabase()
+      await faux.installer(page)
+      Object.assign(faux.espaces[0], {
+        nom: 'Agence RH',
+        slug: 'agence-rh',
+        carrieres_publiques: true,
+        presentation: 'Cabinet lyonnais.',
+      })
+      faux.ajouterOffre('Développeur front', { publique: true, description: 'CDI à Lyon.' })
+      await page.goto('/carrieres/agence-rh')
+      await expect(page.locator('h1')).toHaveText('Agence RH')
+      expect(await auditer(page)).toEqual([])
+    })
+
     test('réglages du formulaire public (page Offres)', async ({ page }) => {
       const faux = new FauxSupabase()
       await faux.installer(page)

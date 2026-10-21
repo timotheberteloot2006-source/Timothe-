@@ -136,7 +136,7 @@ Le script affiche les migrations qu'il va appliquer et demande confirmation.
    ```bash
    npm run verifier:config -- --distant
    ```
-   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0015 »,
+   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0016 »,
    « webhook-stripe déployée et joignable par Stripe » et « postuler déployée et ouverte aux
    candidats », puis, si les e-mails sont configurés, « Domaine … vérifié chez Resend ». Si une
    fonction « refuse les appels sans jeton », elle a été déployée sans
@@ -182,6 +182,9 @@ Avec une vraie adresse e-mail, sur le site en ligne :
       membres reçoivent l'e-mail « Nouvelle candidature », le candidat l'accusé de réception
       (vérifier qu'ils n'arrivent pas en indésirables) ; *Équipe > Notifications* permet de les
       couper.
+- [ ] Page carrières : sur *Équipe*, « Page carrières », choisir l'adresse, cocher « Page en
+      ligne » et ouvrir le lien dans une fenêtre privée : l'offre en ligne y figure, avec son
+      bouton « Postuler ».
 - [ ] Invitation : depuis *Équipe*, créer un lien, l'ouvrir dans une fenêtre privée, créer un
       second compte depuis ce lien : on revient à l'invitation après confirmation.
 - [ ] *Gérer mon abonnement > Résilier* : l'offre reste Pro jusqu'à la fin de la période, et la

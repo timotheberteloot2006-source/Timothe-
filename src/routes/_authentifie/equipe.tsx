@@ -19,13 +19,15 @@ import {
 } from '@/lib/espace'
 import { compterParEtape, ETAPES_DE_BASE, listerEtapes } from '@/lib/etapes'
 import { GestionEtapes } from '@/components/GestionEtapes'
+import { ReglagesPageCarrieres } from '@/components/ReglagesPageCarrieres'
+import { lireReglagesCarrieres } from '@/lib/carrieres'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/equipe')({
   head: () => titrePage('Équipe'),
   loader: async ({ context }) => {
     const espace = await lireEspace()
-    const [membres, invitations, mesEspaces, notifications, etapes, nombresParEtape] =
+    const [membres, invitations, mesEspaces, notifications, etapes, nombresParEtape, carrieres] =
       await Promise.all([
         listerMembres(espace.id),
         // Seul le propriétaire voit et gère les invitations
@@ -35,8 +37,19 @@ export const Route = createFileRoute('/_authentifie/equipe')({
         // Base pas encore à jour (migration 0015) : les trois étapes habituelles
         listerEtapes().catch(() => ETAPES_DE_BASE),
         compterParEtape().catch(() => ({})),
+        // null : base pas encore à jour (migration 0016), la rubrique est masquée
+        lireReglagesCarrieres(espace.id).catch(() => null),
       ])
-    return { espace, membres, invitations, mesEspaces, notifications, etapes, nombresParEtape }
+    return {
+      espace,
+      membres,
+      invitations,
+      mesEspaces,
+      notifications,
+      etapes,
+      nombresParEtape,
+      carrieres,
+    }
   },
   component: Equipe,
   errorComponent: ({ error }) => (
@@ -49,8 +62,16 @@ export const Route = createFileRoute('/_authentifie/equipe')({
 })
 
 function Equipe() {
-  const { espace, membres, invitations, mesEspaces, notifications, etapes, nombresParEtape } =
-    Route.useLoaderData()
+  const {
+    espace,
+    membres,
+    invitations,
+    mesEspaces,
+    notifications,
+    etapes,
+    nombresParEtape,
+    carrieres,
+  } = Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
   const [erreur, setErreur] = useState<string | null>(null)
@@ -155,6 +176,17 @@ function Equipe() {
           </form>
         )}
       </Carte>
+
+      {carrieres && (
+        <Carte titre="Page carrières">
+          <ReglagesPageCarrieres
+            espace={espace}
+            reglages={carrieres}
+            proprietaire={proprietaire}
+            executer={executer}
+          />
+        </Carte>
+      )}
 
       <Carte titre="Étapes de recrutement">
         <GestionEtapes

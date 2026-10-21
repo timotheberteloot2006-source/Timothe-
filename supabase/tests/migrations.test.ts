@@ -1262,3 +1262,89 @@ describe('étapes de recrutement', () => {
     })
   })
 })
+
+describe('page carrières', () => {
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated;
+      grant select, update on public.espaces to authenticated;
+      update public.espaces set nom = 'Agence RH' where id = '${A}';
+      insert into public.offres (user_id, titre, description, publique) values
+        ('${A}', 'Développeur front', 'CDI à Lyon', true),
+        ('${A}', 'comptable', null, true),
+        ('${A}', 'Offre interne', null, false);
+    `)
+  })
+
+  async function lire(adresse: string) {
+    await db.exec('set role anon')
+    try {
+      const { rows } = await db.query<{ page: unknown }>(
+        'select public.lire_page_carrieres($1) as page',
+        [adresse],
+      )
+      return rows[0].page
+    } finally {
+      await db.exec('reset role')
+    }
+  }
+
+  async function regler(uid: string, sql: string) {
+    await enTantQue(uid)
+    await db.exec(`update public.profils set espace_actif = '${A}' where user_id = '${uid}'`)
+    await db.exec('set role authenticated')
+    try {
+      await db.exec(sql)
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  it('n’existe que publiée, avec une adresse', async () => {
+    await expect(
+      db.exec(`update public.espaces set carrieres_publiques = true where id = '${A}'`),
+    ).rejects.toThrow(/espaces_carrieres_adresse/)
+    await db.exec(`update public.espaces set slug = 'agence-rh' where id = '${A}'`)
+    expect(await lire('agence-rh')).toBeNull()
+  })
+
+  it('liste, sans compte, les seules offres en ligne, par titre', async () => {
+    await regler(
+      A,
+      `update public.espaces set slug = 'agence-rh', carrieres_publiques = true,
+         presentation = 'Cabinet lyonnais' where id = '${A}'`,
+    )
+    const page = (await lire('Agence-RH')) as {
+      nom: string
+      presentation: string
+      offres: { titre: string; description: string | null; jeton: string }[]
+    }
+    expect(page).toMatchObject({ nom: 'Agence RH', presentation: 'Cabinet lyonnais' })
+    expect(page.offres.map((o) => [o.titre, o.description])).toEqual([
+      ['comptable', null],
+      ['Développeur front', 'CDI à Lyon'],
+    ])
+    expect(page.offres[0].jeton).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('adresse valide et unique ; réglée par le propriétaire seulement', async () => {
+    for (const mauvaise of ['ab', 'Agence', '-agence', 'agence rh', 'x'.repeat(41)]) {
+      await expect(
+        db.exec(`update public.espaces set slug = '${mauvaise}' where id = '${A}'`),
+      ).rejects.toThrow(/espaces_slug_check/)
+    }
+    await db.exec(`update public.espaces set slug = 'prise' where id = '${B}'`)
+    await expect(
+      db.exec(`update public.espaces set slug = 'prise' where id = '${A}'`),
+    ).rejects.toThrow(/espaces_slug_unique/)
+
+    // Un membre de l'espace ne peut pas la régler (aucune ligne modifiée)
+    await db.exec(
+      `insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre')`,
+    )
+    await regler(B, `update public.espaces set slug = 'piratee' where id = '${A}'`)
+    const { rows } = await db.query(`select slug from public.espaces where id = '${A}'`)
+    expect(rows).toEqual([{ slug: null }])
+  })
+})
