@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "budget": "node scripts/budget.mjs",
     "verifier:config": "node scripts/verifier-config.mjs",
-    "deployer:supabase": "bash scripts/deployer-supabase.sh"
+    "deployer:supabase": "bash scripts/deployer-supabase.sh",
+    "planifier:rappels": "node scripts/planifier-rappels.mjs"
   },
   "dependencies": {
     "@supabase/auth-js": "^2.118.0",

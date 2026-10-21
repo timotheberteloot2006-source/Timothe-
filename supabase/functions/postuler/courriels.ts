@@ -1,6 +1,7 @@
 // E-mails envoyés à la réception d'une candidature par le formulaire public (sans dépendance :
 // testé par Vitest dans courriels.test.ts)
 import type { Courriel } from '../_shared/courriel.ts'
+import { html, ligne } from '../_shared/texte.ts'
 
 // Ligne renvoyée par deposer_candidature_publique (supabase/migrations/0017_relecture_2.sql)
 export interface Depot {
@@ -11,29 +12,6 @@ export interface Depot {
   espace_nom: string
   accuse_reception: boolean
   destinataires: string[]
-}
-
-// Texte saisi par le candidat : sur une ligne, d'une longueur raisonnable
-function ligne(texte: string, longueur = 100) {
-  const propre = texte.replace(/\s+/g, ' ').trim()
-  return propre.length > longueur ? `${propre.slice(0, longueur - 1)}…` : propre
-}
-
-function echapper(texte: string) {
-  return texte.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  )
-}
-
-// Corps HTML minimal : paragraphes, lien éventuel, puis mention de bas de page
-function html(paragraphes: string[], lien?: { texte: string; adresse: string }, pied?: string) {
-  const p = (texte: string) => `<p>${echapper(texte)}</p>`
-  const bouton = lien
-    ? `<p><a href="${echapper(lien.adresse)}">${echapper(lien.texte)}</a></p>`
-    : ''
-  const bas = pied ? `<p style="color:#64748b;font-size:12px">${echapper(pied)}</p>` : ''
-  return `<div style="font-family:sans-serif;line-height:1.5">${paragraphes.map(p).join('')}${bouton}${bas}</div>`
 }
 
 export function preparerCourriels(

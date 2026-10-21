@@ -202,13 +202,20 @@ function Equipe() {
         <Carte titre="Notifications">
           <p className="text-sm text-slate-600">
             E-mails envoyés quand un candidat postule par le formulaire en ligne d’une offre (page «
-            Offres »).
+            Offres »), et la veille de chaque entretien.
           </p>
           <CaseReglage
             libelle="Me prévenir par e-mail des nouvelles candidatures de cet espace"
             valeur={notifications.notifier}
             enregistrer={(valeur) => executer(() => reglerNotifications({ pourMoi: valeur }))}
           />
+          {notifications.rappels !== undefined && (
+            <CaseReglage
+              libelle="Me rappeler la veille les entretiens de cet espace"
+              valeur={notifications.rappels}
+              enregistrer={(valeur) => executer(() => reglerNotifications({ rappels: valeur }))}
+            />
+          )}
           {proprietaire && (
             <CaseReglage
               libelle="Envoyer un accusé de réception aux candidats"

@@ -1085,7 +1085,7 @@ describe('formulaire public', () => {
         db.query('select * from public.mes_notifications()'),
       )
       expect(reglagesB.rows).toEqual([
-        { notifier: false, accuse_reception: true, proprietaire: false },
+        { notifier: false, rappels: true, accuse_reception: true, proprietaire: false },
       ])
 
       await enTantQue2(A, () => db.exec('select public.regler_notifications(true, false)'))
@@ -1428,7 +1428,9 @@ describe('relecture 2', () => {
       await db.exec('select public.regler_notifications(pour_moi => false)')
       await db.exec('select public.regler_notifications(accuse => false)')
       const { rows } = await db.query('select * from public.mes_notifications()')
-      expect(rows).toEqual([{ notifier: false, accuse_reception: false, proprietaire: true }])
+      expect(rows).toEqual([
+        { notifier: false, rappels: true, accuse_reception: false, proprietaire: true },
+      ])
     })
   })
 
@@ -1494,5 +1496,113 @@ describe('relecture 2', () => {
     expect(sql).toContain(
       'update public.historique set email = null where user_id is null and email is not null',
     )
+  })
+})
+
+describe('rappels d’entretien', () => {
+  let alice: string
+
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated, service_role;
+      update public.espaces set nom = 'Agence RH' where id = '${A}';
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+    `)
+    await ajouter(A, ['Alice'])
+    alice = (await db.query<{ id: string }>(`select id from public.candidatures`)).rows[0].id
+  })
+
+  // Entretien dans `heures` heures (négatif : passé)
+  const planifier = (heures: number, lieu = 'Visio') =>
+    db.exec(
+      `insert into public.entretiens (user_id, candidature_id, debut, lieu)
+       values ('${A}', '${alice}', now() + interval '${heures} hours', '${lieu}')`,
+    )
+
+  interface Rappel {
+    candidat: string
+    lieu: string
+    espace_nom: string
+    destinataires: string[]
+  }
+
+  async function prendre() {
+    await db.exec('set role service_role')
+    try {
+      return (await db.query<Rappel>('select * from public.prendre_entretiens_a_rappeler()')).rows
+    } finally {
+      await db.exec('reset role')
+    }
+  }
+
+  it('prend les entretiens des 30 prochaines heures, une seule fois', async () => {
+    await planifier(20, 'Demain')
+    await planifier(40, 'Plus tard')
+    await planifier(-2, 'Passé')
+    const rappels = await prendre()
+    expect(rappels).toMatchObject([
+      {
+        candidat: 'Alice',
+        lieu: 'Demain',
+        espace_nom: 'Agence RH',
+        destinataires: ['a@x.fr', 'b@x.fr'],
+      },
+    ])
+    // Deuxième exécution : déjà rappelé
+    expect(await prendre()).toEqual([])
+  })
+
+  it('un entretien déplacé est rappelé de nouveau ; un envoi échoué est rendu', async () => {
+    await planifier(10)
+    const [premier] = await db
+      .query<{ entretien: string }>('select entretien from public.prendre_entretiens_a_rappeler()')
+      .then((r) => r.rows)
+    await db.exec(`update public.entretiens set debut = debut + interval '2 hours'`)
+    expect(await prendre()).toHaveLength(1)
+
+    await db.exec('set role service_role')
+    try {
+      await db.exec(
+        `select public.rendre_entretiens_a_rappeler(array['${premier.entretien}']::uuid[])`,
+      )
+    } finally {
+      await db.exec('reset role')
+    }
+    expect(await prendre()).toHaveLength(1)
+  })
+
+  it('seuls les membres qui le souhaitent sont rappelés', async () => {
+    await enTantQue(B)
+    await db.exec(`update public.profils set espace_actif = '${A}' where user_id = '${B}'`)
+    await db.exec('set role authenticated')
+    try {
+      await db.exec('select public.regler_notifications(rappels => false)')
+      const { rows } = await db.query('select * from public.mes_notifications()')
+      // Les autres réglages ne bougent pas
+      expect(rows).toEqual([
+        { notifier: true, rappels: false, accuse_reception: true, proprietaire: false },
+      ])
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+    await planifier(5)
+    expect((await prendre())[0].destinataires).toEqual(['a@x.fr'])
+  })
+
+  it('réservé à la fonction serveur', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`)
+      try {
+        await expect(
+          db.exec('select * from public.prendre_entretiens_a_rappeler()'),
+        ).rejects.toThrow(/permission denied/)
+        await expect(
+          db.exec(`select public.rendre_entretiens_a_rappeler('{}'::uuid[])`),
+        ).rejects.toThrow(/permission denied/)
+      } finally {
+        await db.exec('reset role')
+      }
+    }
   })
 })

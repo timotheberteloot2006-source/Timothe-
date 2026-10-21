@@ -158,6 +158,9 @@ export function lienInvitation(jeton: string) {
 export interface ReglagesNotifications {
   // Être prévenu des candidatures reçues par le formulaire en ligne
   notifier: boolean
+  // Être rappelé la veille des entretiens (supabase/migrations/0018_rappels_entretiens.sql) ;
+  // absent avant cette migration
+  rappels?: boolean
   // Accusé de réception envoyé aux candidats (réglé par le propriétaire)
   accuse_reception: boolean
   proprietaire: boolean
@@ -170,9 +173,14 @@ export async function lireNotifications(): Promise<ReglagesNotifications> {
 }
 
 // Un réglage à la fois (l'autre reste tel quel) ; accuse : propriétaire seulement
-export function reglerNotifications(reglage: { pourMoi: boolean } | { accuse: boolean }) {
-  return rpc<void>(
-    'regler_notifications',
-    'pourMoi' in reglage ? { pour_moi: reglage.pourMoi } : { accuse: reglage.accuse },
-  )
+export function reglerNotifications(
+  reglage: { pourMoi: boolean } | { accuse: boolean } | { rappels: boolean },
+) {
+  const parametres =
+    'pourMoi' in reglage
+      ? { pour_moi: reglage.pourMoi }
+      : 'accuse' in reglage
+        ? { accuse: reglage.accuse }
+        : { rappels: reglage.rappels }
+  return rpc<void>('regler_notifications', parametres)
 }

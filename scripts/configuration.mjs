@@ -24,6 +24,7 @@ export const MIGRATIONS = [
     fonction: 'deplacer_etape',
     arguments: { eid: '00000000-0000-0000-0000-000000000000', sens: 0 },
   },
+  { numero: '0018', table: 'entretiens', colonne: 'rappel_envoye_le' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite
@@ -259,6 +260,29 @@ async function interrogerSupabase(url, entetes, fetch) {
     resultats.push(ok('Fonction webhook-stripe déployée et joignable par Stripe.'))
   else resultats.push(attention(`webhook-stripe : réponse inattendue (${webhook.status}).`))
 
+  // Rappels d'entretien : appelés par la tâche planifiée, avec leur secret (ici sans : refus attendu)
+  const rappels = await fetch(`${url}/functions/v1/rappels-entretiens`, {
+    method: 'POST',
+    body: '{}',
+  })
+  const corpsRappels = await rappels.json().catch(() => ({}))
+  if (rappels.status === 404) resultats.push(erreur('Fonction rappels-entretiens non déployée.'))
+  else if (rappels.status === 401 && corpsRappels.erreur === 'Accès refusé.')
+    resultats.push(ok('Fonction rappels-entretiens déployée, protégée par son secret.'))
+  else if (rappels.status === 401)
+    resultats.push(
+      erreur(
+        'rappels-entretiens refuse les appels sans jeton : redéployez-la avec --no-verify-jwt, sinon la tâche planifiée ne peut pas la lancer.',
+      ),
+    )
+  else if (rappels.status === 500 && corpsRappels.erreur?.includes('RAPPELS_SECRET'))
+    resultats.push(
+      attention(
+        'Rappels d’entretien désactivés : RAPPELS_SECRET absent des secrets des fonctions.',
+      ),
+    )
+  else resultats.push(attention(`rappels-entretiens : réponse inattendue (${rappels.status}).`))
+
   // Formulaire public : appelé sans compte (un envoi vide est refusé par la fonction elle-même)
   const postuler = await fetch(`${url}/functions/v1/postuler`, { method: 'POST', body: '{}' })
   const corpsPostuler = await postuler.json().catch(() => ({}))
@@ -411,4 +435,25 @@ export async function verifierResend(env, fetch) {
   } catch (e) {
     return [erreur(`Resend injoignable : ${e.message}`)]
   }
+}
+
+// Rappels d'entretien (facultatifs) : secret de la tâche planifiée, et e-mails pour les envoyer
+export function verifierRappels(env) {
+  const secret = env.RAPPELS_SECRET ?? ''
+  if (estExemple(secret))
+    return [
+      attention(
+        'Rappels d’entretien désactivés (RAPPELS_SECRET absent) : npm run planifier:rappels en propose un.',
+      ),
+    ]
+  if (!/^[A-Za-z0-9_-]{24,200}$/.test(secret))
+    return [
+      erreur('RAPPELS_SECRET doit compter 24 caractères au moins : lettres, chiffres, - et _.'),
+    ]
+  const resultats = [ok('Secret des rappels d’entretien.')]
+  if (estExemple(env.RESEND_API_KEY ?? ''))
+    resultats.push(
+      attention('Rappels d’entretien sans e-mails (RESEND_API_KEY absent) : rien ne sera envoyé.'),
+    )
+  return resultats
 }

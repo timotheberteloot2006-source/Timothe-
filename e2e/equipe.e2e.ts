@@ -165,20 +165,26 @@ test('notifications : chacun choisit d’être prévenu, le propriétaire règle
     'Me prévenir par e-mail des nouvelles candidatures de cet espace',
   )
   const accuse = carte.getByLabel('Envoyer un accusé de réception aux candidats')
+  const rappels = carte.getByLabel('Me rappeler la veille les entretiens de cet espace')
   await expect(pourMoi).toBeChecked()
+  await expect(rappels).toBeChecked()
   await expect(accuse).toBeChecked()
 
   await pourMoi.uncheck()
   await expect.poll(() => faux.membres[0].notifier).toBe(false)
   await accuse.uncheck()
   await expect.poll(() => faux.espaces[0].accuse_reception).toBe(false)
-  // Le réglage personnel n'a pas été modifié par celui de l'espace
+  await rappels.uncheck()
+  await expect.poll(() => faux.membres[0].rappels).toBe(false)
+  // Chaque réglage a été enregistré seul
   expect(faux.membres[0].notifier).toBe(false)
+  expect(faux.espaces[0].accuse_reception).toBe(false)
 
   // Rechargée, la page garde les réglages
   await page.reload()
   await expect(pourMoi).not.toBeChecked()
   await expect(accuse).not.toBeChecked()
+  await expect(rappels).not.toBeChecked()
 })
 
 test('notifications : un membre ne voit pas le réglage de l’accusé de réception', async ({

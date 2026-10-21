@@ -43,8 +43,9 @@ interface MembreFaux {
   email: string
   role: 'proprietaire' | 'membre'
   created_at: string
-  // E-mails des candidatures reçues par le formulaire (absent : oui)
+  // E-mails des candidatures reçues par le formulaire, et rappels d'entretien (absent : oui)
   notifier?: boolean
+  rappels?: boolean
 }
 
 interface InvitationFaux {
@@ -505,6 +506,7 @@ export class FauxSupabase {
       return json([
         {
           notifier: moi.notifier ?? true,
+          rappels: moi.rappels ?? true,
           accuse_reception: espaceActif.accuse_reception ?? true,
           proprietaire: moi.role === 'proprietaire',
         },
@@ -512,11 +514,16 @@ export class FauxSupabase {
     }
     if (chemin === '/rest/v1/rpc/regler_notifications' && moi && espaceActif) {
       // Comme la base (migration 0017) : un réglage absent reste tel quel
-      const { pour_moi, accuse } = corps(requete) as { pour_moi?: boolean; accuse?: boolean }
+      const { pour_moi, accuse, rappels } = corps(requete) as {
+        pour_moi?: boolean
+        accuse?: boolean
+        rappels?: boolean
+      }
       if (accuse != null && moi.role !== 'proprietaire') {
         return json({ code: 'P0001', message: 'reserve_proprietaire: refusé' }, 400)
       }
       if (pour_moi != null) moi.notifier = pour_moi
+      if (rappels != null) moi.rappels = rappels
       if (accuse != null) espaceActif.accuse_reception = accuse
       return json(undefined, 204)
     }

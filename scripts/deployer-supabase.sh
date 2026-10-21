@@ -42,6 +42,7 @@ echo "2/3 Secrets des fonctions (supabase/functions/.env)"
 if grep -q '\.\.\.' supabase/functions/.env; then
   echo "Attention : des valeurs d'exemple (…) restent dans supabase/functions/.env."
   echo "Normal au premier passage pour STRIPE_WEBHOOK_SECRET : relancez ce script une fois le webhook créé."
+  echo "RAPPELS_SECRET laissé à « ... » : les rappels d'entretien restent désactivés."
 fi
 
 echo
@@ -52,6 +53,9 @@ echo "3/3 Fonctions (sans Docker)"
 "${SUPABASE[@]}" functions deploy webhook-stripe --no-verify-jwt --use-api
 # Formulaire public : le candidat n'a pas de compte (contrôles faits par la fonction et la base)
 "${SUPABASE[@]}" functions deploy postuler --no-verify-jwt --use-api
+# Rappels d'entretien : appelée par la tâche planifiée avec son propre secret (x-rappels-secret)
+"${SUPABASE[@]}" functions deploy rappels-entretiens --no-verify-jwt --use-api
 
 echo
 echo "Terminé. Vérifiez avec : npm run verifier:config -- --distant"
+echo "Rappels d'entretien : npm run planifier:rappels affiche la tâche planifiée à créer (une fois)."

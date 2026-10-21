@@ -116,6 +116,12 @@ l'offre, et son historique indique « Candidature reçue par le formulaire en li
 - En offre Gratuite, le formulaire indique qu'il n'accepte plus de candidatures quand l'espace
   atteint 50 candidatures.
 - « Nouveau lien » désactive l'ancien, s'il a été trop diffusé.
+- **Rappels d'entretien** (facultatifs, `supabase/functions/rappels-entretiens`,
+  `supabase/migrations/0018_rappels_entretiens.sql`) : chaque jour, une tâche planifiée de la base
+  (`npm run planifier:rappels`) appelle la fonction, qui envoie à chaque membre qui le souhaite un
+  e-mail reprenant ses entretiens des 30 prochaines heures, à l'heure de `FUSEAU_HORAIRE`. Un
+  entretien n'est rappelé qu'une fois, de nouveau s'il est déplacé ; un envoi échoué est retenté
+  au passage suivant. La fonction n'accepte que les appels portant son secret (`RAPPELS_SECRET`).
 - **Page carrières** (`/carrieres/<adresse>`, `supabase/migrations/0016_page_carrieres.sql`) :
   le propriétaire choisit l'adresse (proposée à partir du nom de l'espace), écrit une
   présentation et met la page en ligne (page **Équipe**, « Page carrières »). Elle liste, sans

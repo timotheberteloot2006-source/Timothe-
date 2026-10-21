@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   domaineExpediteur,
+  verifierRappels,
   lireEnv,
   lireJwt,
   MIGRATIONS,
@@ -135,6 +136,7 @@ function supabaseComplet(methode, url) {
   if (url.endsWith('/auth/v1/settings')) return [200, { external: { email: true } }]
   if (url.endsWith('/webhook-stripe')) return [400, { erreur: 'Signature manquante.' }]
   if (url.endsWith('/postuler')) return [400, { erreur: 'Formulaire illisible.' }]
+  if (url.endsWith('/rappels-entretiens')) return [401, { erreur: 'Accès refusé.' }]
   return undefined
 }
 
@@ -142,18 +144,14 @@ describe('verifierSupabase', () => {
   it('projet prêt', async () => {
     const { fetch, appels } = fauxFetch(supabaseComplet)
     expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual([
-      'ok',
-      'ok',
-      'ok',
-      'ok',
-      'ok',
-      'ok',
+      ...Array(7).fill('ok'),
     ])
     // Seulement des lectures, et des appels refusés : fonction de la migration 0017 sans droit
     // ni étape existante, webhook sans signature, formulaire vide
     expect(appels.filter((a) => !a.startsWith('GET ') && !a.startsWith('OPTIONS '))).toEqual([
       `POST ${URL_PROJET}/rest/v1/rpc/deplacer_etape`,
       `POST ${URL_PROJET}/functions/v1/webhook-stripe`,
+      `POST ${URL_PROJET}/functions/v1/rappels-entretiens`,
       `POST ${URL_PROJET}/functions/v1/postuler`,
     ])
   })
@@ -176,6 +174,9 @@ describe('verifierSupabase', () => {
       if (url.includes('/etapes?select=cle')) return [404, { code: 'PGRST205' }]
       if (url.includes('/espaces?select=slug')) return [400, { code: '42703' }]
       if (url.endsWith('/rpc/deplacer_etape')) return [404, { code: 'PGRST202' }]
+      if (url.includes('/entretiens?select=rappel_envoye_le')) return [400, { code: '42703' }]
+      if (url.endsWith('/rappels-entretiens'))
+        return [500, { erreur: 'RAPPELS_SECRET non configuré.' }]
       if (url.endsWith('/portail-client')) return [404, {}]
       if (url.endsWith('/webhook-stripe')) return [401, { msg: 'Missing authorization header' }]
       if (url.endsWith('/postuler')) return [401, { msg: 'Missing authorization header' }]
@@ -186,7 +187,7 @@ describe('verifierSupabase', () => {
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
       expect.stringContaining(
-        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017 manquent',
+        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018 manquent',
       ),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
@@ -205,7 +206,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0017')
+    expect(MIGRATIONS.at(-1).numero).toBe('0018')
   })
 })
 
@@ -386,5 +387,20 @@ describe('verifierResend', () => {
     expect(erreurs(await verifierResend(COURRIEL, enPanne))).toEqual([
       'Resend injoignable : ENOTFOUND',
     ])
+  })
+})
+
+describe('verifierRappels', () => {
+  it('désactivés, secret trop court, sans e-mails, ou prêts', () => {
+    expect(niveaux(verifierRappels({}))).toEqual(['attention'])
+    expect(niveaux(verifierRappels({ RAPPELS_SECRET: '...' }))).toEqual(['attention'])
+    expect(niveaux(verifierRappels({ RAPPELS_SECRET: 'court' }))).toEqual(['erreur'])
+    expect(niveaux(verifierRappels({ RAPPELS_SECRET: 'a'.repeat(32) }))).toEqual([
+      'ok',
+      'attention',
+    ])
+    expect(
+      niveaux(verifierRappels({ RAPPELS_SECRET: 'a'.repeat(32), RESEND_API_KEY: 're_123' })),
+    ).toEqual(['ok'])
   })
 })

@@ -9,6 +9,7 @@ import {
   lireEnv,
   verifierCourriel,
   verifierFonctions,
+  verifierRappels,
   verifierResend,
   verifierSite,
   verifierStripe,
@@ -34,6 +35,7 @@ const fonctions = charger('supabase/functions/.env', (cle) =>
     'SITE_URL',
     'RESEND_API_KEY',
     'EMAIL_EXPEDITEUR',
+    'RAPPELS_SECRET',
   ].includes(cle),
 )
 
@@ -59,6 +61,7 @@ afficher(
   resultatsFonctions,
 )
 afficher('E-mails (supabase/functions/.env)', resultatsCourriel)
+afficher('Rappels d’entretien (supabase/functions/.env)', verifierRappels(fonctions.valeurs))
 
 const sansErreur = (resultats) => resultats.every((r) => r.niveau !== 'erreur')
 if (distant) {
