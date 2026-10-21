@@ -93,6 +93,20 @@ interface ModeleFaux {
   corps: string
 }
 
+interface CritereFaux {
+  id: string
+  espace_id: string
+  nom: string
+  position: number
+}
+
+interface EvaluationFaux {
+  candidature_id: string
+  critere_id: string
+  user_id: string | null
+  note: number
+}
+
 interface NoteFaux {
   id: string
   candidature_id: string
@@ -143,6 +157,10 @@ export class FauxSupabase {
     },
   ]
   invitations: InvitationFaux[] = []
+  // Grille d'évaluation et notes (supabase/migrations/0020_evaluations.sql)
+  private criteresCrees = new Set<string>()
+  criteresListe: CritereFaux[] = []
+  evaluations: EvaluationFaux[] = []
   // Modèles de réponse (supabase/migrations/0019_modeles_reponse.sql), proposés à la demande
   private modelesCrees = new Set<string>()
   modelesListe: ModeleFaux[] = []
@@ -206,6 +224,18 @@ export class FauxSupabase {
       created_at: new Date().toISOString(),
     })
     return userId
+  }
+
+  criteres(espaceId = this.espaceActif) {
+    if (!this.criteresCrees.has(espaceId)) {
+      this.criteresCrees.add(espaceId)
+      ;['Compétences techniques', 'Communication', 'Motivation'].forEach((nom, position) =>
+        this.criteresListe.push({ id: crypto.randomUUID(), espace_id: espaceId, nom, position }),
+      )
+    }
+    return this.criteresListe
+      .filter((c) => c.espace_id === espaceId)
+      .sort((a, b) => a.position - b.position)
   }
 
   modeles(espaceId = this.espaceActif) {
@@ -494,6 +524,87 @@ export class FauxSupabase {
           .sort((a, b) => a.titre.localeCompare(b.titre, 'fr', { sensitivity: 'base' }))
           .map((o) => ({ titre: o.titre, description: o.description, jeton: o.jeton_public })),
       })
+    }
+
+    // Évaluations (supabase/migrations/0020_evaluations.sql)
+    if (chemin === '/rest/v1/criteres') {
+      const ids = idsFiltres(url)
+      const champs = (corps(requete) ?? {}) as Partial<CritereFaux>
+      if (methode === 'GET') return json(this.criteres())
+      if (!this.estProprietaireActif())
+        return json({ code: '42501', message: 'new row violates row-level security policy' }, 403)
+      if (methode === 'POST') {
+        if (this.criteres().some((c) => c.nom.toLowerCase() === champs.nom!.toLowerCase()))
+          return json({ code: '23505', message: 'duplicate key "criteres_nom_unique"' }, 409)
+        if (this.criteres().length >= 10)
+          return json({ code: 'P0001', message: 'trop_de_criteres: 10' }, 400)
+        this.criteresListe.push({
+          id: crypto.randomUUID(),
+          espace_id: this.espaceActif,
+          nom: champs.nom!,
+          position: this.criteres().length,
+        })
+        return json(undefined, 201)
+      }
+      if (methode === 'PATCH') {
+        this.criteres()
+          .filter((c) => ids?.includes(c.id))
+          .forEach((c) => Object.assign(c, champs))
+        return json(undefined, 204)
+      }
+      if (methode === 'DELETE') {
+        this.criteresListe = this.criteresListe.filter((c) => !ids?.includes(c.id))
+        this.evaluations = this.evaluations.filter((e) => !ids?.includes(e.critere_id))
+        return json(undefined, 204)
+      }
+    }
+    if (chemin === '/rest/v1/evaluations') {
+      const filtre = (cle: string) => url.searchParams.get(cle)?.replace(/^eq[.]/, '')
+      if (methode === 'GET')
+        return json(this.evaluations.filter((e) => e.candidature_id === filtre('candidature_id')))
+      if (methode === 'POST') {
+        // Upsert : la note de l'utilisateur connecté remplace la précédente
+        const { candidature_id, critere_id, note } = corps(requete) as EvaluationFaux
+        const existante = this.evaluations.find(
+          (e) =>
+            e.candidature_id === candidature_id &&
+            e.critere_id === critere_id &&
+            e.user_id === this.utilisateur.id,
+        )
+        if (existante) existante.note = note
+        else
+          this.evaluations.push({ candidature_id, critere_id, note, user_id: this.utilisateur.id })
+        return json(undefined, 201)
+      }
+      if (methode === 'DELETE') {
+        this.evaluations = this.evaluations.filter(
+          (e) =>
+            !(
+              e.candidature_id === filtre('candidature_id') &&
+              e.critere_id === filtre('critere_id') &&
+              e.user_id === filtre('user_id') &&
+              e.user_id === this.utilisateur.id
+            ),
+        )
+        return json(undefined, 204)
+      }
+    }
+    if (chemin === '/rest/v1/rpc/moyennes_evaluations') {
+      const parCandidature = new Map<string, EvaluationFaux[]>()
+      for (const e of this.evaluations) {
+        const c = this.candidatures.find((x) => x.id === e.candidature_id)
+        if (c?.espace_id !== this.espaceActif) continue
+        parCandidature.set(e.candidature_id, [...(parCandidature.get(e.candidature_id) ?? []), e])
+      }
+      return json(
+        [...parCandidature].map(([candidature_id, liste]) => ({
+          candidature_id,
+          moyenne: (
+            Math.round((liste.reduce((s, e) => s + e.note, 0) / liste.length) * 10) / 10
+          ).toFixed(1),
+          evaluateurs: new Set(liste.map((e) => e.user_id)).size,
+        })),
+      )
     }
 
     // Modèles de réponse (supabase/migrations/0019_modeles_reponse.sql)

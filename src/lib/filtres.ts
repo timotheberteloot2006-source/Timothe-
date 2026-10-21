@@ -28,6 +28,7 @@ export const TRIS = {
   experience: 'Plus d’expérience',
   'experience-asc': 'Moins d’expérience',
   statut: 'Statut',
+  note: 'Mieux notées',
 } as const
 
 export type Tri = keyof typeof TRIS
@@ -75,11 +76,13 @@ export function filtrerCandidatures(candidatures: Candidature[], filtres: Filtre
 const comparerNoms = new Intl.Collator('fr', { sensitivity: 'base' }).compare
 
 // Renvoie une copie triée ; à égalité, les plus récentes d'abord. ordreEtapes : clés des
-// étapes dans leur ordre (tri par statut)
+// étapes dans leur ordre (tri par statut) ; moyennes : note moyenne par candidature (tri par note,
+// les candidatures non évaluées à la fin)
 export function trierCandidatures(
   candidatures: Candidature[],
   tri: Tri = 'recent',
   ordreEtapes: readonly string[] = CLES_DE_BASE,
+  moyennes: ReadonlyMap<string, number> = new Map(),
 ) {
   const rang = (statut: string) => {
     const i = ordreEtapes.indexOf(statut)
@@ -94,6 +97,7 @@ export function trierCandidatures(
     experience: (a, b) => b.experience - a.experience,
     'experience-asc': (a, b) => a.experience - b.experience,
     statut: (a, b) => rang(a.statut) - rang(b.statut),
+    note: (a, b) => (moyennes.get(b.id) ?? -1) - (moyennes.get(a.id) ?? -1),
   }
   const comparer = comparaisons[tri]
   return [...candidatures].sort((a, b) => comparer(a, b) || plusRecente(a, b))

@@ -19,7 +19,9 @@ import {
 } from '@/lib/espace'
 import { compterParEtape, ETAPES_DE_BASE, listerEtapes } from '@/lib/etapes'
 import { GestionEtapes } from '@/components/GestionEtapes'
+import { GestionCriteres } from '@/components/GestionCriteres'
 import { GestionModeles } from '@/components/GestionModeles'
+import { listerCriteres } from '@/lib/evaluations'
 import { ReglagesPageCarrieres } from '@/components/ReglagesPageCarrieres'
 import { listerModeles } from '@/lib/modeles'
 import { lireReglagesCarrieres } from '@/lib/carrieres'
@@ -38,6 +40,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
       nombresParEtape,
       carrieres,
       modeles,
+      criteres,
     ] = await Promise.all([
       listerMembres(espace.id),
       // Seul le propriétaire voit et gère les invitations
@@ -52,6 +55,8 @@ export const Route = createFileRoute('/_authentifie/equipe')({
       lireReglagesCarrieres(espace.id).catch(() => null),
       // null : base pas encore à jour (migration 0019), la rubrique est masquée
       listerModeles().catch(() => null),
+      // null : base pas encore à jour (migration 0020), la rubrique est masquée
+      listerCriteres().catch(() => null),
     ])
     return {
       espace,
@@ -63,6 +68,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
       nombresParEtape,
       carrieres,
       modeles,
+      criteres,
     }
   },
   component: Equipe,
@@ -86,6 +92,7 @@ function Equipe() {
     nombresParEtape,
     carrieres,
     modeles,
+    criteres,
   } = Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
@@ -206,6 +213,12 @@ function Equipe() {
       {modeles && (
         <Carte titre="Modèles de réponse">
           <GestionModeles modeles={modeles} executer={executer} />
+        </Carte>
+      )}
+
+      {criteres && (
+        <Carte titre="Critères d’évaluation">
+          <GestionCriteres criteres={criteres} proprietaire={proprietaire} executer={executer} />
         </Carte>
       )}
 

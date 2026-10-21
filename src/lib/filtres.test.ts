@@ -256,3 +256,16 @@ describe('vue tableau', () => {
     expect(ordre.map((x) => x.nom)).toEqual(['C', 'B', 'A'])
   })
 })
+
+describe('tri par note', () => {
+  it('les mieux notées d’abord, les non évaluées à la fin', () => {
+    const [a, b, c] = ['A', 'B', 'C'].map((nom) => candidature({ nom }))
+    const moyennes = new Map([
+      ['A', 3.5],
+      ['C', 4.2],
+    ])
+    const ordre = trierCandidatures([a, b, c], 'note', undefined, moyennes)
+    expect(ordre.map((x) => x.nom)).toEqual(['C', 'A', 'B'])
+    expect(lireFiltres({ tri: 'note' })).toEqual({ tri: 'note' })
+  })
+})

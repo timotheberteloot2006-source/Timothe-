@@ -62,6 +62,13 @@ que les siennes). Les filtres (recherche, compétences requises, expérience min
 s'appliquent dans le navigateur et sont conservés dans l'URL, comme le tri (date, nom, expérience,
 statut) et la page (25 candidatures par page ; l'export contient toutes les pages).
 
+**Évaluation** (`supabase/migrations/0020_evaluations.sql`) : chaque espace a une grille de
+critères (trois proposés : compétences techniques, communication, motivation ; 10 au plus), que
+le propriétaire règle depuis la page **Équipe**. Sur la fiche, chaque membre note le candidat de
+1 à 5 par critère (à la souris ou au clavier) et voit la moyenne de l'équipe ; il ne peut
+modifier ou effacer que ses propres notes. La liste affiche la note moyenne et se trie par
+« Mieux notées ».
+
 **Étapes de recrutement** : le statut d'une candidature est une étape de son espace. Chaque
 espace a trois étapes de base, « Nouveau » (toujours la première, où arrivent les candidatures),
 « Retenu » et « Écarté », que le propriétaire peut renommer ; il peut aussi en ajouter (12 au

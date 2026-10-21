@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import type { Candidature, NouvelleCandidature, Statut } from '@/lib/candidatures'
 import { couleurEtape, type Etape } from '@/lib/etapes'
+import { formaterNote, type Moyenne } from '@/lib/evaluations'
 import type { EntretienAVenir } from '@/lib/entretiens'
 import type { Offre } from '@/lib/offres'
 import { FormulaireCandidature } from './FormulaireCandidature'
@@ -21,6 +22,8 @@ interface Props {
   // Prochain entretien de chaque candidature (par identifiant)
   prochainsEntretiens: Map<string, EntretienAVenir>
   etapes: Etape[]
+  // Note moyenne de chaque candidature évaluée
+  moyennes?: Map<string, Moyenne>
 }
 
 export function ListeCandidatures({
@@ -36,6 +39,7 @@ export function ListeCandidatures({
   offres,
   prochainsEntretiens,
   etapes,
+  moyennes = new Map(),
 }: Props) {
   const titres = new Map(offres.map((o) => [o.id, o.titre]))
   return (
@@ -72,6 +76,16 @@ export function ListeCandidatures({
                   >
                     {c.nom}
                   </Link>
+                  {moyennes.has(c.id) && (
+                    <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">
+                      <span aria-hidden="true">★ {formaterNote(moyennes.get(c.id)!.moyenne)}</span>
+                      <span className="sr-only">
+                        Note moyenne {formaterNote(moyennes.get(c.id)!.moyenne)} sur 5,{' '}
+                        {moyennes.get(c.id)!.evaluateurs} évaluateur
+                        {moyennes.get(c.id)!.evaluateurs > 1 ? 's' : ''}
+                      </span>
+                    </span>
+                  )}
                   {c.cv_chemin && (
                     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
                       CV

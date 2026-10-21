@@ -1737,3 +1737,128 @@ describe('modèles de réponse', () => {
     }
   })
 })
+
+describe('évaluations', () => {
+  let alice: string
+  const critere = async (nom: string, espace = A) =>
+    (
+      await db.query<{ id: string }>(
+        `select id from public.criteres where espace_id = $1 and nom = $2`,
+        [espace, nom],
+      )
+    ).rows[0].id
+
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated;
+      grant select, insert, update, delete on public.criteres, public.evaluations to authenticated;
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+      update public.profils set espace_actif = '${A}' where user_id = '${B}';
+    `)
+    await ajouter(A, ['Alice'])
+    alice = (await db.query<{ id: string }>(`select id from public.candidatures`)).rows[0].id
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  const noter = (critereId: string, note: number) =>
+    db.exec(
+      `insert into public.evaluations (candidature_id, critere_id, note)
+       values ('${alice}', '${critereId}', ${note})
+       on conflict (candidature_id, critere_id, user_id) do update set note = excluded.note`,
+    )
+
+  it('chaque espace reçoit trois critères proposés, dans l’ordre', async () => {
+    const { rows } = await db.query<{ nom: string }>(
+      `select nom from public.criteres where espace_id = '${A}' order by position`,
+    )
+    expect(rows.map((r) => r.nom)).toEqual([
+      'Compétences techniques',
+      'Communication',
+      'Motivation',
+    ])
+  })
+
+  it('chaque membre note ; la moyenne réunit l’équipe', async () => {
+    const technique = await critere('Compétences techniques')
+    const communication = await critere('Communication')
+    await enTant(A, async () => {
+      await noter(technique, 4)
+      await noter(communication, 2)
+      // Nouvelle note sur le même critère : remplace la précédente
+      await noter(communication, 3)
+    })
+    await enTant(B, () => noter(technique, 5))
+    const { rows } = await enTant(A, () => db.query('select * from public.moyennes_evaluations()'))
+    expect(rows).toEqual([{ candidature_id: alice, moyenne: '4.0', evaluateurs: 2 }])
+  })
+
+  it('personne ne modifie ni n’efface les notes d’un autre', async () => {
+    const technique = await critere('Compétences techniques')
+    await enTant(A, () => noter(technique, 4))
+    await enTant(B, async () => {
+      await db.exec(`update public.evaluations set note = 1`)
+      await db.exec(`delete from public.evaluations`)
+      // Ni noter à la place d'un autre
+      await db.exec(
+        `insert into public.evaluations (candidature_id, critere_id, note, user_id)
+         values ('${alice}', '${technique}', 1, '${A}')`,
+      )
+    })
+    const { rows } = await db.query(
+      `select user_id, note from public.evaluations order by note desc`,
+    )
+    // La note de A est intacte ; l'insertion de B a été enregistrée à son nom
+    expect(rows).toEqual([
+      { user_id: A, note: 4 },
+      { user_id: B, note: 1 },
+    ])
+  })
+
+  it('un critère d’un autre espace ou une note hors 1 à 5 sont refusés', async () => {
+    const chezB = await critere('Motivation', B)
+    await expect(enTant(A, () => noter(chezB, 3))).rejects.toThrow(
+      /evaluations_critere_id_espace_id_fkey/,
+    )
+    const technique = await critere('Compétences techniques')
+    await expect(enTant(A, () => noter(technique, 6))).rejects.toThrow(/evaluations_note_check/)
+  })
+
+  it('critères : réglés par le propriétaire seul, 10 au plus, suppression en cascade', async () => {
+    await expect(
+      enTant(B, () => db.exec(`insert into public.criteres (nom) values ('Pirate')`)),
+    ).rejects.toThrow(/row-level security/)
+    await enTant(A, async () => {
+      for (let i = 1; i <= 7; i++)
+        await db.exec(`insert into public.criteres (nom) values ('C${i}')`)
+      await expect(db.exec(`insert into public.criteres (nom) values ('C8')`)).rejects.toThrow(
+        /^trop_de_criteres/,
+      )
+    })
+    const technique = await critere('Compétences techniques')
+    await enTant(A, () => noter(technique, 4))
+    await enTant(A, () => db.exec(`delete from public.criteres where id = '${technique}'`))
+    const { rows } = await db.query('select count(*)::int as n from public.evaluations')
+    expect(rows).toEqual([{ n: 0 }])
+  })
+
+  it('sans compte : rien', async () => {
+    await db.exec('set role anon')
+    try {
+      await expect(db.query('select * from public.moyennes_evaluations()')).rejects.toThrow(
+        /permission denied/,
+      )
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+})

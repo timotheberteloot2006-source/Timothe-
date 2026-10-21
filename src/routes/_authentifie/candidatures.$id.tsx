@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from '@tanstack/react-router'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { CarteEntretiens } from '@/components/candidatures/CarteEntretiens'
+import { CarteEvaluation } from '@/components/candidatures/CarteEvaluation'
 import { CarteHistorique } from '@/components/candidatures/CarteHistorique'
 import { CarteReponse } from '@/components/candidatures/CarteReponse'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
@@ -15,6 +16,7 @@ import {
 } from '@/lib/candidatures'
 import { lireEspace } from '@/lib/espace'
 import { ETAPES_DE_BASE, listerEtapes } from '@/lib/etapes'
+import { listerCriteres, listerEvaluations } from '@/lib/evaluations'
 import { listerModeles } from '@/lib/modeles'
 import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
 import { ajouterNote, listerNotes, supprimerNote, type Note } from '@/lib/notes'
@@ -26,21 +28,45 @@ import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/candidatures/$id')({
   loader: async ({ params }) => {
-    const [candidature, notes, offres, entretiens, historique, etapes, modeles, espace] =
-      await Promise.all([
-        lireCandidature(params.id),
-        listerNotes(params.id),
-        listerOffres(),
-        listerEntretiens(params.id),
-        // L'historique est secondaire : son échec ne doit pas empêcher d'afficher la fiche
-        listerHistorique(params.id).catch(() => null),
-        listerEtapes().catch(() => ETAPES_DE_BASE),
-        // Base pas encore à jour (migration 0019) : aucun modèle, message libre seulement
-        listerModeles().catch(() => []),
-        lireEspace().catch(() => null),
-      ])
+    const [
+      candidature,
+      notes,
+      offres,
+      entretiens,
+      historique,
+      etapes,
+      modeles,
+      espace,
+      criteres,
+      evaluations,
+    ] = await Promise.all([
+      lireCandidature(params.id),
+      listerNotes(params.id),
+      listerOffres(),
+      listerEntretiens(params.id),
+      // L'historique est secondaire : son échec ne doit pas empêcher d'afficher la fiche
+      listerHistorique(params.id).catch(() => null),
+      listerEtapes().catch(() => ETAPES_DE_BASE),
+      // Base pas encore à jour (migration 0019) : aucun modèle, message libre seulement
+      listerModeles().catch(() => []),
+      lireEspace().catch(() => null),
+      // Base pas encore à jour (migration 0020) : pas d'évaluation
+      listerCriteres().catch(() => null),
+      listerEvaluations(params.id).catch(() => []),
+    ])
     if (!candidature) throw notFound()
-    return { candidature, notes, offres, entretiens, historique, etapes, modeles, espace }
+    return {
+      candidature,
+      notes,
+      offres,
+      entretiens,
+      historique,
+      etapes,
+      modeles,
+      espace,
+      criteres,
+      evaluations,
+    }
   },
   // Après loader : les types de loaderData en dépendent
   head: ({ loaderData }) => titrePage(loaderData?.candidature.nom ?? 'Candidature'),
@@ -65,6 +91,8 @@ function FicheCandidature() {
     etapes,
     modeles,
     espace,
+    criteres,
+    evaluations,
   } = Route.useLoaderData()
   const { user } = useAuth()
   const offre = offres.find((o) => o.id === c.offre_id)
@@ -205,6 +233,15 @@ function FicheCandidature() {
         entretiens={entretiens}
         executer={executer}
       />
+      {criteres && (
+        <CarteEvaluation
+          candidatureId={c.id}
+          criteres={criteres}
+          evaluations={evaluations}
+          userId={user?.id}
+          executer={executer}
+        />
+      )}
       <CarteNotes candidatureId={c.id} notes={notes} executer={executer} />
       <CarteReponse
         candidature={c}

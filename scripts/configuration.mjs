@@ -26,6 +26,7 @@ export const MIGRATIONS = [
   },
   { numero: '0018', table: 'entretiens', colonne: 'rappel_envoye_le' },
   { numero: '0019', table: 'modeles_reponse', colonne: 'nom' },
+  { numero: '0020', table: 'criteres', colonne: 'nom' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite

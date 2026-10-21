@@ -23,6 +23,7 @@ import {
 import { LIMITE_GRATUITE, placesRestantes } from '@/lib/abonnement'
 import { lireEspace } from '@/lib/espace'
 import { ETAPES_DE_BASE, listerEtapes, nomsEtapes } from '@/lib/etapes'
+import { listerMoyennes } from '@/lib/evaluations'
 import {
   filtrerCandidatures,
   lireFiltres,
@@ -40,15 +41,17 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   head: () => titrePage('Candidatures'),
   validateSearch: lireFiltres,
   loader: async () => {
-    const [candidatures, espace, offres, entretiens, etapes] = await Promise.all([
+    const [candidatures, espace, offres, entretiens, etapes, moyennes] = await Promise.all([
       listerCandidatures(),
       lireEspace(),
       listerOffres(),
       listerEntretiensAVenir(),
       // Base pas encore à jour (migration 0015) : les trois étapes habituelles
       listerEtapes().catch(() => ETAPES_DE_BASE),
+      // Base pas encore à jour (migration 0020) : aucune note
+      listerMoyennes().catch(() => new Map()),
     ])
-    return { candidatures, espace, offres, entretiens, etapes }
+    return { candidatures, espace, offres, entretiens, etapes, moyennes }
   },
   // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
   shouldReload: false,
@@ -65,7 +68,7 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
 })
 
 function TableauDeBord() {
-  const { candidatures, espace, offres, entretiens, etapes } = Route.useLoaderData()
+  const { candidatures, espace, offres, entretiens, etapes, moyennes } = Route.useLoaderData()
   const prochainsEntretiens = prochainParCandidature(entretiens)
   const places = placesRestantes(espace.est_pro, candidatures.length)
   const recherche = Route.useSearch()
@@ -91,6 +94,7 @@ function TableauDeBord() {
     filtrerCandidatures(candidatures, filtres),
     filtres.tri,
     etapes.map((e) => e.cle),
+    new Map([...moyennes].map(([id, m]) => [id, m.moyenne])),
   )
   const pagination = paginer(resultats, filtres.page)
   // Affichage changé : on oublie la sélection (mise à jour pendant le rendu, motif React
@@ -339,6 +343,7 @@ function TableauDeBord() {
                   offres={offres}
                   prochainsEntretiens={prochainsEntretiens}
                   etapes={etapes}
+                  moyennes={moyennes}
                   selection={idsSelectionnes}
                   onBasculerSelection={basculerSelection}
                   candidatures={pagination.elements}
