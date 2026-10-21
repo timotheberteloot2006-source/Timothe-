@@ -1,4 +1,5 @@
 import { LIBELLES_STATUT, type Statut } from './candidatures'
+import { formaterDate } from './entretiens'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 
 // Table remplie par la base (supabase/migrations/0010_historique.sql), en lecture seule
@@ -6,6 +7,8 @@ export interface Evenement {
   id: number
   user_id: string | null
   email: string | null
+  // Action d'un traitement serveur, sans utilisateur connecté
+  par_systeme: boolean
   action: string
   details: Record<string, unknown>
   created_at: string
@@ -14,17 +17,32 @@ export interface Evenement {
 // Nombre d'événements affichés sur la fiche
 export const LIMITE_HISTORIQUE = 50
 
-export async function listerHistorique(candidatureId: string): Promise<Evenement[]> {
+// tronque : il existe des actions plus anciennes que celles renvoyées
+export async function listerHistorique(
+  candidatureId: string,
+): Promise<{ evenements: Evenement[]; tronque: boolean }> {
   if (!supabase) throw new Error(SUPABASE_NON_CONFIGURE)
   const { data, error } = await supabase
     .from('historique')
-    .select('id, user_id, email, action, details, created_at')
+    .select('id, user_id, email, par_systeme, action, details, created_at')
     .eq('candidature_id', candidatureId)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
-    .limit(LIMITE_HISTORIQUE)
+    // Une de plus que la limite : pour savoir s'il en reste au-delà
+    .limit(LIMITE_HISTORIQUE + 1)
   if (error) throw new Error(error.message)
-  return data
+  return { evenements: data.slice(0, LIMITE_HISTORIQUE), tronque: data.length > LIMITE_HISTORIQUE }
+}
+
+// Auteur affiché : « vous », l'e-mail d'un autre membre, ou ce qu'il en reste
+export function auteur(
+  evenement: Pick<Evenement, 'user_id' | 'email' | 'par_systeme'>,
+  userId?: string,
+) {
+  if (evenement.par_systeme) return 'automatique'
+  if (evenement.user_id && evenement.user_id === userId) return 'vous'
+  // La suppression d'un compte efface son e-mail de l'historique
+  return evenement.email ?? 'compte supprimé'
 }
 
 const LIBELLES_CHAMPS: Record<string, string> = {
@@ -71,8 +89,6 @@ export function decrireEvenement(evenement: Pick<Evenement, 'action' | 'details'
 }
 
 function dateEntretien(debut: unknown) {
-  if (typeof debut !== 'string') return ''
-  const date = new Date(debut)
-  if (Number.isNaN(date.getTime())) return ''
-  return ` (${date.toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })})`
+  if (typeof debut !== 'string' || Number.isNaN(new Date(debut).getTime())) return ''
+  return ` (${formaterDate(debut, { annee: true })})`
 }

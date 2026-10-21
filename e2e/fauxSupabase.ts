@@ -118,6 +118,7 @@ export class FauxSupabase {
     candidature_id: string
     user_id: string | null
     email: string | null
+    par_systeme: boolean
     action: string
     details: Record<string, unknown>
     created_at: string
@@ -173,6 +174,7 @@ export class FauxSupabase {
       candidature_id: candidatureId,
       user_id: this.utilisateur.id,
       email: this.utilisateur.email,
+      par_systeme: false,
       action,
       details,
       created_at: new Date().toISOString(),
@@ -399,7 +401,11 @@ export class FauxSupabase {
         if (champs.cv_chemin !== undefined && champs.cv_chemin !== c.cv_chemin) {
           this.journaliser(
             c.id,
-            !c.cv_chemin ? 'cv_ajoute' : !champs.cv_chemin ? 'cv_retire' : 'cv_remplace',
+            c.cv_chemin === null
+              ? 'cv_ajoute'
+              : champs.cv_chemin === null
+                ? 'cv_retire'
+                : 'cv_remplace',
           )
         }
         const modifies = (
@@ -417,6 +423,7 @@ export class FauxSupabase {
       this.candidatures = this.candidatures.filter((c) => !ids?.includes(c.id))
       this.notes = this.notes.filter((n) => !ids?.includes(n.candidature_id))
       this.entretiens = this.entretiens.filter((e) => !ids?.includes(e.candidature_id))
+      this.historique = this.historique.filter((h) => !ids?.includes(h.candidature_id))
       return json(undefined, 204)
     }
     return json({}, 405)

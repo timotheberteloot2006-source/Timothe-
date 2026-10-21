@@ -734,6 +734,55 @@ describe('historique', () => {
     expect(vuParB.rows).toEqual([])
   })
 
+  it('ne journalise pas le détachement automatique quand une offre est supprimée', async () => {
+    await enTant(A, async () => {
+      const offre = (
+        await db.query<{ id: string }>(
+          `insert into public.offres (titre) values ('Poste') returning id`,
+        )
+      ).rows[0].id
+      await db.exec(`insert into public.candidatures (nom, offre_id) values ('Alice', '${offre}')`)
+      await db.exec(`delete from public.offres where id = '${offre}'`)
+    })
+    expect((await journal()).map((e) => e.action)).toEqual(['creation'])
+    // Retirer l'offre à la main reste journalisé
+    await enTant(A, async () => {
+      const offre = (
+        await db.query<{ id: string }>(
+          `insert into public.offres (titre) values ('Autre') returning id`,
+        )
+      ).rows[0].id
+      await db.exec(`update public.candidatures set offre_id = '${offre}'`)
+      await db.exec(`update public.candidatures set offre_id = null`)
+    })
+    expect((await journal()).map((e) => e.action)).toEqual([
+      'creation',
+      'modification',
+      'modification',
+    ])
+  })
+
+  it('efface l’e-mail d’un compte supprimé et distingue les actions automatiques', async () => {
+    const jeton = await enTant(A, async () => {
+      const { rows } = await db.query<{ jeton: string }>(
+        `insert into public.invitations (espace_id) values ('${A}') returning jeton`,
+      )
+      return rows[0].jeton
+    })
+    await enTant(B, () => db.query(`select public.accepter_invitation($1)`, [jeton]))
+    await enTant(B, () => db.exec(`insert into public.candidatures (nom) values ('Ajout de B')`))
+    // Action sans utilisateur connecté (traitement serveur)
+    await db.exec(`update public.candidatures set statut = 'retenu'`)
+    await enTant(B, () => db.exec('select public.supprimer_mon_compte()'))
+    const { rows } = await db.query(
+      'select action, user_id, email, par_systeme from public.historique order by id',
+    )
+    expect(rows).toEqual([
+      { action: 'creation', user_id: null, email: null, par_systeme: false },
+      { action: 'statut', user_id: null, email: null, par_systeme: true },
+    ])
+  })
+
   it('disparaît avec la candidature, notes et entretiens compris', async () => {
     const id = await enTant(A, async () => {
       const { rows } = await db.query<{ id: string }>(

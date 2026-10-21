@@ -30,7 +30,8 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
       listerNotes(params.id),
       listerOffres(),
       listerEntretiens(params.id),
-      listerHistorique(params.id),
+      // L'historique est secondaire : son échec ne doit pas empêcher d'afficher la fiche
+      listerHistorique(params.id).catch(() => null),
     ])
     if (!candidature) throw notFound()
     return { candidature, notes, offres, entretiens, historique }
@@ -190,7 +191,7 @@ function FicheCandidature() {
         executer={executer}
       />
       <CarteNotes candidatureId={c.id} notes={notes} executer={executer} />
-      <CarteHistorique evenements={historique} userId={user?.id} />
+      <CarteHistorique historique={historique} userId={user?.id} />
     </section>
   )
 }

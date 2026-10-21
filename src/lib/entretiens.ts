@@ -66,11 +66,13 @@ export function finEntretien(entretien: Pick<Entretien, 'debut' | 'duree_minutes
   return new Date(new Date(entretien.debut).getTime() + entretien.duree_minutes * 60 * 1000)
 }
 
-export function formaterDate(iso: string) {
+// « mardi 3 novembre à 15:00 » ; avec l'année pour une date qui peut être lointaine (historique)
+export function formaterDate(iso: string, { annee = false } = {}) {
   return new Date(iso).toLocaleString('fr-FR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    ...(annee && { year: 'numeric' }),
     hour: '2-digit',
     minute: '2-digit',
   })
