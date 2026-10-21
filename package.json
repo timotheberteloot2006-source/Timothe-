@@ -13,7 +13,9 @@
     "test": "vitest run",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "budget": "node scripts/budget.mjs"
+    "budget": "node scripts/budget.mjs",
+    "verifier:config": "node scripts/verifier-config.mjs",
+    "deployer:supabase": "bash scripts/deployer-supabase.sh"
   },
   "dependencies": {
     "@supabase/auth-js": "^2.118.0",

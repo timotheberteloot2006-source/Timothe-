@@ -36,3 +36,6 @@ dist-e2e
 test-results
 playwright-report
 dist-budget
+
+# CLI Supabase (projet lié)
+supabase/.temp

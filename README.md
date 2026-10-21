@@ -103,8 +103,8 @@ statut, supprimer avec notes et CV). La sélection se vide quand les filtres, le
 changent.
 
 Chaque candidature a sa fiche (clic sur le nom) : notes internes datées et CV en PDF (5 Mo au
-plus), rangé dans le bucket Supabase privé `cv` sous `<user_id>/…` ; chaque utilisateur n'accède
-qu'à ses fichiers. Les fichiers sont supprimés avec la candidature ou le compte.
+plus), rangé dans le bucket Supabase privé `cv` sous `<espace_id>/…` ; seuls les membres de l'espace y
+accèdent. Les fichiers sont supprimés avec la candidature ou le compte.
 
 ## Abonnements (Stripe)
 
@@ -134,8 +134,9 @@ Deux offres : **Gratuite** (50 candidatures au plus, limite imposée par la base
 
 Carte de test Stripe : `4242 4242 4242 4242`, date future, n'importe quel code.
 
-Un compte avec un abonnement actif ne peut pas être supprimé : il faut d'abord résilier
-(bouton « Gérer mon abonnement » dans *Mon compte*).
+Un compte dont l'abonnement court encore (y compris résilié jusqu'à la fin de la période, ou avec
+un paiement en attente) ne peut pas être supprimé : il faut d'abord résilier (bouton « Gérer mon
+abonnement » dans *Mon compte*).
 
 ## Pages légales
 
@@ -192,22 +193,15 @@ entretiens, import/export CSV, fiche
 
 ## Mise en production
 
-Le site est une application monopage statique (`npm run build` produit `dist/`).
-`vercel.json` et `netlify.toml` renvoient toutes les adresses vers `index.html`.
+Le guide pas à pas est dans [`docs/MISE_EN_LIGNE.md`](docs/MISE_EN_LIGNE.md) : répétition avec
+Stripe en mode test, puis passage en réel. Il s'appuie sur deux commandes :
 
-1. **Hébergement** (Vercel ou Netlify) : importer le dépôt GitHub. Commande `npm run build`,
-   dossier `dist` (détectés automatiquement). Ajouter les variables d'environnement
-   `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`.
-2. **Supabase**, *Authentication > URL Configuration* : *Site URL* = l'adresse de production
-   (ex. `https://filtre.fr`), et ajouter `https://filtre.fr/nouveau-mot-de-passe` et
-   `https://filtre.fr/compte` aux *Redirect URLs*.
-3. **Supabase**, base : exécuter les migrations de `supabase/migrations/` dans l'ordre
-   (ou `supabase db push`).
-4. **Stripe** en mode réel (*live*) : recréer le produit et le prix Pro, activer le portail
-   client, créer le webhook vers `https://<id-du-projet>.supabase.co/functions/v1/webhook-stripe`.
-5. **Secrets des fonctions** : `STRIPE_SECRET_KEY` (clé live), `STRIPE_PRICE_PRO`,
-   `STRIPE_WEBHOOK_SECRET` (celui du webhook live) et `SITE_URL` = l'adresse de production, puis
-   `supabase secrets set --env-file supabase/functions/.env` et redéployer les fonctions.
-6. **Vérifier** : inscription, confirmation par e-mail, connexion, ajout d'une candidature,
-   passage à Pro avec une vraie carte, puis résiliation depuis *Mon compte*.
+- `npm run verifier:config` contrôle les fichiers `.env` et `supabase/functions/.env` ; avec
+  `-- --distant`, il interroge aussi Supabase et Stripe en lecture seule (migrations, fonctions,
+  webhook, prix, portail client) ;
+- `npm run deployer:supabase` applique les migrations manquantes, envoie les secrets et déploie
+  les fonctions.
 
+`vercel.json` et `netlify.toml` déclarent les mêmes en-têtes de sécurité (politique de contenu
+stricte, site non intégrable dans une autre page) ; `vite preview` les applique aussi, et un test
+de bout en bout vérifie que le site fonctionne sans aucune ressource bloquée.
