@@ -14,6 +14,7 @@ export const MIGRATIONS = [
   { numero: '0010', table: 'historique', colonne: 'id' },
   { numero: '0011', table: 'historique', colonne: 'par_systeme' },
   { numero: '0012', table: 'abonnements', colonne: 'stripe_evenement_le' },
+  { numero: '0013', table: 'offres', colonne: 'jeton_public' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite
@@ -243,6 +244,20 @@ async function interrogerSupabase(url, entetes, fetch) {
   else if (webhook.status === 400 && corpsWebhook.erreur?.includes('Signature'))
     resultats.push(ok('Fonction webhook-stripe déployée et joignable par Stripe.'))
   else resultats.push(attention(`webhook-stripe : réponse inattendue (${webhook.status}).`))
+
+  // Formulaire public : appelé sans compte (un envoi vide est refusé par la fonction elle-même)
+  const postuler = await fetch(`${url}/functions/v1/postuler`, { method: 'POST', body: '{}' })
+  const corpsPostuler = await postuler.json().catch(() => ({}))
+  if (postuler.status === 404) resultats.push(erreur('Fonction postuler non déployée.'))
+  else if (postuler.status === 401)
+    resultats.push(
+      erreur(
+        'postuler refuse les appels sans jeton : redéployez-la avec --no-verify-jwt, sinon les candidats ne peuvent pas envoyer le formulaire.',
+      ),
+    )
+  else if (postuler.status === 400 && corpsPostuler.erreur)
+    resultats.push(ok('Fonction postuler déployée et ouverte aux candidats.'))
+  else resultats.push(attention(`postuler : réponse inattendue (${postuler.status}).`))
   return resultats
 }
 

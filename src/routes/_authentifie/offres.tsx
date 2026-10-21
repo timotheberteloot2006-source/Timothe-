@@ -1,12 +1,26 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useState, type FormEvent } from 'react'
 import { classeChamp } from '@/components/candidatures/styles'
-import { creerOffre, listerOffres, renommerOffre, supprimerOffre, type Offre } from '@/lib/offres'
+import { lireEspace } from '@/lib/espace'
+import { lienFormulaire } from '@/lib/formulairePublic'
+import {
+  creerOffre,
+  listerOffres,
+  modifierFormulaire,
+  nouveauLienFormulaire,
+  renommerOffre,
+  supprimerOffre,
+  type Offre,
+} from '@/lib/offres'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/offres')({
   head: () => titrePage('Offres d’emploi'),
-  loader: listerOffres,
+  // Nom de l'espace : c'est celui que voient les candidats sur le formulaire public
+  loader: async () => {
+    const [offres, espace] = await Promise.all([listerOffres(), lireEspace()])
+    return { offres, nomEspace: espace.nom }
+  },
   component: Offres,
   errorComponent: ({ error }) => (
     <section className="mx-auto max-w-3xl px-4 py-16">
@@ -18,7 +32,7 @@ export const Route = createFileRoute('/_authentifie/offres')({
 })
 
 function Offres() {
-  const offres = Route.useLoaderData()
+  const { offres, nomEspace } = Route.useLoaderData()
   const router = useRouter()
   const [erreur, setErreur] = useState<string | null>(null)
   const [idEnEdition, setIdEnEdition] = useState<string | null>(null)
@@ -60,7 +74,9 @@ function Offres() {
     <section className="mx-auto max-w-3xl space-y-6 px-4 py-12">
       <h1 className="text-2xl font-bold">Offres d’emploi</h1>
       <p className="text-slate-600">
-        Rattachez chaque candidature à une offre pour les retrouver et les filtrer par poste.
+        Rattachez chaque candidature à une offre pour les retrouver et les filtrer par poste. Chaque
+        offre peut aussi avoir son formulaire en ligne : les candidats postulent eux-mêmes, et leur
+        candidature arrive directement dans la liste.
       </p>
 
       <form onSubmit={handleCreation} className="flex flex-wrap items-end gap-3">
@@ -104,33 +120,43 @@ function Offres() {
                 />
               </li>
             ) : (
-              <li key={offre.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div>
-                  <p className="font-medium">{offre.titre}</p>
-                  <Link
-                    to="/tableau-de-bord"
-                    search={{ offre: offre.id }}
-                    className="text-sm text-accent hover:underline"
-                  >
-                    {offre.nb_candidatures} candidature{offre.nb_candidatures > 1 ? 's' : ''}
-                  </Link>
+              <li key={offre.id} className="space-y-3 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">
+                      {offre.titre}
+                      {offre.publique && (
+                        <span className="ml-2 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800">
+                          Formulaire en ligne
+                        </span>
+                      )}
+                    </p>
+                    <Link
+                      to="/tableau-de-bord"
+                      search={{ offre: offre.id }}
+                      className="text-sm text-accent hover:underline"
+                    >
+                      {offre.nb_candidatures} candidature{offre.nb_candidatures > 1 ? 's' : ''}
+                    </Link>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIdEnEdition(offre.id)}
+                      className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                    >
+                      Renommer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSuppression(offre)}
+                      className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-red-50 hover:text-red-700"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIdEnEdition(offre.id)}
-                    className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    Renommer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSuppression(offre)}
-                    className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-red-50 hover:text-red-700"
-                  >
-                    Supprimer
-                  </button>
-                </div>
+                <PanneauFormulaire offre={offre} nomEspace={nomEspace} executer={executer} />
               </li>
             ),
           )}
@@ -182,5 +208,126 @@ function FormulaireRenommage({
         Annuler
       </button>
     </form>
+  )
+}
+
+// Réglages du formulaire public d'une offre : ouverture, lien à diffuser, description
+function PanneauFormulaire({
+  offre,
+  nomEspace,
+  executer,
+}: {
+  offre: Offre
+  nomEspace: string
+  executer: (action: () => Promise<void>) => Promise<boolean>
+}) {
+  const [copie, setCopie] = useState(false)
+  // Affiché tout de suite, remis à l'état précédent si la modification échoue
+  const [publique, setPublique] = useState(offre.publique)
+  const lien = lienFormulaire(offre.jeton_public)
+
+  async function basculer(valeur: boolean) {
+    setPublique(valeur)
+    if (!(await executer(() => modifierFormulaire(offre.id, { publique: valeur }))))
+      setPublique(!valeur)
+  }
+
+  async function copier() {
+    try {
+      await navigator.clipboard.writeText(lien)
+      setCopie(true)
+    } catch {
+      // Presse-papiers refusé : le lien reste sélectionnable dans le champ
+      setCopie(false)
+    }
+  }
+
+  function handleNouveauLien() {
+    if (
+      window.confirm(
+        'Créer un nouveau lien ? L’ancien ne fonctionnera plus : les candidats qui l’ont reçu ne pourront plus postuler.',
+      )
+    )
+      executer(() => nouveauLienFormulaire(offre.id)).then(() => setCopie(false))
+  }
+
+  function handleDescription(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const texte = String(new FormData(event.currentTarget).get('description') ?? '').trim()
+    executer(() => modifierFormulaire(offre.id, { description: texte || null }))
+  }
+
+  return (
+    <details className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium">Formulaire de candidature</summary>
+      <div className="mt-3 space-y-3">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={publique} onChange={(e) => basculer(e.target.checked)} />
+          Formulaire en ligne
+        </label>
+
+        {publique && (
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="block min-w-64 flex-1">
+              <span className="font-medium">Lien à diffuser</span>
+              <input
+                readOnly
+                value={lien}
+                onFocus={(e) => e.target.select()}
+                className={classeChamp}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={copier}
+              className="rounded-md border border-slate-300 px-3 py-2 font-medium hover:bg-slate-100"
+            >
+              {copie ? 'Lien copié' : 'Copier le lien'}
+            </button>
+            <button
+              type="button"
+              onClick={handleNouveauLien}
+              className="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
+              Nouveau lien
+            </button>
+          </div>
+        )}
+
+        <p className="text-slate-600">
+          Les candidats voient le nom de votre espace : « {nomEspace} ».
+          {nomEspace === 'Mon espace' && (
+            <>
+              {' '}
+              Donnez-lui le nom de votre entreprise depuis la page{' '}
+              <Link to="/equipe" className="text-accent underline underline-offset-2">
+                Équipe
+              </Link>
+              .
+            </>
+          )}
+        </p>
+
+        <form onSubmit={handleDescription} className="space-y-2">
+          <label className="block">
+            <span className="font-medium">Description présentée aux candidats</span>
+            <textarea
+              name="description"
+              rows={4}
+              maxLength={5000}
+              defaultValue={offre.description ?? ''}
+              placeholder="Missions, profil recherché, lieu, type de contrat…"
+              className={classeChamp}
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-md bg-indigo-600 px-3 py-2 font-medium text-white hover:bg-indigo-500"
+          >
+            Enregistrer la description
+          </button>
+        </form>
+      </div>
+    </details>
   )
 }

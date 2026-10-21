@@ -1,3 +1,4 @@
+import { appelerFonction } from './fonctions'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
 
 // Même valeur que dans supabase/migrations/0004_abonnements.sql
@@ -48,15 +49,7 @@ export function ouvrirPortail() {
 }
 
 async function redirigerVers(fonction: string) {
-  if (!supabase) throw new Error(SUPABASE_NON_CONFIGURE)
-  const { data, error } = await (await supabase.fonctions()).invoke<{ url: string }>(fonction)
-  if (error) {
-    // Les fonctions renvoient { erreur } avec un message lisible (FunctionsHttpError : la réponse
-    // HTTP est dans error.context ; testé sans importer la classe, chargée à la demande)
-    const reponse = error.name === 'FunctionsHttpError' ? (error.context as Response) : null
-    const corps = reponse ? await reponse.json().catch(() => null) : null
-    throw new Error(corps?.erreur ?? error.message)
-  }
+  const data = await appelerFonction<{ url: string }>(fonction)
   if (!data?.url) throw new Error('Réponse inattendue du serveur de paiement.')
   window.location.assign(data.url)
 }

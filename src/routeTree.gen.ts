@@ -23,6 +23,7 @@ import { Route as AuthentifieCompteRouteImport } from './routes/_authentifie/com
 import { Route as AuthentifieEquipeRouteImport } from './routes/_authentifie/equipe'
 import { Route as AuthentifieOffresRouteImport } from './routes/_authentifie/offres'
 import { Route as AuthentifieTableauDeBordRouteImport } from './routes/_authentifie/tableau-de-bord'
+import { Route as PostulerJetonRouteImport } from './routes/postuler.$jeton'
 import { Route as AuthentifieCandidaturesIdRouteImport } from './routes/_authentifie/candidatures.$id'
 import { Route as AuthentifieInvitationJetonRouteImport } from './routes/_authentifie/invitation.$jeton'
 
@@ -96,6 +97,11 @@ const AuthentifieTableauDeBordRoute =
     path: '/tableau-de-bord',
     getParentRoute: () => AuthentifieRoute,
   } as any)
+const PostulerJetonRoute = PostulerJetonRouteImport.update({
+  id: '/postuler/$jeton',
+  path: '/postuler/$jeton',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthentifieCandidaturesIdRoute =
   AuthentifieCandidaturesIdRouteImport.update({
     id: '/candidatures/$id',
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof AuthentifieEquipeRoute
   '/offres': typeof AuthentifieOffresRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
+  '/postuler/$jeton': typeof PostulerJetonRoute
   '/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
   '/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
 }
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/equipe': typeof AuthentifieEquipeRoute
   '/offres': typeof AuthentifieOffresRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
+  '/postuler/$jeton': typeof PostulerJetonRoute
   '/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
   '/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
 }
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/_authentifie/equipe': typeof AuthentifieEquipeRoute
   '/_authentifie/offres': typeof AuthentifieOffresRoute
   '/_authentifie/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
+  '/postuler/$jeton': typeof PostulerJetonRoute
   '/_authentifie/candidatures/$id': typeof AuthentifieCandidaturesIdRoute
   '/_authentifie/invitation/$jeton': typeof AuthentifieInvitationJetonRoute
 }
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/offres'
     | '/tableau-de-bord'
+    | '/postuler/$jeton'
     | '/candidatures/$id'
     | '/invitation/$jeton'
   fileRoutesByTo: FileRoutesByTo
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/offres'
     | '/tableau-de-bord'
+    | '/postuler/$jeton'
     | '/candidatures/$id'
     | '/invitation/$jeton'
   id:
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/_authentifie/equipe'
     | '/_authentifie/offres'
     | '/_authentifie/tableau-de-bord'
+    | '/postuler/$jeton'
     | '/_authentifie/candidatures/$id'
     | '/_authentifie/invitation/$jeton'
   fileRoutesById: FileRoutesById
@@ -228,6 +240,7 @@ export interface RootRouteChildren {
   MotDePasseOublieRoute: typeof MotDePasseOublieRoute
   NouveauMotDePasseRoute: typeof NouveauMotDePasseRoute
   TarifsRoute: typeof TarifsRoute
+  PostulerJetonRoute: typeof PostulerJetonRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -330,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthentifieTableauDeBordRouteImport
       parentRoute: typeof AuthentifieRoute
     }
+    '/postuler/$jeton': {
+      id: '/postuler/$jeton'
+      path: '/postuler/$jeton'
+      fullPath: '/postuler/$jeton'
+      preLoaderRoute: typeof PostulerJetonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authentifie/candidatures/$id': {
       id: '/_authentifie/candidatures/$id'
       path: '/candidatures/$id'
@@ -380,6 +400,7 @@ const rootRouteChildren: RootRouteChildren = {
   MotDePasseOublieRoute: MotDePasseOublieRoute,
   NouveauMotDePasseRoute: NouveauMotDePasseRoute,
   TarifsRoute: TarifsRoute,
+  PostulerJetonRoute: PostulerJetonRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

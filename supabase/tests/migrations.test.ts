@@ -13,6 +13,7 @@ const B = '00000000-0000-0000-0000-00000000000b'
 const SIMULACRE_SUPABASE = `
   create role anon;
   create role authenticated;
+  create role service_role;
   create schema auth;
   create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as
@@ -42,7 +43,8 @@ beforeAll(async () => {
   for (const fichier of readdirSync(DOSSIER).sort()) {
     await db.exec(readFileSync(join(DOSSIER, fichier), 'utf8'))
   }
-})
+  // Démarrage de PGlite et 13 migrations : plusieurs secondes sur une machine chargée
+}, 60_000)
 
 beforeEach(async () => {
   await db.exec(`
@@ -693,11 +695,7 @@ describe('historique', () => {
       { action: 'cv_retire', details: {}, email: 'a@x.fr' },
       { action: 'note_ajoutee', details: {}, email: 'a@x.fr' },
       { action: 'note_supprimee', details: {}, email: 'a@x.fr' },
-      {
-        action: 'entretien_planifie',
-        details: { debut: '2026-11-03T14:00:00Z' },
-        email: 'a@x.fr',
-      },
+      { action: 'entretien_planifie', details: { debut: '2026-11-03T14:00:00Z' }, email: 'a@x.fr' },
     ])
     const lu = await enTant(A, () =>
       db.query(`select count(*)::int as n from public.historique where candidature_id = '${id}'`),
@@ -888,5 +886,135 @@ describe('relecture de sécurité', () => {
     )
     // Les fonctions utiles au site restent appelables par un utilisateur connecté
     await enTant(A, () => db.exec('select * from public.mon_espace()'))
+  })
+})
+
+describe('formulaire public', () => {
+  const JETON = '11111111-1111-1111-1111-111111111111'
+  const IP = 'empreinte-1'
+
+  beforeEach(async () => {
+    await db.exec(`
+      delete from prive.envois_formulaire;
+      grant usage on schema public to anon, service_role;
+      insert into public.offres (user_id, titre, description, publique, jeton_public)
+        values ('${A}', 'Développeur front', 'CDI à Lyon', true, '${JETON}');
+    `)
+  })
+
+  async function deposer(email: string, empreinte = IP, code = JETON) {
+    await db.exec('set role service_role')
+    try {
+      const { rows } = await db.query<{ resultat: string }>(
+        `select public.deposer_candidature_publique($1, $2, gen_random_uuid(), 'Alice Martin',
+           $3, array['React'], 4, null) as resultat`,
+        [code, empreinte, email],
+      )
+      return rows[0].resultat
+    } finally {
+      await db.exec('reset role')
+    }
+  }
+
+  it('l’offre publiée se lit sans compte, une offre non publiée non', async () => {
+    await db.exec('set role anon')
+    try {
+      const { rows } = await db.query(`select * from public.lire_offre_publique('${JETON}')`)
+      expect(rows).toEqual([
+        {
+          titre: 'Développeur front',
+          description: 'CDI à Lyon',
+          espace_nom: expect.any(String),
+          ouverte: true,
+        },
+      ])
+      await db.exec('reset role')
+      await db.exec(`update public.offres set publique = false`)
+      await db.exec('set role anon')
+      expect((await db.query(`select * from public.lire_offre_publique('${JETON}')`)).rows).toEqual(
+        [],
+      )
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+
+  it('seule la fonction serveur peut déposer une candidature', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`)
+      try {
+        await expect(
+          db.exec(`select public.deposer_candidature_publique('${JETON}', 'x', gen_random_uuid(),
+            'Pirate', 'p@x.fr', '{}', 0, null)`),
+        ).rejects.toThrow(/permission denied/)
+      } finally {
+        await db.exec('reset role')
+      }
+    }
+  })
+
+  it('crée la candidature dans l’espace de l’offre, notée « reception » dans l’historique', async () => {
+    expect(await deposer('alice@x.fr')).toBe('creee')
+    const { rows } = await db.query(
+      `select c.espace_id, c.user_id, c.source, c.statut, c.experience, c.competences,
+              o.titre, h.action, h.par_systeme
+       from public.candidatures c
+       join public.offres o on o.id = c.offre_id
+       join public.historique h on h.candidature_id = c.id`,
+    )
+    expect(rows).toEqual([
+      {
+        espace_id: A,
+        user_id: null,
+        source: 'formulaire',
+        statut: 'nouveau',
+        experience: 4,
+        competences: ['React'],
+        titre: 'Développeur front',
+        action: 'reception',
+        par_systeme: true,
+      },
+    ])
+  })
+
+  it('un candidat déjà présent n’est pas dupliqué : le nouvel envoi est noté sur sa fiche', async () => {
+    expect(await deposer('alice@x.fr')).toBe('creee')
+    expect(await deposer('ALICE@x.fr')).toBe('deja_recue')
+    const { rows } = await db.query(`select action, details from public.historique order by id`)
+    expect(rows).toEqual([
+      { action: 'reception', details: {} },
+      { action: 'nouvelle_postulation', details: { offre: 'Développeur front' } },
+    ])
+    expect(await nombre('candidatures', A)).toBe(0) // user_id null : créée par personne
+    const total = await db.query<{ n: number }>(
+      'select count(*)::int as n from public.candidatures',
+    )
+    expect(total.rows[0].n).toBe(1)
+  })
+
+  it('limite les envois par connexion et par heure', async () => {
+    for (let i = 1; i <= 5; i++) expect(await deposer(`c${i}@x.fr`)).toBe('creee')
+    await expect(deposer('c6@x.fr')).rejects.toThrow(/^trop_de_candidatures/)
+    // Une autre connexion n'est pas concernée ; les envois de plus d'une heure ne comptent plus
+    expect(await deposer('c7@x.fr', 'empreinte-2')).toBe('creee')
+    await db.exec(`update prive.envois_formulaire set created_at = now() - interval '2 hours'`)
+    expect(await deposer('c8@x.fr')).toBe('creee')
+  })
+
+  it('refuse une offre fermée ou inconnue, et respecte la limite Gratuite', async () => {
+    await expect(deposer('a@x.fr', IP, '22222222-2222-2222-2222-222222222222')).rejects.toThrow(
+      /^offre_fermee/,
+    )
+    await ajouter(A, noms(1, 50))
+    await db.exec('set role anon')
+    try {
+      const { rows } = await db.query<{ ouverte: boolean }>(
+        `select ouverte from public.lire_offre_publique('${JETON}')`,
+      )
+      expect(rows[0].ouverte).toBe(false)
+    } finally {
+      await db.exec('reset role')
+    }
+    await expect(deposer('b@x.fr')).rejects.toThrow(/^limite_gratuite/)
   })
 })

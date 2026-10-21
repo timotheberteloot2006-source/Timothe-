@@ -18,6 +18,10 @@ describe('decrireEvenement', () => {
     expect(decrire('cv_retire')).toBe('CV supprimé')
     expect(decrire('note_ajoutee')).toBe('Note ajoutée')
     expect(decrire('note_supprimee')).toBe('Note supprimée')
+    expect(decrire('reception')).toBe('Candidature reçue par le formulaire en ligne')
+    expect(decrire('nouvelle_postulation', { offre: 'Data analyst' })).toBe(
+      'A postulé à nouveau (offre : Data analyst)',
+    )
   })
 
   it('indique la date des entretiens, à l’heure locale', () => {
@@ -42,6 +46,7 @@ describe('auteur', () => {
     user_id: null,
     email: null,
     par_systeme: false,
+    action: 'statut',
     ...champs,
   })
 
@@ -50,5 +55,12 @@ describe('auteur', () => {
     expect(auteur(evenement({ user_id: 'u2', email: 'b@x.fr' }), 'u1')).toBe('b@x.fr')
     expect(auteur(evenement({}), 'u1')).toBe('compte supprimé')
     expect(auteur(evenement({ par_systeme: true }), 'u1')).toBe('automatique')
+  })
+
+  it('attribue au candidat ce qu’il a envoyé par le formulaire en ligne', () => {
+    expect(auteur(evenement({ par_systeme: true, action: 'reception' }))).toBe('le candidat')
+    expect(auteur(evenement({ par_systeme: true, action: 'nouvelle_postulation' }))).toBe(
+      'le candidat',
+    )
   })
 })

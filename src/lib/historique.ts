@@ -36,14 +36,18 @@ export async function listerHistorique(
 
 // Auteur affiché : « vous », l'e-mail d'un autre membre, ou ce qu'il en reste
 export function auteur(
-  evenement: Pick<Evenement, 'user_id' | 'email' | 'par_systeme'>,
+  evenement: Pick<Evenement, 'user_id' | 'email' | 'par_systeme' | 'action'>,
   userId?: string,
 ) {
+  // Envoyé par le candidat depuis le formulaire public (supabase/functions/postuler)
+  if (evenement.par_systeme && ACTIONS_CANDIDAT.has(evenement.action)) return 'le candidat'
   if (evenement.par_systeme) return 'automatique'
   if (evenement.user_id && evenement.user_id === userId) return 'vous'
   // La suppression d'un compte efface son e-mail de l'historique
   return evenement.email ?? 'compte supprimé'
 }
+
+const ACTIONS_CANDIDAT = new Set(['reception', 'nouvelle_postulation'])
 
 const LIBELLES_CHAMPS: Record<string, string> = {
   nom: 'nom',
@@ -60,6 +64,12 @@ export function decrireEvenement(evenement: Pick<Evenement, 'action' | 'details'
   switch (action) {
     case 'creation':
       return 'Candidature créée'
+    case 'reception':
+      return 'Candidature reçue par le formulaire en ligne'
+    case 'nouvelle_postulation':
+      return typeof details.offre === 'string'
+        ? `A postulé à nouveau (offre : ${details.offre})`
+        : 'A postulé à nouveau'
     case 'statut': {
       const libelle = (s: unknown) => LIBELLES_STATUT[s as Statut] ?? String(s)
       return `Statut : ${libelle(details.avant)} → ${libelle(details.apres)}`

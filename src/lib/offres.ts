@@ -7,6 +7,10 @@ export interface Offre {
   titre: string
   created_at: string
   nb_candidatures: number
+  // Formulaire de candidature public (supabase/migrations/0013_formulaire_public.sql)
+  description: string | null
+  publique: boolean
+  jeton_public: string
 }
 
 function table() {
@@ -22,7 +26,7 @@ function erreurOffre(error: PostgrestError) {
 
 export async function listerOffres(): Promise<Offre[]> {
   const { data, error } = await table()
-    .select('id, titre, created_at, candidatures(count)')
+    .select('id, titre, created_at, description, publique, jeton_public, candidatures(count)')
     .order('titre')
   if (error) throw erreurOffre(error)
   // candidatures(count) renvoie [{ count: n }]
@@ -39,6 +43,21 @@ export async function creerOffre(titre: string) {
 
 export async function renommerOffre(id: string, titre: string) {
   const { error } = await table().update({ titre: titre.trim() }).eq('id', id)
+  if (error) throw erreurOffre(error)
+}
+
+// Formulaire public : ouvert ou fermé, et texte présenté aux candidats
+export async function modifierFormulaire(
+  id: string,
+  champs: Partial<Pick<Offre, 'publique' | 'description'>>,
+) {
+  const { error } = await table().update(champs).eq('id', id)
+  if (error) throw erreurOffre(error)
+}
+
+// Nouveau lien : l'ancien ne fonctionne plus (s'il a été diffusé trop largement)
+export async function nouveauLienFormulaire(id: string) {
+  const { error } = await table().update({ jeton_public: crypto.randomUUID() }).eq('id', id)
   if (error) throw erreurOffre(error)
 }
 

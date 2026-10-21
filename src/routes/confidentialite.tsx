@@ -31,6 +31,19 @@ function Confidentialite() {
         </li>
       </ul>
 
+      <h2>Vous postulez par un formulaire en ligne</h2>
+      <p>
+        Si vous envoyez votre candidature depuis le formulaire d’une offre, vos informations (nom,
+        e-mail, expérience, compétences, CV) sont transmises au recruteur qui a publié l’offre,
+        indiqué sur le formulaire. C’est lui le responsable du traitement : adressez-lui vos
+        demandes d’accès, de rectification ou d’effacement. L’éditeur les conserve pour son compte,
+        comme sous-traitant.
+      </p>
+      <p>
+        Pour limiter les envois abusifs, une empreinte non réversible de votre adresse IP est
+        conservée une journée au plus ; l’adresse elle-même n’est pas enregistrée.
+      </p>
+
       <h2>Données collectées sur votre compte</h2>
       <ul>
         <li>

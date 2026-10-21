@@ -12,7 +12,7 @@ Deux commandes accompagnent le guide :
 |---|---|
 | `npm run verifier:config` | Contrôle les fichiers `.env` et `supabase/functions/.env` : valeurs manquantes, clé secrète publiée par erreur, clé d'un autre projet… |
 | `npm run verifier:config -- --distant` | Interroge aussi Supabase et Stripe, en lecture seule : migrations appliquées, fonctions déployées, webhook, prix, portail client |
-| `npm run deployer:supabase` | Applique les migrations manquantes, envoie les secrets et déploie les trois fonctions. Peut être relancée sans risque |
+| `npm run deployer:supabase` | Applique les migrations manquantes, envoie les secrets et déploie les quatre fonctions (paiement, webhook, formulaire public). Peut être relancée sans risque |
 
 Elles s'utilisent depuis le dossier du projet, avec Node 22 (`npm install` fait une fois).
 Sous Windows, lancer `deployer:supabase` depuis Git Bash ou WSL, ou taper ses commandes à la main
@@ -98,11 +98,11 @@ Le script affiche les migrations qu'il va appliquer et demande confirmation.
 > sans rien casser). Déclarer d'abord ce qui est déjà en place, puis relancer le script :
 > ```bash
 > npx supabase migration repair --status applied 0001 0002 0003 0004 0005 0006 0007 0008 0009 0010
-> npm run deployer:supabase    # n'applique plus que 0011 et 0012
+> npm run deployer:supabase    # n'applique plus que 0011, 0012 et 0013
 > ```
-> Sans la CLI, on peut aussi exécuter `0011_historique_corrections.sql` puis
-> `0012_relecture_securite.sql` dans le *SQL Editor* : les deux méthodes ne doivent simplement
-> pas être mélangées par la suite.
+> Sans la CLI, on peut aussi exécuter `0011_historique_corrections.sql`,
+> `0012_relecture_securite.sql` puis `0013_formulaire_public.sql` dans le *SQL Editor* : les deux
+> méthodes ne doivent simplement pas être mélangées par la suite.
 
 ## Étape 4 — Webhook Stripe
 
@@ -119,9 +119,10 @@ Le script affiche les migrations qu'il va appliquer et demande confirmation.
    ```bash
    npm run verifier:config -- --distant
    ```
-   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0012 » et
-   « webhook-stripe déployée et joignable par Stripe ». Si la fonction « refuse les appels sans
-   jeton », elle a été déployée sans `--no-verify-jwt` : relancer le script.
+   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0013 »,
+   « webhook-stripe déployée et joignable par Stripe » et « postuler déployée et ouverte aux
+   candidats ». Si une fonction « refuse les appels sans jeton », elle a été déployée sans
+   `--no-verify-jwt` : relancer le script.
 
 ## Étape 5 — Hébergement
 
@@ -157,6 +158,9 @@ Avec une vraie adresse e-mail, sur le site en ligne :
       horloge de test Stripe (*Test clocks*) jusqu'au renouvellement. *Mon compte* signale le
       paiement en attente, et *Tarifs* propose « Gérer mon abonnement » au lieu d'un second
       abonnement.
+- [ ] Formulaire public : sur *Offres*, ouvrir « Formulaire de candidature », cocher
+      « Formulaire en ligne », copier le lien et l'ouvrir dans une fenêtre privée. Postuler avec
+      un CV : la candidature apparaît dans la liste, avec son CV, rattachée à l'offre.
 - [ ] Invitation : depuis *Équipe*, créer un lien, l'ouvrir dans une fenêtre privée, créer un
       second compte depuis ce lien : on revient à l'invitation après confirmation.
 - [ ] *Gérer mon abonnement > Résilier* : l'offre reste Pro jusqu'à la fin de la période, et la

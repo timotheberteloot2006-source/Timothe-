@@ -19,6 +19,8 @@ export interface CandidatureFaux {
   cv_chemin: string | null
   offre_id: string | null
   espace_id: string
+  // Déposée par le candidat (formulaire public)
+  source?: 'formulaire'
 }
 
 interface EspaceFaux {
@@ -60,6 +62,9 @@ interface OffreFaux {
   espace_id: string
   titre: string
   created_at: string
+  description: string | null
+  publique: boolean
+  jeton_public: string
 }
 
 interface NoteFaux {
@@ -168,13 +173,19 @@ export class FauxSupabase {
     return userId
   }
 
-  journaliser(candidatureId: string, action: string, details: Record<string, unknown> = {}) {
+  // parSysteme : action sans utilisateur connecté (ex. formulaire public)
+  journaliser(
+    candidatureId: string,
+    action: string,
+    details: Record<string, unknown> = {},
+    parSysteme = false,
+  ) {
     this.historique.push({
       id: this.historique.length + 1,
       candidature_id: candidatureId,
-      user_id: this.utilisateur.id,
-      email: this.utilisateur.email,
-      par_systeme: false,
+      user_id: parSysteme ? null : this.utilisateur.id,
+      email: parSysteme ? null : this.utilisateur.email,
+      par_systeme: parSysteme,
       action,
       details,
       created_at: new Date().toISOString(),
@@ -208,14 +219,18 @@ export class FauxSupabase {
     return this
   }
 
-  ajouterOffre(titre: string) {
+  ajouterOffre(titre: string, champs: Partial<OffreFaux> = {}) {
     this.compteur++
-    const offre = {
+    const offre: OffreFaux = {
       id: crypto.randomUUID(),
       user_id: this.utilisateur.id,
       espace_id: this.espaceActif,
       titre,
       created_at: new Date(Date.UTC(2026, 0, 1, 0, this.compteur)).toISOString(),
+      description: null,
+      publique: false,
+      jeton_public: crypto.randomUUID(),
+      ...champs,
     }
     this.offres.push(offre)
     return offre
@@ -358,6 +373,28 @@ export class FauxSupabase {
     }
     if (chemin.startsWith('/storage/v1/object/sign/')) {
       return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4' })
+    }
+
+    // Formulaire public (supabase/migrations/0013_formulaire_public.sql et functions/postuler)
+    if (chemin === '/rest/v1/rpc/lire_offre_publique') {
+      const { code } = corps(requete) as { code: string }
+      const offre = this.offres.find((o) => o.jeton_public === code && o.publique)
+      const ligne = offre && {
+        titre: offre.titre,
+        description: offre.description,
+        espace_nom: this.espaces.find((e) => e.id === offre.espace_id)?.nom,
+        ouverte: this.abonnement?.statut === 'active' || this.candidatures.length < 50,
+      }
+      const objet = (requete.headers()['accept'] ?? '').includes('vnd.pgrst.object')
+      if (!objet) return json(ligne ? [ligne] : [])
+      if (ligne) return json(ligne)
+      return json(
+        { code: 'PGRST116', details: 'The result contains 0 rows', message: 'no rows' },
+        406,
+      )
+    }
+    if (chemin === '/functions/v1/postuler' && methode === 'POST') {
+      return this.postuler(route, json)
     }
 
     // Fonctions de paiement
@@ -713,9 +750,9 @@ export class FauxSupabase {
       return json(undefined, 201)
     }
     if (methode === 'PATCH') {
-      const { titre } = corps(requete) as { titre: string }
-      if (titrePris(titre, ids?.[0])) return json(doublon, 409)
-      this.offres.filter((o) => ids?.includes(o.id)).forEach((o) => (o.titre = titre))
+      const champs = corps(requete) as Partial<OffreFaux>
+      if (champs.titre && titrePris(champs.titre, ids?.[0])) return json(doublon, 409)
+      this.offres.filter((o) => ids?.includes(o.id)).forEach((o) => Object.assign(o, champs))
       return json(undefined, 204)
     }
     if (methode === 'DELETE') {
@@ -727,6 +764,57 @@ export class FauxSupabase {
       return json(undefined, 204)
     }
     return json({}, 405)
+  }
+
+  // Imite supabase/functions/postuler et deposer_candidature_publique (sans compte)
+  envoisFormulaire: Record<string, string>[] = []
+  // Erreur renvoyée par la fonction au prochain envoi, ex. limite d'envois atteinte
+  erreurPostuler: { erreur: string; status: number } | null = null
+
+  private postuler(route: Route, json: Repondre) {
+    const requete = route.request()
+    const { champs, fichiers } = lireMultipart(
+      requete.headers()['content-type'] ?? '',
+      requete.postDataBuffer() ?? Buffer.alloc(0),
+    )
+    this.envoisFormulaire.push(champs)
+    if (this.erreurPostuler)
+      return json({ erreur: this.erreurPostuler.erreur }, this.erreurPostuler.status)
+    const offre = this.offres.find((o) => o.jeton_public === champs.jeton && o.publique)
+    if (!offre) return json({ erreur: 'Cette offre n’accepte plus de candidatures.' }, 409)
+    const existante = this.candidatures.find(
+      (c) =>
+        c.espace_id === offre.espace_id && c.email?.toLowerCase() === champs.email.toLowerCase(),
+    )
+    if (existante) {
+      this.journaliser(existante.id, 'nouvelle_postulation', { offre: offre.titre }, true)
+      return json({ recu: true })
+    }
+    const id = crypto.randomUUID()
+    const cv = fichiers.cv?.length ? `${offre.espace_id}/${id}/cv.pdf` : null
+    if (cv) this.fichiers.add(cv)
+    this.candidatures.push({
+      id,
+      user_id: null as unknown as string,
+      nom: champs.nom,
+      email: champs.email,
+      poste: null,
+      competences: champs.competences
+        ? champs.competences
+            .split(',')
+            .map((c) => c.trim())
+            .filter(Boolean)
+        : [],
+      experience: Number(champs.experience || 0),
+      statut: 'nouveau',
+      created_at: new Date().toISOString(),
+      cv_chemin: cv,
+      offre_id: offre.id,
+      espace_id: offre.espace_id,
+      source: 'formulaire',
+    })
+    this.journaliser(id, 'reception', {}, true)
+    return json({ recu: true })
   }
 
   // Simule l'index unique (utilisateur, lower(email))
@@ -777,4 +865,23 @@ export async function seConnecter(page: Page, faux: FauxSupabase) {
   await page.getByLabel('Mot de passe').fill(MOT_DE_PASSE)
   await page.getByRole('button', { name: 'Se connecter' }).click()
   await page.waitForURL('**/tableau-de-bord')
+}
+
+// Corps multipart/form-data : champs texte et contenu des fichiers
+function lireMultipart(typeContenu: string, corps: Buffer) {
+  const limite = typeContenu.match(/boundary=(?:"([^"]+)"|([^;]+))/)
+  const champs: Record<string, string> = {}
+  const fichiers: Record<string, Buffer> = {}
+  if (!limite) return { champs, fichiers }
+  const separateur = `--${limite[1] ?? limite[2]}`
+  for (const partie of corps.toString('latin1').split(separateur).slice(1, -1)) {
+    const fin = partie.indexOf('\r\n\r\n')
+    const entetes = partie.slice(0, fin)
+    const contenu = partie.slice(fin + 4, -2)
+    const nom = entetes.match(/name="([^"]+)"/)?.[1]
+    if (!nom) continue
+    if (/filename="/.test(entetes)) fichiers[nom] = Buffer.from(contenu, 'latin1')
+    else champs[nom] = Buffer.from(contenu, 'latin1').toString('utf8')
+  }
+  return { champs, fichiers }
 }

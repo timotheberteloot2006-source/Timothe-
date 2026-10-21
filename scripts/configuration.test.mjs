@@ -131,16 +131,25 @@ function fauxFetch(repondre) {
 function supabaseComplet(methode, url) {
   if (url.endsWith('/auth/v1/settings')) return [200, { external: { email: true } }]
   if (url.endsWith('/webhook-stripe')) return [400, { erreur: 'Signature manquante.' }]
+  if (url.endsWith('/postuler')) return [400, { erreur: 'Formulaire illisible.' }]
   return undefined
 }
 
 describe('verifierSupabase', () => {
   it('projet prêt', async () => {
     const { fetch, appels } = fauxFetch(supabaseComplet)
-    expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual(['ok', 'ok', 'ok', 'ok', 'ok'])
+    expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual([
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+    ])
     // Seulement des lectures, et l'appel au webhook sans signature (refusé par la fonction)
     expect(appels.filter((a) => !a.startsWith('GET ') && !a.startsWith('OPTIONS '))).toEqual([
       `POST ${URL_PROJET}/functions/v1/webhook-stripe`,
+      `POST ${URL_PROJET}/functions/v1/postuler`,
     ])
   })
 
@@ -157,17 +166,20 @@ describe('verifierSupabase', () => {
     const { fetch } = fauxFetch((methode, url) => {
       if (url.includes('select=par_systeme')) return [400, { code: '42703' }]
       if (url.includes('select=stripe_evenement_le')) return [400, { code: '42703' }]
+      if (url.includes('/offres?select=jeton_public')) return [400, { code: '42703' }]
       if (url.endsWith('/portail-client')) return [404, {}]
       if (url.endsWith('/webhook-stripe')) return [401, { msg: 'Missing authorization header' }]
+      if (url.endsWith('/postuler')) return [401, { msg: 'Missing authorization header' }]
       if (url.endsWith('/auth/v1/settings'))
         return [200, { external: { email: true }, mailer_autoconfirm: true }]
       return undefined
     })
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
-      expect.stringContaining('à partir de 0011 : 0011, 0012 manquent'),
+      expect.stringContaining('à partir de 0011 : 0011, 0012, 0013 manquent'),
       'Fonction portail-client non déployée.',
-      expect.stringContaining('--no-verify-jwt'),
+      expect.stringContaining('webhook-stripe refuse'),
+      expect.stringContaining('postuler refuse'),
     ])
     expect(resultats.find((r) => r.niveau === 'attention')?.message).toContain('Confirm email')
   })
@@ -182,7 +194,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0012')
+    expect(MIGRATIONS.at(-1).numero).toBe('0013')
   })
 })
 

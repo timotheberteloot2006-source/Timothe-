@@ -84,6 +84,23 @@ candidatures (formulaire, ou d'un coup à l'import CSV) ; le tableau de bord fil
 « Sans offre ». La base garantit qu'une candidature ne vise qu'une offre du même utilisateur ;
 supprimer une offre conserve ses candidatures, détachées.
 
+Chaque offre peut avoir un **formulaire de candidature public** (page **Offres**, « Formulaire de
+candidature ») : une fois en ligne, son lien `/postuler/<lien secret>` permet aux candidats de
+postuler sans compte, avec leur CV en PDF. La candidature arrive dans la liste, rattachée à
+l'offre, et son historique indique « Candidature reçue par le formulaire en ligne ».
+
+- L'envoi passe par la fonction `supabase/functions/postuler` (déployée avec `--no-verify-jwt`),
+  qui contrôle les champs et le PDF, puis par la fonction SQL `deposer_candidature_publique`
+  (`supabase/migrations/0013_formulaire_public.sql`), seule autorisée à écrire.
+- Contre le spam : champ piège invisible, envoi trop rapide ignoré, 5 envois par heure et par
+  connexion (empreinte non réversible de l'adresse IP, gardée un jour).
+- Un candidat déjà présent dans l'espace (même e-mail) n'est pas dupliqué : le nouvel envoi est
+  noté dans l'historique de sa fiche. Il reçoit le même message de confirmation, pour ne pas
+  révéler qui figure dans la base.
+- En offre Gratuite, le formulaire indique qu'il n'accepte plus de candidatures quand l'espace
+  atteint 50 candidatures.
+- « Nouveau lien » désactive l'ancien, s'il a été trop diffusé.
+
 Sur la fiche d'une candidature, on planifie des **entretiens** (date, durée, lieu ou lien de
 visio) et on les ajoute à son agenda grâce à un fichier `.ics` (Google Agenda, Outlook, Apple
 Calendrier…). Le tableau de bord affiche les entretiens à venir et la date du prochain sur chaque
@@ -125,7 +142,9 @@ Deux offres : **Gratuite** (50 candidatures au plus, limite imposée par la base
    supabase functions deploy creer-checkout
    supabase functions deploy portail-client
    supabase functions deploy webhook-stripe --no-verify-jwt
+   supabase functions deploy postuler --no-verify-jwt
    ```
+   (ou simplement `npm run deployer:supabase`, voir [`docs/MISE_EN_LIGNE.md`](docs/MISE_EN_LIGNE.md))
 4. Dans Stripe, *Developers > Webhooks* : ajouter l'adresse
    `https://<id-du-projet>.supabase.co/functions/v1/webhook-stripe` avec les événements
    `customer.subscription.created`, `customer.subscription.updated` et

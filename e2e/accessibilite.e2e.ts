@@ -101,6 +101,29 @@ for (const schema of ['light', 'dark'] as const) {
       expect(await auditer(page)).toEqual([])
     })
 
+    test('formulaire de candidature public', async ({ page }) => {
+      const faux = new FauxSupabase()
+      await faux.installer(page)
+      const offre = faux.ajouterOffre('Développeur front', {
+        publique: true,
+        description: 'CDI à Lyon.',
+      })
+      await page.goto(`/postuler/${offre.jeton_public}`)
+      await expect(page.locator('h1')).toHaveText('Développeur front')
+      expect(await auditer(page)).toEqual([])
+    })
+
+    test('réglages du formulaire public (page Offres)', async ({ page }) => {
+      const faux = new FauxSupabase()
+      await faux.installer(page)
+      faux.ajouterOffre('Développeur front', { publique: true })
+      await seConnecter(page, faux)
+      await page.goto('/offres')
+      await page.getByText('Formulaire de candidature').click()
+      await expect(page.getByLabel('Lien à diffuser')).toBeVisible()
+      expect(await auditer(page)).toEqual([])
+    })
+
     test('panneaux ouverts du tableau de bord', async ({ page }) => {
       const faux = new FauxSupabase()
       await faux.installer(page)
@@ -112,11 +135,13 @@ for (const schema of ['light', 'dark'] as const) {
       expect(await auditer(page)).toEqual([])
       await page.getByRole('button', { name: 'Fermer' }).click()
       await page.getByRole('button', { name: 'Importer un CSV' }).click()
-      await page.getByLabel('Fichier CSV').setInputFiles({
-        name: 'a.csv',
-        mimeType: 'text/csv',
-        buffer: Buffer.from('nom;experience\nAlice Martin;2\nX;deux\nNouveau;1\n'),
-      })
+      await page
+        .getByLabel('Fichier CSV')
+        .setInputFiles({
+          name: 'a.csv',
+          mimeType: 'text/csv',
+          buffer: Buffer.from('nom;experience\nAlice Martin;2\nX;deux\nNouveau;1\n'),
+        })
       expect(await auditer(page)).toEqual([])
     })
   })

@@ -50,6 +50,8 @@ echo "3/3 Fonctions (sans Docker)"
 "${SUPABASE[@]}" functions deploy portail-client --use-api
 # Stripe n'envoie pas de jeton Supabase : l'authenticité vient de la signature du webhook
 "${SUPABASE[@]}" functions deploy webhook-stripe --no-verify-jwt --use-api
+# Formulaire public : le candidat n'a pas de compte (contrôles faits par la fonction et la base)
+"${SUPABASE[@]}" functions deploy postuler --no-verify-jwt --use-api
 
 echo
 echo "Terminé. Vérifiez avec : npm run verifier:config -- --distant"
