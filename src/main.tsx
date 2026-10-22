@@ -5,6 +5,7 @@ import './index.css'
 import { AuthProvider } from './components/AuthProvider'
 import { useAuth } from './lib/auth'
 import { routeTree } from './routeTree.gen'
+import { oublierDonnees } from './lib/rechargement'
 
 const router = createRouter({
   routeTree,
@@ -29,6 +30,8 @@ function InnerApp() {
   useEffect(() => {
     if (auth.chargement) return
     if (userIdPrecedent.current !== undefined && userIdPrecedent.current !== userId) {
+      // Rien des pages de l'ancien compte ne doit resservir en cas de panne
+      oublierDonnees()
       router.invalidate()
     }
     userIdPrecedent.current = userId

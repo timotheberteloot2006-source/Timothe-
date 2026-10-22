@@ -15,26 +15,27 @@ import {
   type Periode,
 } from '@/lib/indicateurs'
 import { listerOffres } from '@/lib/offres'
-import { rechargementALaDemande } from '@/lib/rechargement'
+import { rechargementALaDemande, sansInterruption } from '@/lib/rechargement'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/statistiques')({
   head: () => titrePage('Statistiques'),
   validateSearch: lirePeriode,
-  loader: async () => {
-    const [candidatures, etapes, offres, etiquettes, attributions, datesRetenues] =
-      await Promise.all([
-        listerCandidatures(),
-        // Bases pas encore à jour (migrations 0015 et 0022) : étapes habituelles, sans étiquette
-        listerEtapes().catch(() => ETAPES_DE_BASE),
-        listerOffres(),
-        listerEtiquettes().catch(() => []),
-        listerAttributions().catch(() => new Map<string, string[]>()),
-        // Le délai est secondaire : son échec n'empêche pas d'afficher le reste
-        listerDatesRetenues().catch(() => new Map<string, string>()),
-      ])
-    return { candidatures, etapes, offres, etiquettes, attributions, datesRetenues }
-  },
+  loader: (contexte) =>
+    sansInterruption('statistiques', contexte, async () => {
+      const [candidatures, etapes, offres, etiquettes, attributions, datesRetenues] =
+        await Promise.all([
+          listerCandidatures(),
+          // Bases pas encore à jour (migrations 0015 et 0022) : étapes habituelles, sans étiquette
+          listerEtapes().catch(() => ETAPES_DE_BASE),
+          listerOffres(),
+          listerEtiquettes().catch(() => []),
+          listerAttributions().catch(() => new Map<string, string[]>()),
+          // Le délai est secondaire : son échec n'empêche pas d'afficher le reste
+          listerDatesRetenues().catch(() => new Map<string, string>()),
+        ])
+      return { candidatures, etapes, offres, etiquettes, attributions, datesRetenues }
+    }),
   ...rechargementALaDemande,
   component: PageStatistiques,
   errorComponent: ({ error }) => (

@@ -150,6 +150,7 @@ describe('verifierSupabase', () => {
     expect(appels.filter((a) => !a.startsWith('GET ') && !a.startsWith('OPTIONS '))).toEqual([
       `POST ${URL_PROJET}/rest/v1/rpc/deplacer_etape`,
       `POST ${URL_PROJET}/rest/v1/rpc/noter_reponse_envoyee`,
+      `POST ${URL_PROJET}/rest/v1/rpc/version_schema`,
       `POST ${URL_PROJET}/functions/v1/webhook-stripe`,
       `POST ${URL_PROJET}/functions/v1/rappels-entretiens`,
       `POST ${URL_PROJET}/functions/v1/postuler`,
@@ -187,6 +188,7 @@ describe('verifierSupabase', () => {
       if (url.endsWith('/postuler')) return [401, { msg: 'Missing authorization header' }]
       if (url.endsWith('/cv-partage')) return [404, {}]
       if (url.includes('/partages?select=jeton')) return [404, { code: 'PGRST205' }]
+      if (url.endsWith('/rpc/version_schema')) return [404, { code: 'PGRST202' }]
       if (url.endsWith('/auth/v1/settings'))
         return [200, { external: { email: true }, mailer_autoconfirm: true }]
       return undefined
@@ -194,7 +196,7 @@ describe('verifierSupabase', () => {
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
       expect.stringContaining(
-        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023 manquent',
+        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024 manquent',
       ),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
@@ -214,7 +216,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0023')
+    expect(MIGRATIONS.at(-1).numero).toBe('0024')
   })
 })
 

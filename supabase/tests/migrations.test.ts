@@ -674,8 +674,9 @@ describe('historique', () => {
       await db.exec(
         `update public.candidatures set poste = 'Dev', competences = '{React}' where id = '${c}'`,
       )
-      await db.exec(`update public.candidatures set cv_chemin = 'a/1.pdf' where id = '${c}'`)
-      await db.exec(`update public.candidatures set cv_chemin = 'a/2.pdf' where id = '${c}'`)
+      const chemin = (n: number) => `espace_id || '/' || id || '/${n}.pdf'`
+      await db.exec(`update public.candidatures set cv_chemin = ${chemin(1)} where id = '${c}'`)
+      await db.exec(`update public.candidatures set cv_chemin = ${chemin(2)} where id = '${c}'`)
       await db.exec(`update public.candidatures set cv_chemin = null where id = '${c}'`)
       await db.exec(`insert into public.notes (candidature_id, contenu) values ('${c}', 'Bien')`)
       await db.exec(`delete from public.notes where candidature_id = '${c}'`)
@@ -858,14 +859,18 @@ describe('relecture de sécurité', () => {
 
   it('liste les CV des espaces possédés, quel que soit l’espace actif', async () => {
     await db.exec(
-      `insert into public.candidatures (user_id, nom, cv_chemin) values
-         ('${A}', 'Avec CV', '${A}/c1/cv.pdf'), ('${A}', 'Sans CV', null),
-         ('${B}', 'De B', '${B}/c2/cv.pdf')`,
+      `insert into public.candidatures (user_id, nom) values
+         ('${A}', 'Avec CV'), ('${A}', 'Sans CV'), ('${B}', 'De B');
+       update public.candidatures set cv_chemin = espace_id || '/' || id || '/cv.pdf'
+       where nom in ('Avec CV', 'De B')`,
     )
+    const avecCv = (
+      await db.query<{ id: string }>(`select id from public.candidatures where nom = 'Avec CV'`)
+    ).rows[0].id
     const { rows } = await enTant(A, () =>
       db.query<{ chemins: string[] }>('select public.cv_de_mes_espaces() as chemins'),
     )
-    expect(rows[0].chemins).toEqual([`${A}/c1/cv.pdf`])
+    expect(rows[0].chemins).toEqual([`${A}/${avecCv}/cv.pdf`])
   })
 
   it('ne laisse appeler aucune fonction sans compte, ni celles qui renseignent sur autrui', async () => {
@@ -2060,10 +2065,13 @@ describe('partages', () => {
       update public.profils set espace_actif = '${A}' where user_id = '${B}';
     `)
     await db.exec(
-      `insert into public.candidatures (user_id, nom, email, poste, competences, experience, cv_chemin)
-       values ('${A}', 'Alice', 'alice@x.fr', 'Développeuse', '{React,SQL}', 5, '${A}/c/cv.pdf')`,
+      `insert into public.candidatures (user_id, nom, email, poste, competences, experience)
+       values ('${A}', 'Alice', 'alice@x.fr', 'Développeuse', '{React,SQL}', 5)`,
     )
     alice = (await db.query<{ id: string }>(`select id from public.candidatures`)).rows[0].id
+    await db.exec(
+      `update public.candidatures set cv_chemin = '${A}/${alice}/cv.pdf' where id = '${alice}'`,
+    )
     await db.exec(
       `insert into public.notes (candidature_id, contenu) values ('${alice}', 'Très bon entretien')`,
     )
@@ -2123,9 +2131,14 @@ describe('partages', () => {
     })
     expect(JSON.stringify(partage)).not.toContain('alice@x.fr')
     expect(JSON.stringify(partage)).not.toContain('cv.pdf')
+    // Une consultation par minute au plus : le compteur ne se gonfle pas en rechargeant
     await lire(jeton)
     const { rows } = await db.query(`select user_id, consultations from public.partages`)
-    expect(rows).toEqual([{ user_id: B, consultations: 2 }])
+    expect(rows).toEqual([{ user_id: B, consultations: 1 }])
+    await db.exec(`update public.partages set derniere_consultation = now() - interval '2 minutes'`)
+    await lire(jeton)
+    const apres = await db.query(`select consultations from public.partages`)
+    expect(apres.rows).toEqual([{ consultations: 2 }])
   })
 
   it('notes et CV seulement s’ils sont inclus ; le chemin du CV réservé au serveur', async () => {
@@ -2139,7 +2152,7 @@ describe('partages', () => {
       db.query<{ c: string | null }>(`select public.cv_du_partage($1) as c`, [code])
     await db.exec('set role service_role')
     try {
-      expect((await chemin(avec.jeton)).rows[0].c).toBe(`${A}/c/cv.pdf`)
+      expect((await chemin(avec.jeton)).rows[0].c).toBe(`${A}/${alice}/cv.pdf`)
       expect((await chemin(sans.jeton)).rows[0].c).toBeNull()
     } finally {
       await db.exec('reset role')
@@ -2240,7 +2253,7 @@ describe('partages', () => {
           `insert into public.partages (candidature_id, expire_le) values ('${chezB}', now() + interval '1 day')`,
         ),
       ),
-    ).rejects.toThrow(/row-level security/)
+    ).rejects.toThrow(/^candidature_inaccessible/)
     // Ni lire, ni révoquer depuis un autre espace actif
     await db.exec(`update public.profils set espace_actif = '${B}' where user_id = '${B}'`)
     await enTant(B, async () => {
@@ -2249,6 +2262,102 @@ describe('partages', () => {
         (await db.query<{ r: boolean }>(`select public.revoquer_partage($1) as r`, [id])).rows[0].r,
       ).toBe(false)
     })
+  })
+
+  it('relecture 4 : chemin de CV forgé refusé, CV d’un autre espace jamais signé', async () => {
+    await db.exec(`insert into public.candidatures (user_id, nom) values ('${B}', 'Chez B')`)
+    const chezB = (
+      await db.query<{ id: string }>(`select id from public.candidatures where nom = 'Chez B'`)
+    ).rows[0].id
+    // Chemin d'un CV de l'espace B écrit dans une candidature de A
+    await expect(
+      enTant(A, () =>
+        db.exec(
+          `update public.candidatures set cv_chemin = '${B}/${chezB}/cv.pdf' where id = '${alice}'`,
+        ),
+      ),
+    ).rejects.toThrow(/candidatures_cv_chemin_check/)
+    await expect(
+      db.exec(
+        `update public.candidatures set cv_chemin = '${A}/${alice}/../x.pdf' where id = '${alice}'`,
+      ),
+    ).rejects.toThrow(/candidatures_cv_chemin_check/)
+    // Ligne forgée avant la contrainte (non revérifiée) : le partage ne la signe pas
+    await db.exec(`
+      alter table public.candidatures drop constraint candidatures_cv_chemin_check;
+      update public.candidatures set cv_chemin = '${B}/${chezB}/cv.pdf' where id = '${alice}';
+    `)
+    try {
+      const { jeton } = await creer(A, `true, false, now() + interval '1 day'`)
+      expect(await lire(jeton)).toMatchObject({ cv: false })
+      await db.exec('set role service_role')
+      try {
+        const { rows } = await db.query<{ c: string | null }>(
+          `select public.cv_du_partage($1) as c`,
+          [jeton],
+        )
+        expect(rows[0].c).toBeNull()
+      } finally {
+        await db.exec('reset role')
+      }
+    } finally {
+      await db.exec(`
+        update public.candidatures set cv_chemin = null where id = '${alice}';
+        alter table public.candidatures add constraint candidatures_cv_chemin_check check (
+          cv_chemin is null or cv_chemin ~ ('^' || espace_id::text || '/' || id::text || '/[^/]+$')
+        ) not valid;
+      `)
+    }
+  })
+
+  it('relecture 4 : les liens d’un membre retiré de l’espace sont révoqués', async () => {
+    const deB = await creer(B)
+    const deA = await creer(A)
+    await db.exec(`delete from public.membres where espace_id = '${A}' and user_id = '${B}'`)
+    expect(await lire(deB.jeton)).toBeNull()
+    expect(await lire(deA.jeton)).not.toBeNull()
+    const { rows } = await db.query<{ revoque: boolean }>(
+      `select revoque_le is not null as revoque from public.partages where id = '${deB.id}'`,
+    )
+    expect(rows).toEqual([{ revoque: true }])
+  })
+
+  it('relecture 4 : notes figées à la création du lien', async () => {
+    const { jeton } = await creer(A, `false, true, now() + interval '1 day'`)
+    await db.exec(
+      `insert into public.notes (candidature_id, contenu, created_at)
+       values ('${alice}', 'Prétentions : 60 k€', now() + interval '1 minute')`,
+    )
+    const partage = await lire(jeton)
+    expect(partage?.notes).toEqual([expect.objectContaining({ contenu: 'Très bon entretien' })])
+  })
+
+  it('relecture 4 : rien n’est révélé sur les liens ou étiquettes d’un autre espace', async () => {
+    await db.exec(`insert into public.candidatures (user_id, nom) values ('${B}', 'Chez B')`)
+    const chezB = (
+      await db.query<{ id: string }>(`select id from public.candidatures where nom = 'Chez B'`)
+    ).rows[0].id
+    await db.exec(`update public.profils set espace_actif = '${B}' where user_id = '${B}'`)
+    for (let i = 0; i < 10; i++)
+      await enTant(B, () =>
+        db.exec(
+          `insert into public.partages (candidature_id, expire_le) values ('${chezB}', now() + interval '1 day')`,
+        ),
+      )
+    // Même refus, que l'autre espace ait 10 liens ou non
+    await expect(
+      enTant(A, () =>
+        db.exec(
+          `insert into public.partages (candidature_id, expire_le) values ('${chezB}', now() + interval '1 day')`,
+        ),
+      ),
+    ).rejects.toThrow(/^candidature_inaccessible/)
+    await db.exec(`grant select, insert on public.etiquettes to authenticated`)
+    await expect(
+      enTant(A, () =>
+        db.exec(`insert into public.etiquettes (espace_id, nom) values ('${B}', 'X')`),
+      ),
+    ).rejects.toThrow(/^espace_inaccessible/)
   })
 
   it('sans compte : rien, même avec des droits trop larges sur la table', async () => {
@@ -2270,5 +2379,4 @@ describe('partages', () => {
     )
     expect(rows).toEqual([{ ok: true }])
   })
-
 })

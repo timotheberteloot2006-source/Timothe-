@@ -42,29 +42,39 @@ import { genererCsv, nomFichierExport, telechargerCsv } from '@/lib/exportCandid
 import { listerOffres, titresParId } from '@/lib/offres'
 import { listerEntretiensAVenir, prochainParCandidature } from '@/lib/entretiens'
 import { EntretiensAVenir } from '@/components/candidatures/EntretiensAVenir'
-import { rechargementALaDemande } from '@/lib/rechargement'
+import { rechargementALaDemande, sansInterruption } from '@/lib/rechargement'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   head: () => titrePage('Candidatures'),
   validateSearch: lireFiltres,
-  loader: async () => {
-    const [candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions] =
-      await Promise.all([
-        listerCandidatures(),
-        lireEspace(),
-        listerOffres(),
-        listerEntretiensAVenir(),
-        // Base pas encore à jour (migration 0015) : les trois étapes habituelles
-        listerEtapes().catch(() => ETAPES_DE_BASE),
-        // Base pas encore à jour (migration 0020) : aucune note
-        listerMoyennes().catch(() => new Map()),
-        // Base pas encore à jour (migration 0022) : aucune étiquette
-        listerEtiquettes().catch(() => []),
-        listerAttributions().catch(() => new Map<string, string[]>()),
-      ])
-    return { candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions }
-  },
+  loader: (contexte) =>
+    sansInterruption('tableau-de-bord', contexte, async () => {
+      const [candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions] =
+        await Promise.all([
+          listerCandidatures(),
+          lireEspace(),
+          listerOffres(),
+          listerEntretiensAVenir(),
+          // Base pas encore à jour (migration 0015) : les trois étapes habituelles
+          listerEtapes().catch(() => ETAPES_DE_BASE),
+          // Base pas encore à jour (migration 0020) : aucune note
+          listerMoyennes().catch(() => new Map()),
+          // Base pas encore à jour (migration 0022) : aucune étiquette
+          listerEtiquettes().catch(() => []),
+          listerAttributions().catch(() => new Map<string, string[]>()),
+        ])
+      return {
+        candidatures,
+        espace,
+        offres,
+        entretiens,
+        etapes,
+        moyennes,
+        etiquettes,
+        attributions,
+      }
+    }),
   ...rechargementALaDemande,
   component: TableauDeBord,
   errorComponent: ({ error }) => (

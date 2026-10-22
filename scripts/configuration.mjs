@@ -41,6 +41,8 @@ export const MIGRATIONS = [
   },
   { numero: '0022', table: 'etiquettes', colonne: 'couleur' },
   { numero: '0023', table: 'partages', colonne: 'jeton' },
+  // N'ajoute que des contraintes et des corrections : repérée par la version du schéma
+  { numero: '0024', fonction: 'version_schema', arguments: {} },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite

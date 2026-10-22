@@ -16,17 +16,17 @@ interface Props {
   candidatureId: string
   avecCv: boolean
   partages: Partage[]
+  // Heure du dernier chargement de la fiche (rafraîchie avec elle) : distingue les liens expirés
+  maintenant: number
   // Exécute une modification puis recharge la fiche ; renvoie false en cas d'erreur
   executer: (action: () => Promise<void>) => Promise<boolean>
 }
 
 // Liens en lecture seule pour montrer la candidature à quelqu'un sans compte
-export function CartePartage({ candidatureId, avecCv, partages, executer }: Props) {
+export function CartePartage({ candidatureId, avecCv, partages, maintenant, executer }: Props) {
   const id = useId()
   const [envoi, setEnvoi] = useState(false)
   const [copie, setCopie] = useState<string | null>(null)
-  // Heure fixée à l'affichage de la fiche : distingue les liens expirés
-  const [maintenant] = useState(() => Date.now())
   const valables = partages.filter((p) => etatPartage(p, maintenant) === 'valable')
   const anciens = partages.length - valables.length
 
@@ -145,7 +145,7 @@ export function CartePartage({ candidatureId, avecCv, partages, executer }: Prop
           </label>
           <label className="flex items-center gap-2 py-2 text-sm">
             <input type="checkbox" name="notes" className="size-4 accent-indigo-600" />
-            Inclure les notes internes
+            Inclure les notes internes déjà écrites
           </label>
           <button
             type="submit"

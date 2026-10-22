@@ -28,61 +28,66 @@ import { listerEntretiens } from '@/lib/entretiens'
 import { listerHistorique } from '@/lib/historique'
 import { listerOffres } from '@/lib/offres'
 import { useAuth } from '@/lib/auth'
+import { sansInterruption } from '@/lib/rechargement'
 import { titrePage } from '@/lib/titre'
 
+async function chargerFiche(id: string) {
+  const [
+    candidature,
+    notes,
+    offres,
+    entretiens,
+    historique,
+    etapes,
+    modeles,
+    espace,
+    criteres,
+    evaluations,
+    etiquettes,
+    etiquettesPosees,
+    partages,
+  ] = await Promise.all([
+    lireCandidature(id),
+    listerNotes(id),
+    listerOffres(),
+    listerEntretiens(id),
+    // L'historique est secondaire : son échec ne doit pas empêcher d'afficher la fiche
+    listerHistorique(id).catch(() => null),
+    listerEtapes().catch(() => ETAPES_DE_BASE),
+    // Base pas encore à jour (migration 0019) : aucun modèle, message libre seulement
+    listerModeles().catch(() => []),
+    lireEspace().catch(() => null),
+    // Base pas encore à jour (migration 0020) : pas d'évaluation
+    listerCriteres().catch(() => null),
+    listerEvaluations(id).catch(() => []),
+    // Base pas encore à jour (migration 0022) : pas d'étiquettes
+    listerEtiquettes().catch(() => null),
+    listerEtiquettesCandidature(id).catch(() => []),
+    // null : base pas encore à jour (migration 0023), la carte est masquée
+    listerPartages(id).catch(() => null),
+  ])
+  if (!candidature) throw notFound()
+  return {
+    candidature,
+    notes,
+    offres,
+    entretiens,
+    historique,
+    etapes,
+    modeles,
+    espace,
+    criteres,
+    evaluations,
+    etiquettes,
+    etiquettesPosees,
+    partages,
+    // Heure du chargement (liens de partage expirés)
+    chargeLe: Date.now(),
+  }
+}
+
 export const Route = createFileRoute('/_authentifie/candidatures/$id')({
-  loader: async ({ params }) => {
-    const [
-      candidature,
-      notes,
-      offres,
-      entretiens,
-      historique,
-      etapes,
-      modeles,
-      espace,
-      criteres,
-      evaluations,
-      etiquettes,
-      etiquettesPosees,
-      partages,
-    ] = await Promise.all([
-      lireCandidature(params.id),
-      listerNotes(params.id),
-      listerOffres(),
-      listerEntretiens(params.id),
-      // L'historique est secondaire : son échec ne doit pas empêcher d'afficher la fiche
-      listerHistorique(params.id).catch(() => null),
-      listerEtapes().catch(() => ETAPES_DE_BASE),
-      // Base pas encore à jour (migration 0019) : aucun modèle, message libre seulement
-      listerModeles().catch(() => []),
-      lireEspace().catch(() => null),
-      // Base pas encore à jour (migration 0020) : pas d'évaluation
-      listerCriteres().catch(() => null),
-      listerEvaluations(params.id).catch(() => []),
-      // Base pas encore à jour (migration 0022) : pas d'étiquettes
-      listerEtiquettes().catch(() => null),
-      listerEtiquettesCandidature(params.id).catch(() => []),
-      // null : base pas encore à jour (migration 0023), la carte est masquée
-      listerPartages(params.id).catch(() => null),
-    ])
-    if (!candidature) throw notFound()
-    return {
-      candidature,
-      notes,
-      offres,
-      entretiens,
-      historique,
-      etapes,
-      modeles,
-      espace,
-      criteres,
-      evaluations,
-      etiquettes,
-      etiquettesPosees,
-      partages,
-    }
-  },
+  loader: (contexte) => sansInterruption('fiche', contexte, () => chargerFiche(contexte.params.id)),
   // Après loader : les types de loaderData en dépendent
   head: ({ loaderData }) => titrePage(loaderData?.candidature.nom ?? 'Candidature'),
   component: FicheCandidature,
@@ -111,6 +116,7 @@ function FicheCandidature() {
     etiquettes,
     etiquettesPosees,
     partages,
+    chargeLe,
   } = Route.useLoaderData()
   const { user } = useAuth()
   const offre = offres.find((o) => o.id === c.offre_id)
@@ -291,6 +297,7 @@ function FicheCandidature() {
           candidatureId={c.id}
           avecCv={!!c.cv_chemin}
           partages={partages}
+          maintenant={chargeLe}
           executer={executer}
         />
       )}

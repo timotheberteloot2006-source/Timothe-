@@ -12,15 +12,17 @@ import {
   supprimerOffre,
   type Offre,
 } from '@/lib/offres'
+import { sansInterruption } from '@/lib/rechargement'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/offres')({
   head: () => titrePage('Offres d’emploi'),
   // Nom de l'espace : c'est celui que voient les candidats sur le formulaire public
-  loader: async () => {
-    const [offres, espace] = await Promise.all([listerOffres(), lireEspace()])
-    return { offres, nomEspace: espace.nom }
-  },
+  loader: (contexte) =>
+    sansInterruption('offres', contexte, async () => {
+      const [offres, espace] = await Promise.all([listerOffres(), lireEspace()])
+      return { offres, nomEspace: espace.nom }
+    }),
   component: Offres,
   errorComponent: ({ error }) => (
     <section className="mx-auto max-w-3xl px-4 py-16">

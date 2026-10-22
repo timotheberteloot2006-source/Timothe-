@@ -145,3 +145,16 @@ test('formulaire de création ouvert sur la fiche : accessible', async ({ page }
     .analyze()
   expect(violations.map((v) => v.id)).toEqual([])
 })
+
+test('créer sur la fiche une étiquette déjà existante la pose sans doublon', async ({ page }) => {
+  faux.ajouter({ nom: 'Alice Martin' })
+  faux.ajouterEtiquette('Senior', 'vert')
+  await seConnecter(page, faux)
+  await page.goto(`/candidatures/${faux.candidature('Alice Martin')!.id}`)
+  await page.getByRole('button', { name: 'Nouvelle étiquette' }).click()
+  await page.getByLabel('Nom de la nouvelle étiquette').fill(' senior ')
+  await page.getByRole('button', { name: 'Créer et ajouter' }).click()
+  await expect(page.getByRole('list', { name: 'Étiquettes' })).toHaveText(/Senior/)
+  expect(faux.etiquettes.map((e) => e.nom)).toEqual(['Senior'])
+  expect(faux.etiquettesDe('Alice Martin')).toEqual(['Senior'])
+})

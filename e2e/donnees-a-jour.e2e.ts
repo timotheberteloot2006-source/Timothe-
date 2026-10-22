@@ -94,3 +94,39 @@ test('onglet caché : pas de rafraîchissement ; au retour, aussitôt', async ({
   await expect(page.getByRole('link', { name: 'Bruno' })).toBeVisible()
   expect(lectures.n).toBe(1)
 })
+
+test('coupure réseau pendant le rafraîchissement : la page et la saisie restent', async ({
+  page,
+}) => {
+  await page.clock.install()
+  faux.ajouter({ nom: 'Alice' })
+  await seConnecter(page, faux)
+  await page.getByRole('button', { name: 'Modifier' }).click()
+  await page.getByRole('textbox', { name: 'Nom' }).fill('Alice Martin')
+  await page.waitForLoadState('networkidle')
+
+  // Plus de réseau : le rafraîchissement échoue
+  await page.route('**/rest/v1/**', (route) => route.abort('internetdisconnected'))
+  await page.clock.runFor(61_000)
+  await expect(page.getByRole('status')).toContainText('Connexion perdue')
+  await expect(page.getByRole('textbox', { name: 'Nom' })).toHaveValue('Alice Martin')
+  await expect(page.getByText('Impossible de charger les candidatures')).toHaveCount(0)
+
+  // Réseau revenu : données à jour, message retiré
+  await page.unroute('**/rest/v1/**')
+  faux.ajouter({ nom: 'Bruno' })
+  await page.clock.runFor(61_000)
+  await expect(page.getByRole('link', { name: 'Bruno' })).toBeVisible()
+  await expect(page.getByRole('status')).not.toContainText('Connexion perdue')
+  await expect(page.getByRole('textbox', { name: 'Nom' })).toHaveValue('Alice Martin')
+})
+
+test('arriver sur une page sans réseau affiche toujours l’erreur', async ({ page }) => {
+  faux.ajouter({ nom: 'Alice' })
+  await seConnecter(page, faux)
+  await page.getByRole('link', { name: 'Alice' }).click()
+  await expect(page.getByRole('heading', { name: 'Alice', level: 1 })).toBeVisible()
+  await page.route('**/rest/v1/**', (route) => route.abort('internetdisconnected'))
+  await page.getByRole('link', { name: '← Retour aux candidatures' }).click()
+  await expect(page.getByText('Impossible de charger les candidatures')).toBeVisible()
+})

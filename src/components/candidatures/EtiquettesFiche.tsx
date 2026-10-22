@@ -8,6 +8,7 @@ import {
   retirerEtiquette,
   type Etiquette,
 } from '@/lib/etiquettes'
+import { normaliser } from '@/lib/candidatures'
 import { classeChamp } from './styles'
 
 interface Props {
@@ -37,8 +38,10 @@ export function EtiquettesFiche({
     event.preventDefault()
     const nom = String(new FormData(event.currentTarget).get('nom') ?? '').trim()
     if (!nom) return
+    // Nom déjà pris (sans tenir compte des majuscules) : on pose l'étiquette existante
+    const existante = etiquettes.find((e) => normaliser(e.nom) === normaliser(nom))
     const ok = await executer(async () => {
-      const etiquette = await creerEtiquette(nom)
+      const etiquette = existante ?? (await creerEtiquette(nom))
       await poserEtiquette([candidatureId], etiquette.id)
     })
     if (ok) setCreation(false)

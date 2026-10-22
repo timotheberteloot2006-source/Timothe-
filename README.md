@@ -89,8 +89,9 @@ le profil à quelqu'un sans compte (un manager). Le lien montre le nom, le poste
 les compétences, l'offre, l'étape, les étiquettes et la moyenne de l'équipe par critère, jamais
 l'e-mail ; le CV et les notes internes seulement si on les inclut. Le CV s'ouvre par un lien
 signé de 60 secondes que donne la fonction `supabase/functions/cv-partage` (déployée avec
-`--no-verify-jwt`). Chaque lien affiche son nombre de consultations et se révoque d'un clic ; 10
-liens valables au plus par candidature. La création et la révocation sont inscrites dans
+`--no-verify-jwt`). Chaque lien affiche son nombre de consultations (une par minute au plus) et se révoque d'un
+clic ; 10 liens valables au plus par candidature. Les notes partagées sont celles écrites avant la
+création du lien, et les liens d'un membre qui quitte l'espace (ou en est retiré) sont révoqués. La création et la révocation sont inscrites dans
 l'historique.
 
 **Étiquettes** (`supabase/migrations/0022_etiquettes.sql`) : libellés libres de l'espace
