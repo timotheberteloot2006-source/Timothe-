@@ -1,4 +1,6 @@
+import { useId } from 'react'
 import type { Etape } from '@/lib/etapes'
+import type { Etiquette } from '@/lib/etiquettes'
 import { TRIS, type Filtres, type Tri } from '@/lib/filtres'
 import type { Offre } from '@/lib/offres'
 import { classeChamp } from './styles'
@@ -8,9 +10,12 @@ interface Props {
   onChange: (filtres: Filtres) => void
   offres: Offre[]
   etapes: Etape[]
+  etiquettes?: Etiquette[]
 }
 
-export function BarreFiltres({ filtres, onChange, offres, etapes }: Props) {
+export function BarreFiltres({ filtres, onChange, offres, etapes, etiquettes = [] }: Props) {
+  const id = useId()
+
   function modifier(champs: Partial<Filtres>) {
     onChange({ ...filtres, ...champs })
   }
@@ -86,6 +91,26 @@ export function BarreFiltres({ filtres, onChange, offres, etapes }: Props) {
             ))}
           </select>
         </label>
+      )}
+      {etiquettes.length > 0 && (
+        <div>
+          <label htmlFor={`${id}-etiquette`} className="text-sm font-medium">
+            Étiquette
+          </label>
+          <select
+            id={`${id}-etiquette`}
+            value={filtres.etiquette ?? ''}
+            onChange={(e) => modifier({ etiquette: e.target.value || undefined })}
+            className={classeChamp}
+          >
+            <option value="">Toutes</option>
+            {etiquettes.map((etiquette) => (
+              <option key={etiquette.id} value={etiquette.id}>
+                {etiquette.nom}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
       <label className="block">
         <span className="text-sm font-medium">Trier par</span>

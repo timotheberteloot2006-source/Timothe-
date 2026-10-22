@@ -4,7 +4,9 @@ import { couleurEtape, type Etape } from '@/lib/etapes'
 import { formaterNote, type Moyenne } from '@/lib/evaluations'
 import type { EntretienAVenir } from '@/lib/entretiens'
 import type { Offre } from '@/lib/offres'
+import type { Etiquette } from '@/lib/etiquettes'
 import { FormulaireCandidature } from './FormulaireCandidature'
+import { PastillesEtiquettes } from './PastillesEtiquettes'
 
 interface Props {
   candidatures: Candidature[]
@@ -24,6 +26,8 @@ interface Props {
   etapes: Etape[]
   // Note moyenne de chaque candidature évaluée
   moyennes?: Map<string, Moyenne>
+  // Étiquettes posées sur chaque candidature
+  etiquettesDe?: (id: string) => Etiquette[]
 }
 
 export function ListeCandidatures({
@@ -40,6 +44,7 @@ export function ListeCandidatures({
   prochainsEntretiens,
   etapes,
   moyennes = new Map(),
+  etiquettesDe = () => [],
 }: Props) {
   const titres = new Map(offres.map((o) => [o.id, o.titre]))
   return (
@@ -130,6 +135,7 @@ export function ListeCandidatures({
                     ))}
                   </ul>
                 )}
+                <PastillesEtiquettes etiquettes={etiquettesDe(c.id)} />
               </div>
               <div className="flex items-center gap-2">
                 <select

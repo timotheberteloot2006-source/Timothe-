@@ -10,6 +10,8 @@ export interface Filtres {
   statut?: Statut
   // Identifiant d'offre, ou « aucune » pour les candidatures sans offre
   offre?: string
+  // Identifiant d'étiquette (src/lib/etiquettes.ts)
+  etiquette?: string
   // Absent : plus récentes d'abord
   tri?: Tri
   // Absent : première page
@@ -47,6 +49,8 @@ export function lireFiltres(search: Record<string, unknown>): Filtres {
     filtres.statut = search.statut
   if (typeof search.offre === 'string' && /^[\w-]{1,64}$/.test(search.offre))
     filtres.offre = search.offre
+  if (typeof search.etiquette === 'string' && /^[\w-]{1,64}$/.test(search.etiquette))
+    filtres.etiquette = search.etiquette
   // « recent » est l'ordre par défaut : inutile de le garder dans l'adresse
   if (typeof search.tri === 'string' && Object.hasOwn(TRIS, search.tri) && search.tri !== 'recent')
     filtres.tri = search.tri as Tri
@@ -56,7 +60,12 @@ export function lireFiltres(search: Record<string, unknown>): Filtres {
   return filtres
 }
 
-export function filtrerCandidatures(candidatures: Candidature[], filtres: Filtres) {
+// attributions : identifiants des étiquettes posées, par candidature
+export function filtrerCandidatures(
+  candidatures: Candidature[],
+  filtres: Filtres,
+  attributions: ReadonlyMap<string, readonly string[]> = new Map(),
+) {
   const recherche = normaliser(filtres.q ?? '')
   const competencesRequises = (filtres.competences ?? '').split(',').map(normaliser).filter(Boolean)
 
@@ -64,6 +73,7 @@ export function filtrerCandidatures(candidatures: Candidature[], filtres: Filtre
     if (filtres.statut && c.statut !== filtres.statut) return false
     if (filtres.offre && (c.offre_id ?? 'aucune') !== filtres.offre) return false
     if (filtres.experienceMin && c.experience < filtres.experienceMin) return false
+    if (filtres.etiquette && !attributions.get(c.id)?.includes(filtres.etiquette)) return false
     if (recherche) {
       const texte = normaliser([c.nom, c.email, c.poste].filter(Boolean).join(' '))
       if (!texte.includes(recherche)) return false

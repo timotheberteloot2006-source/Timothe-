@@ -25,6 +25,13 @@ import { lireEspace } from '@/lib/espace'
 import { ETAPES_DE_BASE, listerEtapes, nomsEtapes } from '@/lib/etapes'
 import { listerMoyennes } from '@/lib/evaluations'
 import {
+  etiquettesDe,
+  listerAttributions,
+  listerEtiquettes,
+  poserEtiquette,
+  retirerEtiquette,
+} from '@/lib/etiquettes'
+import {
   filtrerCandidatures,
   lireFiltres,
   paginer,
@@ -41,17 +48,21 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   head: () => titrePage('Candidatures'),
   validateSearch: lireFiltres,
   loader: async () => {
-    const [candidatures, espace, offres, entretiens, etapes, moyennes] = await Promise.all([
-      listerCandidatures(),
-      lireEspace(),
-      listerOffres(),
-      listerEntretiensAVenir(),
-      // Base pas encore à jour (migration 0015) : les trois étapes habituelles
-      listerEtapes().catch(() => ETAPES_DE_BASE),
-      // Base pas encore à jour (migration 0020) : aucune note
-      listerMoyennes().catch(() => new Map()),
-    ])
-    return { candidatures, espace, offres, entretiens, etapes, moyennes }
+    const [candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions] =
+      await Promise.all([
+        listerCandidatures(),
+        lireEspace(),
+        listerOffres(),
+        listerEntretiensAVenir(),
+        // Base pas encore à jour (migration 0015) : les trois étapes habituelles
+        listerEtapes().catch(() => ETAPES_DE_BASE),
+        // Base pas encore à jour (migration 0020) : aucune note
+        listerMoyennes().catch(() => new Map()),
+        // Base pas encore à jour (migration 0022) : aucune étiquette
+        listerEtiquettes().catch(() => []),
+        listerAttributions().catch(() => new Map<string, string[]>()),
+      ])
+    return { candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions }
   },
   // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
   shouldReload: false,
@@ -68,15 +79,20 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
 })
 
 function TableauDeBord() {
-  const { candidatures, espace, offres, entretiens, etapes, moyennes } = Route.useLoaderData()
+  const { candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions } =
+    Route.useLoaderData()
   const prochainsEntretiens = prochainParCandidature(entretiens)
   const places = placesRestantes(espace.est_pro, candidatures.length)
   const recherche = Route.useSearch()
-  // Étape inconnue dans l'adresse (supprimée, favori ancien, autre espace) : filtre ignoré
-  const filtres =
-    recherche.statut && !etapes.some((e) => e.cle === recherche.statut)
-      ? { ...recherche, statut: undefined }
-      : recherche
+  // Étape ou étiquette inconnue dans l'adresse (supprimée, favori ancien, autre espace) : filtre
+  // ignoré
+  const filtres = {
+    ...recherche,
+    statut: etapes.some((e) => e.cle === recherche.statut) ? recherche.statut : undefined,
+    etiquette: etiquettes.some((e) => e.id === recherche.etiquette)
+      ? recherche.etiquette
+      : undefined,
+  }
   // Offre du filtre en cours, présélectionnée à l'ajout et à l'import
   const offreFiltree = filtres.offre && filtres.offre !== 'aucune' ? filtres.offre : null
   const navigate = Route.useNavigate()
@@ -91,7 +107,7 @@ function TableauDeBord() {
 
   const enTableau = filtres.vue === 'tableau'
   const resultats = trierCandidatures(
-    filtrerCandidatures(candidatures, filtres),
+    filtrerCandidatures(candidatures, filtres, attributions),
     filtres.tri,
     etapes.map((e) => e.cle),
     moyennes,
@@ -127,6 +143,16 @@ function TableauDeBord() {
     )
     selectionner([])
   }
+
+  async function etiqueterSelection(etiquetteId: string, poser: boolean) {
+    const ids = selectionnees.map((c) => c.id)
+    await executer(() =>
+      poser ? poserEtiquette(ids, etiquetteId) : retirerEtiquette(ids, etiquetteId),
+    )
+  }
+
+  // Étiquettes de chaque candidature, dans l'ordre alphabétique
+  const etiquettesCandidature = (id: string) => etiquettesDe(attributions.get(id), etiquettes)
 
   async function supprimerSelection() {
     const n = selectionnees.length
@@ -270,6 +296,7 @@ function TableauDeBord() {
             onChange={changerFiltres}
             offres={offres}
             etapes={etapes}
+            etiquettes={etiquettes}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-slate-600">
@@ -307,7 +334,14 @@ function TableauDeBord() {
                 disabled={resultats.length === 0}
                 onClick={() =>
                   telechargerCsv(
-                    genererCsv(resultats, titresParId(offres), nomsEtapes(etapes)),
+                    genererCsv(
+                      resultats,
+                      titresParId(offres),
+                      nomsEtapes(etapes),
+                      new Map(
+                        resultats.map((c) => [c.id, etiquettesCandidature(c.id).map((e) => e.nom)]),
+                      ),
+                    ),
                     nomFichierExport(),
                   )
                 }
@@ -323,6 +357,7 @@ function TableauDeBord() {
               candidatures={resultats}
               titresOffres={titresParId(offres)}
               etapes={etapes}
+              etiquettesDe={etiquettesCandidature}
               onChangerStatut={(id, statut) => executer(() => changerStatut(id, statut))}
             />
           ) : (
@@ -336,6 +371,8 @@ function TableauDeBord() {
                   onSupprimer={supprimerSelection}
                   onAnnuler={() => selectionner([])}
                   etapes={etapes}
+                  etiquettes={etiquettes}
+                  onEtiqueter={etiqueterSelection}
                 />
               )}
               {resultats.length > 0 ? (
@@ -344,6 +381,7 @@ function TableauDeBord() {
                   prochainsEntretiens={prochainsEntretiens}
                   etapes={etapes}
                   moyennes={moyennes}
+                  etiquettesDe={etiquettesCandidature}
                   selection={idsSelectionnes}
                   onBasculerSelection={basculerSelection}
                   candidatures={pagination.elements}

@@ -39,6 +39,7 @@ export const MIGRATIONS = [
       sujet: '',
     },
   },
+  { numero: '0022', table: 'etiquettes', colonne: 'couleur' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite

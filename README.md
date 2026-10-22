@@ -69,6 +69,13 @@ le propriétaire règle depuis la page **Équipe**. Sur la fiche, chaque membre 
 modifier ou effacer que ses propres notes. La liste affiche la note moyenne et se trie par
 « Mieux notées ».
 
+**Étiquettes** (`supabase/migrations/0022_etiquettes.sql`) : libellés libres de l'espace
+(« Senior », « Télétravail »…, 30 au plus, cinq couleurs), que tous les membres créent,
+renomment et suppriment depuis la page **Équipe**. On les pose et les retire sur la fiche (où
+l'on peut aussi en créer une à la volée) ou par lot depuis la sélection de la liste ; la liste et
+le tableau les affichent, un filtre « Étiquette » les retrouve et l'export CSV les reprend. Chaque
+pose et chaque retrait est inscrit dans l'historique de la candidature.
+
 **Étapes de recrutement** : le statut d'une candidature est une étape de son espace. Chaque
 espace a trois étapes de base, « Nouveau » (toujours la première, où arrivent les candidatures),
 « Retenu » et « Écarté », que le propriétaire peut renommer ; il peut aussi en ajouter (12 au

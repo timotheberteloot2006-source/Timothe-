@@ -1885,3 +1885,165 @@ describe('évaluations', () => {
     }
   })
 })
+
+describe('étiquettes', () => {
+  let alice: string
+  let bruno: string
+
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated;
+      grant select, insert, update, delete
+        on public.etiquettes, public.candidatures_etiquettes to authenticated;
+      grant select on public.historique to authenticated;
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+      update public.profils set espace_actif = '${A}' where user_id = '${B}';
+    `)
+    await ajouter(A, ['Alice', 'Bruno'])
+    const { rows } = await db.query<{ id: string; nom: string }>(
+      `select id, nom from public.candidatures order by nom`,
+    )
+    ;[alice, bruno] = rows.map((r) => r.id)
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  const creer = async (nom: string, uid = A) =>
+    (
+      await enTant(uid, () =>
+        db.query<{ id: string }>(`insert into public.etiquettes (nom) values ($1) returning id`, [
+          nom,
+        ]),
+      )
+    ).rows[0].id
+
+  const poser = (candidature: string, etiquette: string) =>
+    db.exec(
+      `insert into public.candidatures_etiquettes (candidature_id, etiquette_id)
+       values ('${candidature}', '${etiquette}') on conflict do nothing`,
+    )
+
+  const historique = async () =>
+    (
+      await db.query<{ action: string; nom: string; user_id: string }>(
+        `select action, details->>'nom' as nom, user_id from public.historique
+         where action like 'etiquette%' order by id`,
+      )
+    ).rows
+
+  it('tout membre crée, renomme et pose des étiquettes dans son espace actif', async () => {
+    const senior = await creer('  Senior ', B)
+    await enTant(B, async () => {
+      await poser(alice, senior)
+      // Déjà posée : rien de plus
+      await poser(alice, senior)
+      await db.exec(`update public.etiquettes set nom = 'Confirmé', couleur = 'vert'`)
+    })
+    const { rows } = await db.query(
+      `select e.nom, e.couleur, e.espace_id, ce.candidature_id, ce.espace_id as espace_attribution
+       from public.etiquettes e join public.candidatures_etiquettes ce on ce.etiquette_id = e.id`,
+    )
+    expect(rows).toEqual([
+      {
+        nom: 'Confirmé',
+        couleur: 'vert',
+        espace_id: A,
+        candidature_id: alice,
+        espace_attribution: A,
+      },
+    ])
+    expect(await historique()).toEqual([{ action: 'etiquette_ajoutee', nom: 'Senior', user_id: B }])
+  })
+
+  it('nom unique sans tenir compte des majuscules, couleur connue, 30 au plus', async () => {
+    await creer('Senior')
+    await expect(creer('senior ')).rejects.toThrow(/etiquettes_nom_unique/)
+    await expect(
+      enTant(A, () =>
+        db.exec(`insert into public.etiquettes (nom, couleur) values ('X', 'fuchsia')`),
+      ),
+    ).rejects.toThrow(/etiquettes_couleur_check/)
+    await expect(creer('   ')).rejects.toThrow(/etiquettes_nom_check/)
+    for (let i = 2; i <= 30; i++) await creer(`E${i}`)
+    await expect(creer('E31')).rejects.toThrow(/^trop_d_etiquettes/)
+  })
+
+  it('une étiquette d’un autre espace ne se pose pas, ne se voit pas, ne se modifie pas', async () => {
+    // Espace personnel de B (pas son espace actif)
+    const chezB = (
+      await db.query<{ id: string }>(
+        `insert into public.etiquettes (espace_id, nom) values ('${B}', 'Secret') returning id`,
+      )
+    ).rows[0].id
+    await expect(enTant(A, () => poser(alice, chezB))).rejects.toThrow(
+      /candidatures_etiquettes_etiquette_id_espace_id_fkey/,
+    )
+    await enTant(A, async () => {
+      expect((await db.query('select * from public.etiquettes')).rows).toEqual([])
+      await db.exec(`update public.etiquettes set nom = 'Pirate'`)
+      await db.exec(`delete from public.etiquettes`)
+    })
+    const { rows } = await db.query(`select nom from public.etiquettes`)
+    expect(rows).toEqual([{ nom: 'Secret' }])
+    // Ni déplacer une étiquette vers un autre espace
+    const senior = await creer('Senior')
+    await expect(
+      db.exec(`update public.etiquettes set espace_id = '${B}' where id = '${senior}'`),
+    ).rejects.toThrow(/^etiquette_figee/)
+  })
+
+  it('retrait inscrit dans l’historique ; suppression de l’étiquette en cascade, sans trace', async () => {
+    const senior = await creer('Senior')
+    const distance = await creer('Télétravail')
+    await enTant(A, async () => {
+      await poser(alice, senior)
+      await poser(bruno, senior)
+      await poser(alice, distance)
+      await db.exec(
+        `delete from public.candidatures_etiquettes
+         where candidature_id = '${alice}' and etiquette_id = '${distance}'`,
+      )
+      await db.exec(`delete from public.etiquettes where id = '${senior}'`)
+    })
+    const { rows } = await db.query('select count(*)::int as n from public.candidatures_etiquettes')
+    expect(rows).toEqual([{ n: 0 }])
+    expect((await historique()).map((h) => [h.action, h.nom])).toEqual([
+      ['etiquette_ajoutee', 'Senior'],
+      ['etiquette_ajoutee', 'Senior'],
+      ['etiquette_ajoutee', 'Télétravail'],
+      ['etiquette_retiree', 'Télétravail'],
+    ])
+    // Candidature supprimée : ses étiquettes partent avec elle
+    await enTant(A, () => poser(alice, distance))
+    await db.exec(`delete from public.candidatures where id = '${alice}'`)
+    expect(
+      (await db.query('select count(*)::int as n from public.candidatures_etiquettes')).rows,
+    ).toEqual([{ n: 0 }])
+  })
+
+  it('sans compte : rien, même avec des droits trop larges sur les tables', async () => {
+    const senior = await creer('Senior')
+    await enTant(A, () => poser(alice, senior))
+    await db.exec(
+      `grant select, insert, delete on public.etiquettes, public.candidatures_etiquettes to anon`,
+    )
+    await db.exec('set role anon')
+    try {
+      expect((await db.query('select * from public.etiquettes')).rows).toEqual([])
+      expect((await db.query('select * from public.candidatures_etiquettes')).rows).toEqual([])
+      await expect(poser(bruno, senior)).rejects.toThrow(/row-level security/)
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`revoke all on public.etiquettes, public.candidatures_etiquettes from anon`)
+    }
+  })
+})

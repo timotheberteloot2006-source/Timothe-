@@ -107,6 +107,13 @@ interface EvaluationFaux {
   note: number
 }
 
+export interface EtiquetteFaux {
+  id: string
+  espace_id: string
+  nom: string
+  couleur: string
+}
+
 interface NoteFaux {
   id: string
   candidature_id: string
@@ -161,6 +168,9 @@ export class FauxSupabase {
   private criteresCrees = new Set<string>()
   criteresListe: CritereFaux[] = []
   evaluations: EvaluationFaux[] = []
+  // Étiquettes et étiquettes posées (supabase/migrations/0022_etiquettes.sql)
+  etiquettes: EtiquetteFaux[] = []
+  attributions: { candidature_id: string; etiquette_id: string }[] = []
   // Modèles de réponse (supabase/migrations/0019_modeles_reponse.sql), proposés à la demande
   private modelesCrees = new Set<string>()
   modelesListe: ModeleFaux[] = []
@@ -296,6 +306,27 @@ export class FauxSupabase {
     }
     this.etapesCreees.push(etape)
     return etape
+  }
+
+  // Étiquette de l'espace actif, posée sur les candidatures nommées
+  ajouterEtiquette(nom: string, couleur = 'gris', ...candidats: string[]) {
+    const etiquette = { id: crypto.randomUUID(), espace_id: this.espaceActif, nom, couleur }
+    this.etiquettes.push(etiquette)
+    for (const candidat of candidats)
+      this.attributions.push({
+        candidature_id: this.candidature(candidat)!.id,
+        etiquette_id: etiquette.id,
+      })
+    return etiquette
+  }
+
+  // Noms des étiquettes posées sur une candidature
+  etiquettesDe(nomCandidat: string) {
+    const id = this.candidature(nomCandidat)?.id
+    return this.attributions
+      .filter((a) => a.candidature_id === id)
+      .map((a) => this.etiquettes.find((e) => e.id === a.etiquette_id)!.nom)
+      .sort()
   }
 
   private estProprietaireActif() {
@@ -525,6 +556,11 @@ export class FauxSupabase {
           .map((o) => ({ titre: o.titre, description: o.description, jeton: o.jeton_public })),
       })
     }
+
+    // Étiquettes (supabase/migrations/0022_etiquettes.sql)
+    if (chemin === '/rest/v1/etiquettes') return this.etiquettesRest(route, url, json)
+    if (chemin === '/rest/v1/candidatures_etiquettes')
+      return this.attributionsRest(route, url, json)
 
     // Évaluations (supabase/migrations/0020_evaluations.sql)
     if (chemin === '/rest/v1/criteres') {
@@ -774,6 +810,109 @@ export class FauxSupabase {
     return json({ message: `Non simulé : ${methode} ${chemin}` }, 404)
   }
 
+  private etiquettesRest(route: Route, url: URL, json: Repondre) {
+    const requete = route.request()
+    const methode = requete.method()
+    const ids = idsFiltres(url)
+    const espace = this.etiquettes.filter((e) => e.espace_id === this.espaceActif)
+    const champs = (corps(requete) ?? {}) as Partial<EtiquetteFaux>
+    const doublon = (sauf?: string) =>
+      champs.nom !== undefined &&
+      espace.some((e) => e.id !== sauf && e.nom.toLowerCase() === champs.nom!.trim().toLowerCase())
+    const refus = { code: '23505', message: 'duplicate key "etiquettes_nom_unique"' }
+    if (methode === 'GET') return json(espace.map(({ espace_id: _e, ...e }) => e))
+    if (methode === 'POST') {
+      if (doublon()) return json(refus, 409)
+      if (espace.length >= 30) return json({ code: 'P0001', message: 'trop_d_etiquettes: 30' }, 400)
+      const etiquette = {
+        id: crypto.randomUUID(),
+        espace_id: this.espaceActif,
+        nom: champs.nom!.trim(),
+        couleur: champs.couleur ?? 'gris',
+      }
+      this.etiquettes.push(etiquette)
+      const { espace_id: _e, ...ligne } = etiquette
+      const objet = (requete.headers()['accept'] ?? '').includes('vnd.pgrst.object')
+      return json(objet ? ligne : [ligne], 201)
+    }
+    if (methode === 'PATCH') {
+      if (ids?.some((id) => doublon(id))) return json(refus, 409)
+      espace
+        .filter((e) => ids?.includes(e.id))
+        .forEach((e) => Object.assign(e, champs, champs.nom ? { nom: champs.nom.trim() } : {}))
+      return json(undefined, 204)
+    }
+    if (methode === 'DELETE') {
+      const supprimees = espace.filter((e) => ids?.includes(e.id)).map((e) => e.id)
+      this.etiquettes = this.etiquettes.filter((e) => !supprimees.includes(e.id))
+      // Retirées des candidatures, sans trace dans l'historique
+      this.attributions = this.attributions.filter((a) => !supprimees.includes(a.etiquette_id))
+      return json(undefined, 204)
+    }
+    return json({}, 405)
+  }
+
+  private attributionsRest(route: Route, url: URL, json: Repondre) {
+    const requete = route.request()
+    const methode = requete.method()
+    const valeur = (cle: string) => {
+      const v = url.searchParams.get(cle)
+      if (!v) return null
+      return v.startsWith('in.(') ? v.slice(4, -1).split(',') : [v.replace(/^eq\./, '')]
+    }
+    const nom = (id: string) => this.etiquettes.find((e) => e.id === id)?.nom
+    // Règle RLS : candidatures de l'espace actif
+    const dansEspace = (candidatureId: string) =>
+      this.candidatures.some((c) => c.id === candidatureId && c.espace_id === this.espaceActif)
+    if (methode === 'GET') {
+      const candidatures = valeur('candidature_id')
+      return json(
+        this.attributions.filter(
+          (a) =>
+            dansEspace(a.candidature_id) &&
+            (!candidatures || candidatures.includes(a.candidature_id)),
+        ),
+      )
+    }
+    if (methode === 'POST') {
+      for (const { candidature_id, etiquette_id } of [corps(requete)].flat() as {
+        candidature_id: string
+        etiquette_id: string
+      }[]) {
+        const etiquette = this.etiquettes.find((e) => e.id === etiquette_id)
+        if (!etiquette || etiquette.espace_id !== this.espaceActif)
+          return json({ code: '23503', message: 'violates foreign key constraint' }, 409)
+        if (!dansEspace(candidature_id))
+          return json({ code: '42501', message: 'new row violates row-level security policy' }, 403)
+        // Déjà posée : ignorée (upsert « ignore-duplicates »)
+        if (
+          this.attributions.some(
+            (a) => a.candidature_id === candidature_id && a.etiquette_id === etiquette_id,
+          )
+        )
+          continue
+        this.attributions.push({ candidature_id, etiquette_id })
+        this.journaliser(candidature_id, 'etiquette_ajoutee', { nom: etiquette.nom })
+      }
+      return json(undefined, 201)
+    }
+    if (methode === 'DELETE') {
+      const etiquettes = valeur('etiquette_id') ?? []
+      const candidatures = valeur('candidature_id') ?? []
+      this.attributions = this.attributions.filter((a) => {
+        const retiree =
+          etiquettes.includes(a.etiquette_id) &&
+          candidatures.includes(a.candidature_id) &&
+          dansEspace(a.candidature_id)
+        if (retiree)
+          this.journaliser(a.candidature_id, 'etiquette_retiree', { nom: nom(a.etiquette_id) })
+        return !retiree
+      })
+      return json(undefined, 204)
+    }
+    return json({}, 405)
+  }
+
   private candidaturesRest(route: Route, url: URL, json: Repondre) {
     const requete = route.request()
     const methode = requete.method()
@@ -869,6 +1008,7 @@ export class FauxSupabase {
       this.notes = this.notes.filter((n) => !ids?.includes(n.candidature_id))
       this.entretiens = this.entretiens.filter((e) => !ids?.includes(e.candidature_id))
       this.historique = this.historique.filter((h) => !ids?.includes(h.candidature_id))
+      this.attributions = this.attributions.filter((a) => !ids?.includes(a.candidature_id))
       return json(undefined, 204)
     }
     return json({}, 405)

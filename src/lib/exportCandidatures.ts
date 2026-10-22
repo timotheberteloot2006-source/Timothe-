@@ -14,14 +14,17 @@ const ENTETE = [
   'statut',
   'ajoutee le',
   'offre',
+  'etiquettes',
 ]
 
 // titresOffres : titre de chaque offre par identifiant, pour la colonne « offre » ; etapes : nom
-// de chaque étape par clé, pour la colonne « statut »
+// de chaque étape par clé, pour la colonne « statut » ; etiquettes : noms des étiquettes de
+// chaque candidature, pour la colonne « etiquettes »
 export function genererCsv(
   candidatures: Candidature[],
   titresOffres: Map<string, string> = new Map(),
   etapes: Map<string, string> = nomsEtapes(ETAPES_DE_BASE),
+  etiquettes: Map<string, string[]> = new Map(),
 ): string {
   const lignes = candidatures.map((c) =>
     [
@@ -33,6 +36,7 @@ export function genererCsv(
       texte(etapes.get(c.statut) ?? c.statut),
       new Date(c.created_at).toLocaleDateString('fr-FR'),
       texte((c.offre_id && titresOffres.get(c.offre_id)) || ''),
+      texte((etiquettes.get(c.id) ?? []).join(', ')),
     ].map(echapper),
   )
   // Le BOM indique à Excel que le fichier est en UTF-8 ; CRLF est la fin de ligne attendue en CSV

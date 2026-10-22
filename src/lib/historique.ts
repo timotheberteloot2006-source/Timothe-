@@ -98,6 +98,14 @@ export function decrireEvenement(evenement: Pick<Evenement, 'action' | 'details'
       return 'Note ajoutée'
     case 'note_supprimee':
       return 'Note supprimée'
+    case 'etiquette_ajoutee':
+      return typeof details.nom === 'string'
+        ? `Étiquette « ${details.nom} » ajoutée`
+        : 'Étiquette ajoutée'
+    case 'etiquette_retiree':
+      return typeof details.nom === 'string'
+        ? `Étiquette « ${details.nom} » retirée`
+        : 'Étiquette retirée'
     case 'entretien_planifie':
       return `Entretien planifié${dateEntretien(details.debut)}`
     case 'entretien_supprime':

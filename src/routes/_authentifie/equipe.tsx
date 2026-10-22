@@ -22,6 +22,8 @@ import { GestionEtapes } from '@/components/GestionEtapes'
 import { GestionCriteres } from '@/components/GestionCriteres'
 import { GestionModeles } from '@/components/GestionModeles'
 import { listerCriteres } from '@/lib/evaluations'
+import { GestionEtiquettes } from '@/components/GestionEtiquettes'
+import { listerEtiquettes } from '@/lib/etiquettes'
 import { ReglagesPageCarrieres } from '@/components/ReglagesPageCarrieres'
 import { listerModeles } from '@/lib/modeles'
 import { lireReglagesCarrieres } from '@/lib/carrieres'
@@ -41,6 +43,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
       carrieres,
       modeles,
       criteres,
+      etiquettes,
     ] = await Promise.all([
       listerMembres(espace.id),
       // Seul le propriétaire voit et gère les invitations
@@ -57,6 +60,8 @@ export const Route = createFileRoute('/_authentifie/equipe')({
       listerModeles().catch(() => null),
       // null : base pas encore à jour (migration 0020), la rubrique est masquée
       listerCriteres().catch(() => null),
+      // null : base pas encore à jour (migration 0022), la rubrique est masquée
+      listerEtiquettes().catch(() => null),
     ])
     return {
       espace,
@@ -69,6 +74,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
       carrieres,
       modeles,
       criteres,
+      etiquettes,
     }
   },
   component: Equipe,
@@ -93,6 +99,7 @@ function Equipe() {
     carrieres,
     modeles,
     criteres,
+    etiquettes,
   } = Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
@@ -213,6 +220,12 @@ function Equipe() {
       {modeles && (
         <Carte titre="Modèles de réponse">
           <GestionModeles modeles={modeles} executer={executer} />
+        </Carte>
+      )}
+
+      {etiquettes && (
+        <Carte titre="Étiquettes">
+          <GestionEtiquettes etiquettes={etiquettes} executer={executer} />
         </Carte>
       )}
 

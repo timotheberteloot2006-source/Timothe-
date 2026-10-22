@@ -4,6 +4,7 @@ import { CarteEntretiens } from '@/components/candidatures/CarteEntretiens'
 import { CarteEvaluation } from '@/components/candidatures/CarteEvaluation'
 import { CarteHistorique } from '@/components/candidatures/CarteHistorique'
 import { CarteReponse } from '@/components/candidatures/CarteReponse'
+import { EtiquettesFiche } from '@/components/candidatures/EtiquettesFiche'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
 import { classeChamp } from '@/components/candidatures/styles'
 import {
@@ -17,6 +18,7 @@ import {
 import { lireEspace } from '@/lib/espace'
 import { ETAPES_DE_BASE, listerEtapes } from '@/lib/etapes'
 import { listerCriteres, listerEvaluations } from '@/lib/evaluations'
+import { listerEtiquettes, listerEtiquettesCandidature } from '@/lib/etiquettes'
 import { listerModeles } from '@/lib/modeles'
 import { deposerCv, ouvrirCv, retirerCv, verifierFichierCv } from '@/lib/cv'
 import { ajouterNote, listerNotes, supprimerNote, type Note } from '@/lib/notes'
@@ -39,6 +41,8 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
       espace,
       criteres,
       evaluations,
+      etiquettes,
+      etiquettesPosees,
     ] = await Promise.all([
       lireCandidature(params.id),
       listerNotes(params.id),
@@ -53,6 +57,9 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
       // Base pas encore à jour (migration 0020) : pas d'évaluation
       listerCriteres().catch(() => null),
       listerEvaluations(params.id).catch(() => []),
+      // Base pas encore à jour (migration 0022) : pas d'étiquettes
+      listerEtiquettes().catch(() => null),
+      listerEtiquettesCandidature(params.id).catch(() => []),
     ])
     if (!candidature) throw notFound()
     return {
@@ -66,6 +73,8 @@ export const Route = createFileRoute('/_authentifie/candidatures/$id')({
       espace,
       criteres,
       evaluations,
+      etiquettes,
+      etiquettesPosees,
     }
   },
   // Après loader : les types de loaderData en dépendent
@@ -93,6 +102,8 @@ function FicheCandidature() {
     espace,
     criteres,
     evaluations,
+    etiquettes,
+    etiquettesPosees,
   } = Route.useLoaderData()
   const { user } = useAuth()
   const offre = offres.find((o) => o.id === c.offre_id)
@@ -199,6 +210,18 @@ function FicheCandidature() {
                 </li>
               ))}
             </ul>
+          )}
+
+          {etiquettes && (
+            <EtiquettesFiche
+              // Recréées en changeant de candidature (formulaire de création refermé)
+              key={`etiquettes-${c.id}`}
+              candidatureId={c.id}
+              nomCandidat={c.nom}
+              etiquettes={etiquettes}
+              posees={etiquettesPosees}
+              executer={executer}
+            />
           )}
 
           <div className="flex flex-wrap gap-3">

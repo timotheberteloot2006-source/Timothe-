@@ -34,10 +34,12 @@ describe('genererCsv', () => {
   it('commence par le BOM et utilise ; et CRLF', () => {
     const csv = genererCsv([alice])
     expect(
-      csv.startsWith('\uFEFFnom;email;poste;competences;experience;statut;ajoutee le;offre\r\n'),
+      csv.startsWith(
+        '\uFEFFnom;email;poste;competences;experience;statut;ajoutee le;offre;etiquettes\r\n',
+      ),
     ).toBe(true)
     expect(csv).toContain(
-      'Alice Martin;alice@exemple.fr;"Développeuse; front";React, TypeScript;5;Retenu;05/03/2026;\r\n',
+      'Alice Martin;alice@exemple.fr;"Développeuse; front";React, TypeScript;5;Retenu;05/03/2026;;\r\n',
     )
   })
 
@@ -79,6 +81,18 @@ describe('colonne offre', () => {
       new Map([['o1', 'Data; BI']]),
     )
     expect(lireCsv(csv).map((l) => l[7])).toEqual(['offre', '', 'Data; BI'])
+  })
+})
+
+describe('colonne etiquettes', () => {
+  it('donne les noms des étiquettes posées', () => {
+    const csv = genererCsv(
+      [alice, candidature({ id: 'c2', nom: 'Étiquetée' })],
+      new Map(),
+      undefined,
+      new Map([['c2', ['=Piège', 'Senior']]]),
+    )
+    expect(lireCsv(csv).map((l) => l[8])).toEqual(['etiquettes', '', "'=Piège, Senior"])
   })
 })
 

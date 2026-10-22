@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Statut } from '@/lib/candidatures'
 import type { Etape } from '@/lib/etapes'
+import type { Etiquette } from '@/lib/etiquettes'
 
 interface Props {
   // Nombre de candidatures cochées et de candidatures sur la page
@@ -11,6 +12,9 @@ interface Props {
   onSupprimer: () => void
   onAnnuler: () => void
   etapes: Etape[]
+  // Étiquettes de l'espace, à poser sur la sélection ou à lui retirer
+  etiquettes?: Etiquette[]
+  onEtiqueter?: (etiquetteId: string, poser: boolean) => void
 }
 
 // Case « tout sélectionner » de la page et actions sur les candidatures cochées
@@ -22,6 +26,8 @@ export function BarreSelection({
   onSupprimer,
   etapes,
   onAnnuler,
+  etiquettes = [],
+  onEtiqueter,
 }: Props) {
   const caseTout = useRef<HTMLInputElement>(null)
 
@@ -61,6 +67,36 @@ export function BarreSelection({
               </option>
             ))}
           </select>
+          {etiquettes.length > 0 && onEtiqueter && (
+            <>
+              <select
+                value=""
+                onChange={(e) => e.target.value && onEtiqueter(e.target.value, true)}
+                aria-label="Ajouter une étiquette à la sélection"
+                className="rounded-md border border-slate-300 bg-surface px-2 py-1 text-sm"
+              >
+                <option value="">Ajouter une étiquette…</option>
+                {etiquettes.map((etiquette) => (
+                  <option key={etiquette.id} value={etiquette.id}>
+                    {etiquette.nom}
+                  </option>
+                ))}
+              </select>
+              <select
+                value=""
+                onChange={(e) => e.target.value && onEtiqueter(e.target.value, false)}
+                aria-label="Retirer une étiquette de la sélection"
+                className="rounded-md border border-slate-300 bg-surface px-2 py-1 text-sm"
+              >
+                <option value="">Retirer une étiquette…</option>
+                {etiquettes.map((etiquette) => (
+                  <option key={etiquette.id} value={etiquette.id}>
+                    {etiquette.nom}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <button
             type="button"
             onClick={onSupprimer}

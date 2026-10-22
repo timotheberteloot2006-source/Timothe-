@@ -3,6 +3,8 @@ import { useState, type DragEvent } from 'react'
 import type { Candidature, Statut } from '@/lib/candidatures'
 import { couleurEtape, nomsEtapes, type Etape } from '@/lib/etapes'
 import { regrouperParStatut } from '@/lib/filtres'
+import type { Etiquette } from '@/lib/etiquettes'
+import { PastillesEtiquettes } from './PastillesEtiquettes'
 
 // Cartes affichées d'emblée par colonne (le reste s'affiche à la demande)
 const CARTES_PAR_COLONNE = 50
@@ -16,9 +18,17 @@ interface Props {
   onChangerStatut: (id: string, statut: Statut) => Promise<void>
   // Une colonne par étape, dans leur ordre
   etapes: Etape[]
+  // Étiquettes posées sur chaque candidature
+  etiquettesDe?: (id: string) => Etiquette[]
 }
 
-export function TableauKanban({ candidatures, titresOffres, onChangerStatut, etapes }: Props) {
+export function TableauKanban({
+  candidatures,
+  titresOffres,
+  onChangerStatut,
+  etapes,
+  etiquettesDe = () => [],
+}: Props) {
   const noms = nomsEtapes(etapes)
   // Statut affiché tout de suite, le temps que la base confirme
   const [deplacees, setDeplacees] = useState(new Map<string, Statut>())
@@ -131,6 +141,7 @@ export function TableauKanban({ candidatures, titresOffres, onChangerStatut, eta
                       {c.competences.join(', ')}
                     </p>
                   )}
+                  <PastillesEtiquettes etiquettes={etiquettesDe(c.id)} petites />
                   {/* Déplacement au clavier (et sans glisser-déposer) */}
                   <select
                     value={c.statut}

@@ -64,6 +64,12 @@ function donneesDeDemonstration(faux: FauxSupabase) {
     contenu: 'Bon entretien.',
     created_at: '2026-01-05T10:00:00Z',
   })
+  // Une étiquette de chaque couleur (contraste en clair et en sombre)
+  faux.ajouterEtiquette('Senior', 'vert', 'Alice Martin')
+  faux.ajouterEtiquette('Télétravail', 'indigo', 'Alice Martin', 'Chloé Petit')
+  faux.ajouterEtiquette('Relancer', 'rouge', 'Bruno Léger')
+  faux.ajouterEtiquette('Urgent', 'ambre', 'Alice Martin')
+  faux.ajouterEtiquette('À revoir', 'gris', 'Chloé Petit')
   faux.ajouterEntretien(alice, new Date(Date.now() + 2 * JOUR), { lieu: 'Visio' })
   faux.ajouterEntretien(alice, new Date(Date.now() - 2 * JOUR), { lieu: 'Téléphone' })
 }

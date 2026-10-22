@@ -34,6 +34,8 @@ describe('decrireEvenement', () => {
     expect(decrire('nouvelle_postulation', { offre: 'Data analyst' })).toBe(
       'A postulé à nouveau (offre : Data analyst)',
     )
+    expect(decrire('etiquette_ajoutee', { nom: 'Senior' })).toBe('Étiquette « Senior » ajoutée')
+    expect(decrire('etiquette_retiree', { nom: 'Senior' })).toBe('Étiquette « Senior » retirée')
   })
 
   it('indique la date des entretiens, à l’heure locale', () => {

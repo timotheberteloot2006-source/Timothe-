@@ -219,6 +219,37 @@ describe('filtre par offre', () => {
   })
 })
 
+describe('filtre par étiquette', () => {
+  const senior = candidature({ id: 'c1', nom: 'Senior' })
+  const junior = candidature({ id: 'c2', nom: 'Junior' })
+  const sansEtiquette = candidature({ id: 'c3', nom: 'Sans' })
+  const attributions = new Map([
+    ['c1', ['e-senior', 'e-distance']],
+    ['c2', ['e-junior']],
+  ])
+
+  it('garde les candidatures qui portent l’étiquette', () => {
+    expect(
+      noms(
+        filtrerCandidatures(
+          [senior, junior, sansEtiquette],
+          { etiquette: 'e-senior' },
+          attributions,
+        ),
+      ),
+    ).toEqual(['Senior'])
+    // Étiquette posée nulle part (supprimée entre-temps) : aucun résultat
+    expect(
+      filtrerCandidatures([senior, junior], { etiquette: 'e-inconnue' }, attributions),
+    ).toEqual([])
+  })
+
+  it('lit l’étiquette depuis l’adresse', () => {
+    expect(lireFiltres({ etiquette: '3f1c-ab' })).toEqual({ etiquette: '3f1c-ab' })
+    expect(lireFiltres({ etiquette: 'a b' })).toEqual({})
+  })
+})
+
 describe('vue tableau', () => {
   it('lireFiltres ne garde que la vue « tableau »', () => {
     expect(lireFiltres({ vue: 'tableau' })).toEqual({ vue: 'tableau' })

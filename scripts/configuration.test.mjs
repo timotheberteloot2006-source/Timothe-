@@ -177,6 +177,7 @@ describe('verifierSupabase', () => {
       if (url.includes('/modeles_reponse?select=nom')) return [404, { code: 'PGRST205' }]
       if (url.includes('/criteres?select=nom')) return [404, { code: 'PGRST205' }]
       if (url.endsWith('/rpc/noter_reponse_envoyee')) return [404, { code: 'PGRST202' }]
+      if (url.includes('/etiquettes?select=couleur')) return [404, { code: 'PGRST205' }]
       if (url.endsWith('/rappels-entretiens'))
         return [500, { erreur: 'RAPPELS_SECRET non configuré.' }]
       if (url.endsWith('/portail-client')) return [404, {}]
@@ -189,7 +190,7 @@ describe('verifierSupabase', () => {
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
       expect.stringContaining(
-        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021 manquent',
+        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022 manquent',
       ),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
@@ -208,7 +209,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0021')
+    expect(MIGRATIONS.at(-1).numero).toBe('0022')
   })
 })
 
