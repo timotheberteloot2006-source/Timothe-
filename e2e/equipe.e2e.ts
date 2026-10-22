@@ -29,6 +29,7 @@ test('le propriétaire renomme son espace et gère les liens d’invitation', as
 
   // Le nom de l'espace apparaît dans le tableau de bord
   await page.getByRole('link', { name: 'Tableau de bord' }).click()
+  await expect(page.getByRole('heading', { name: 'Candidatures', level: 1 })).toBeVisible()
   await expect(page.getByText('Espace « Cabinet Martin »')).toBeVisible()
 })
 

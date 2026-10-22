@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 
 // Ko compressés ; à relever consciemment si une fonctionnalité le justifie
-const BUDGET_JS_INITIAL = 140
+const BUDGET_JS_INITIAL = 135
 const BUDGET_CSS = 8
 
 const DOSSIER = 'dist-budget'

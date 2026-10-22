@@ -2,28 +2,13 @@ import type { Candidature } from './candidatures'
 import type { Etape } from './etapes'
 import type { Etiquette } from './etiquettes'
 import type { Offre } from './offres'
+import { type Periode } from './parametres'
 import { SUPABASE_NON_CONFIGURE, supabase } from './supabase'
+
+export { lirePeriode, PERIODES, type Periode } from './parametres'
 
 // Indicateurs de recrutement de la page Statistiques, sur les candidatures reçues pendant une
 // période
-
-export const PERIODES = {
-  '30j': '30 derniers jours',
-  '90j': '90 derniers jours',
-  '12m': '12 derniers mois',
-  tout: 'Depuis le début',
-} as const
-
-export type Periode = keyof typeof PERIODES
-
-// « tout » est la période par défaut : inutile de la garder dans l'adresse
-export function lirePeriode(search: Record<string, unknown>): { periode?: Periode } {
-  return typeof search.periode === 'string' &&
-    Object.hasOwn(PERIODES, search.periode) &&
-    search.periode !== 'tout'
-    ? { periode: search.periode as Periode }
-    : {}
-}
 
 // Début de la période, ou null pour « depuis le début »
 export function debutPeriode(periode: Periode, maintenant = new Date()): Date | null {

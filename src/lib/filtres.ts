@@ -1,64 +1,8 @@
 import { normaliser, type Candidature, type Statut } from './candidatures'
 import { CLES_DE_BASE } from './etapes'
+import { PAR_PAGE, type Filtres, type Tri } from './parametres'
 
-export interface Filtres {
-  // Recherche dans le nom, l'e-mail et le poste
-  q?: string
-  // Compétences séparées par des virgules ; toutes sont exigées
-  competences?: string
-  experienceMin?: number
-  statut?: Statut
-  // Identifiant d'offre, ou « aucune » pour les candidatures sans offre
-  offre?: string
-  // Identifiant d'étiquette (src/lib/etiquettes.ts)
-  etiquette?: string
-  // Absent : plus récentes d'abord
-  tri?: Tri
-  // Absent : première page
-  page?: number
-  // Absent : liste ; « tableau » : colonnes par statut (sans pagination)
-  vue?: 'tableau'
-}
-
-export const PAR_PAGE = 25
-
-export const TRIS = {
-  recent: 'Plus récentes',
-  ancien: 'Plus anciennes',
-  nom: 'Nom (A → Z)',
-  'nom-desc': 'Nom (Z → A)',
-  experience: 'Plus d’expérience',
-  'experience-asc': 'Moins d’expérience',
-  statut: 'Statut',
-  note: 'Mieux notées',
-} as const
-
-export type Tri = keyof typeof TRIS
-
-// Lit les filtres depuis les paramètres d'URL en ignorant les valeurs invalides
-export function lireFiltres(search: Record<string, unknown>): Filtres {
-  const filtres: Filtres = {}
-  if (typeof search.q === 'string' && search.q.trim()) filtres.q = search.q
-  if (typeof search.competences === 'string' && search.competences.trim())
-    filtres.competences = search.competences
-  const experience = Number(search.experienceMin)
-  if (search.experienceMin !== undefined && Number.isInteger(experience) && experience > 0)
-    filtres.experienceMin = experience
-  // Clé d'étape (vérifiée ensuite contre les étapes de l'espace : une clé inconnue ne filtre rien)
-  if (typeof search.statut === 'string' && /^[a-z0-9_]{1,40}$/.test(search.statut))
-    filtres.statut = search.statut
-  if (typeof search.offre === 'string' && /^[\w-]{1,64}$/.test(search.offre))
-    filtres.offre = search.offre
-  if (typeof search.etiquette === 'string' && /^[\w-]{1,64}$/.test(search.etiquette))
-    filtres.etiquette = search.etiquette
-  // « recent » est l'ordre par défaut : inutile de le garder dans l'adresse
-  if (typeof search.tri === 'string' && Object.hasOwn(TRIS, search.tri) && search.tri !== 'recent')
-    filtres.tri = search.tri as Tri
-  const page = Number(search.page)
-  if (Number.isInteger(page) && page > 1) filtres.page = page
-  if (search.vue === 'tableau') filtres.vue = 'tableau'
-  return filtres
-}
+export { lireFiltres, PAR_PAGE, TRIS, type Filtres, type Tri } from './parametres'
 
 // attributions : identifiants des étiquettes posées, par candidature
 export function filtrerCandidatures(

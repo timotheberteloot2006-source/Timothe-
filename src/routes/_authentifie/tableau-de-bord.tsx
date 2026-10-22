@@ -31,13 +31,8 @@ import {
   poserEtiquette,
   retirerEtiquette,
 } from '@/lib/etiquettes'
-import {
-  filtrerCandidatures,
-  lireFiltres,
-  paginer,
-  trierCandidatures,
-  type Filtres,
-} from '@/lib/filtres'
+import { filtrerCandidatures, paginer, trierCandidatures, type Filtres } from '@/lib/filtres'
+import { lireFiltres } from '@/lib/parametres'
 import { genererCsv, nomFichierExport, telechargerCsv } from '@/lib/exportCandidatures'
 import { listerOffres, titresParId } from '@/lib/offres'
 import { listerEntretiensAVenir, prochainParCandidature } from '@/lib/entretiens'

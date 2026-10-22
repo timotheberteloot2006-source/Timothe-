@@ -28,7 +28,17 @@ function entetesSecurite(urlSupabase: string | undefined): Record<string, string
 export default defineConfig(({ mode }) => ({
   plugins: [
     // TanStack Router doit passer avant le plugin React
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      codeSplittingOptions: {
+        defaultBehavior: [
+          ['loader'],
+          ['component'],
+          ['errorComponent', 'notFoundComponent', 'pendingComponent'],
+        ],
+      },
+    }),
     react(),
     tailwindcss(),
   ],

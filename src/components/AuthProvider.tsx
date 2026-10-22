@@ -1,7 +1,6 @@
 import type { Session } from '@supabase/auth-js'
 import { useEffect, useState, type ReactNode } from 'react'
 import { AuthContext, type ResultatInscription } from '@/lib/auth'
-import { supprimerTousLesCv } from '@/lib/cv'
 import { SUPABASE_NON_CONFIGURE, supabase } from '@/lib/supabase'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -85,6 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Les fichiers ne sont pas effacés avec l'utilisateur : on supprime d'abord les CV des
       // espaces dont il est propriétaire (supprimés avec lui), jamais ceux d'une autre équipe
+      // Module chargé à la demande : la suppression du compte est rare
+      const { supprimerTousLesCv } = await import('@/lib/cv')
       await supprimerTousLesCv()
     } catch (e) {
       return e instanceof Error ? e.message : String(e)

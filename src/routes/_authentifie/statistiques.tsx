@@ -8,12 +8,10 @@ import {
   calculerIndicateurs,
   formaterDelai,
   libelleMois,
-  lirePeriode,
   listerDatesRetenues,
-  PERIODES,
   pourcentage,
-  type Periode,
 } from '@/lib/indicateurs'
+import { lirePeriode, PERIODES, type Periode } from '@/lib/parametres'
 import { listerOffres } from '@/lib/offres'
 import { rechargementALaDemande, sansInterruption } from '@/lib/rechargement'
 import { titrePage } from '@/lib/titre'

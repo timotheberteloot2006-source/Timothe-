@@ -267,12 +267,20 @@ notes, le stockage des CV et les règles de sécurité (RLS).
 ### Performance
 
 `npm run budget` construit le site comme en production et vérifie le poids compressé du code
-chargé à l'ouverture d'une page : 140 Ko de JavaScript et 8 Ko de CSS au plus
+chargé à l'ouverture d'une page : 135 Ko de JavaScript et 8 Ko de CSS au plus
 (`scripts/budget.mjs`, lancé par la vérification automatique). Pour tenir ce budget :
 
-- chaque page est un morceau séparé, chargé à la visite (découpage automatique de TanStack Router) ;
+- chaque page est découpée en morceaux chargés à la visite (découpage automatique de TanStack
+  Router, `vite.config.ts`) : son affichage, et aussi le chargement de ses données (`loader`), qui
+  entraîne avec lui les modules de calcul (`src/lib/filtres.ts`, `indicateurs.ts`…) ;
+- ce qui est lu au démarrage pour valider l'adresse d'une page (filtres de la liste, période des
+  statistiques) vit dans `src/lib/parametres.ts`, sans dépendance ;
 - `src/lib/clientSupabase.ts` assemble un client Supabase sans le temps réel (inutilisé), et ne
-  télécharge le stockage des CV et les fonctions de paiement qu'à leur première utilisation.
+  télécharge le stockage des CV et les fonctions de paiement qu'à leur première utilisation ; la
+  suppression des CV d'un compte supprimé est chargée à la demande.
+
+Le reste du code chargé au démarrage est surtout React, l'authentification
+Supabase et le routeur, nécessaires dès la première page.
 
 ### Accessibilité
 
