@@ -235,6 +235,8 @@ function FicheCandidature() {
       />
       {criteres && (
         <CarteEvaluation
+          // Recréée en changeant de candidature (sinon ses notes resteraient affichées)
+          key={`evaluation-${c.id}`}
           candidatureId={c.id}
           criteres={criteres}
           evaluations={evaluations}
@@ -244,9 +246,11 @@ function FicheCandidature() {
       )}
       <CarteNotes candidatureId={c.id} notes={notes} executer={executer} />
       <CarteReponse
+        // Recréée en changeant de candidature : brouillon et confirmation repartent de zéro
+        key={`reponse-${c.id}`}
         candidature={c}
         offreTitre={offre?.titre ?? null}
-        espaceNom={espace?.nom ?? ''}
+        espaceNom={espace?.nom ?? null}
         modeles={modeles}
         onEnvoye={() => router.invalidate()}
       />

@@ -1,6 +1,7 @@
 // Envoie au candidat une réponse (modèle de l'espace, retouché ou non) depuis sa fiche, puis la
 // note dans l'historique. Appelée par un membre connecté : ses droits s'appliquent (fonctions SQL
-// preparer_reponse et noter_reponse_envoyee, supabase/migrations/0019_modeles_reponse.sql).
+// preparer_reponse et noter_reponse_envoyee, supabase/migrations/0021_relecture_3.sql). La
+// préparation réserve l'envoi (limite par espace) et donne le jeton qu'exige la trace.
 import { courrielsActives, envoyerCourriels } from '../_shared/courriel.ts'
 import { clientUtilisateur, corsHeaders, json } from '../_shared/http.ts'
 import { corpsHtml, expediteurPour, remplirModele, valeursModele } from '../_shared/modeles.ts'
@@ -15,6 +16,7 @@ interface Preparation {
   poste: string | null
   espace_nom: string
   envoyeur: string | null
+  jeton: string
 }
 
 Deno.serve(async (req) => {
@@ -75,6 +77,7 @@ Deno.serve(async (req) => {
 
   const trace = await client.rpc('noter_reponse_envoyee', {
     id_candidature: candidature,
+    reservation: c.jeton,
     sujet: ligne(remplirModele(sujet, valeurs), 200),
     modele,
   })

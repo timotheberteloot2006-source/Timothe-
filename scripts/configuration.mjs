@@ -2,6 +2,8 @@
 // Chaque contrôle renvoie une liste de résultats { niveau: 'ok' | 'attention' | 'erreur', message }.
 // Les contrôles distants ne font que des lectures (aucune donnée créée ni modifiée).
 
+import { SECRET_VALIDE } from './planification.mjs'
+
 export const MIGRATIONS = [
   // Une table ou une colonne créée par chaque migration ; 0002, 0003 et 0009 n'ajoutent que des
   // contraintes ou des fonctions, non visibles sans compte
@@ -27,6 +29,16 @@ export const MIGRATIONS = [
   { numero: '0018', table: 'entretiens', colonne: 'rappel_envoye_le' },
   { numero: '0019', table: 'modeles_reponse', colonne: 'nom' },
   { numero: '0020', table: 'criteres', colonne: 'nom' },
+  // Nouveau paramètre « reservation » : sans la migration, la fonction est introuvable
+  {
+    numero: '0021',
+    fonction: 'noter_reponse_envoyee',
+    arguments: {
+      id_candidature: '00000000-0000-0000-0000-000000000000',
+      reservation: '00000000-0000-0000-0000-000000000000',
+      sujet: '',
+    },
+  },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite
@@ -448,7 +460,7 @@ export function verifierRappels(env) {
         'Rappels d’entretien désactivés (RAPPELS_SECRET absent) : npm run planifier:rappels en propose un.',
       ),
     ]
-  if (!/^[A-Za-z0-9_-]{24,200}$/.test(secret))
+  if (!SECRET_VALIDE.test(secret))
     return [
       erreur('RAPPELS_SECRET doit compter 24 caractères au moins : lettres, chiffres, - et _.'),
     ]

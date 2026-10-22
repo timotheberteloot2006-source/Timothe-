@@ -127,8 +127,8 @@ export function resumerEvaluations(
     moyenne: toutes.length
       ? arrondir(toutes.reduce((s, e) => s + e.note, 0) / toutes.length)
       : null,
-    // Notes d'un compte supprimé : on ne sait plus qui les a données, comptées par critère
-    evaluateurs: new Set(toutes.map((e) => e.user_id ?? `supprime-${e.critere_id}`)).size,
+    // Comptes supprimés : un seul évaluateur (même règle que moyennes_evaluations, migration 0021)
+    evaluateurs: new Set(toutes.map((e) => e.user_id ?? 'compte supprimé')).size,
   }
 }
 

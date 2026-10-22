@@ -27,6 +27,19 @@ describe('resumerEvaluations', () => {
     expect(resume.evaluateurs).toBe(2)
   })
 
+  it('les notes de comptes supprimés comptent pour un seul évaluateur', () => {
+    const resume = resumerEvaluations(
+      [
+        { critere_id: 'tech', user_id: null, note: 4 },
+        { critere_id: 'com', user_id: null, note: 2 },
+        { critere_id: 'tech', user_id: 'lea', note: 5 },
+      ],
+      CRITERES,
+      'moi',
+    )
+    expect(resume.evaluateurs).toBe(2)
+  })
+
   it('sans note : rien à afficher', () => {
     const resume = resumerEvaluations([], CRITERES, 'moi')
     expect(resume.moyenne).toBeNull()

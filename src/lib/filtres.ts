@@ -82,7 +82,7 @@ export function trierCandidatures(
   candidatures: Candidature[],
   tri: Tri = 'recent',
   ordreEtapes: readonly string[] = CLES_DE_BASE,
-  moyennes: ReadonlyMap<string, number> = new Map(),
+  moyennes: ReadonlyMap<string, { moyenne: number }> = new Map(),
 ) {
   const rang = (statut: string) => {
     const i = ordreEtapes.indexOf(statut)
@@ -97,7 +97,7 @@ export function trierCandidatures(
     experience: (a, b) => b.experience - a.experience,
     'experience-asc': (a, b) => a.experience - b.experience,
     statut: (a, b) => rang(a.statut) - rang(b.statut),
-    note: (a, b) => (moyennes.get(b.id) ?? -1) - (moyennes.get(a.id) ?? -1),
+    note: (a, b) => (moyennes.get(b.id)?.moyenne ?? -1) - (moyennes.get(a.id)?.moyenne ?? -1),
   }
   const comparer = comparaisons[tri]
   return [...candidatures].sort((a, b) => comparer(a, b) || plusRecente(a, b))

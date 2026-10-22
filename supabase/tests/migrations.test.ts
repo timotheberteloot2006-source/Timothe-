@@ -1668,35 +1668,44 @@ describe('modèles de réponse', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('préparer : données du modèle pour un membre, refus sinon', async () => {
-    const preparation = await enTant(A, () =>
-      db.query(`select * from public.preparer_reponse('${alice}')`),
-    )
-    expect(preparation.rows).toEqual([
-      {
-        email: 'alice@x.fr',
-        nom: 'Alice',
-        offre_titre: null,
-        poste: null,
-        espace_nom: 'Agence RH',
-        envoyeur: 'a@x.fr',
-      },
-    ])
-    await expect(
-      enTant(B, () => db.query(`select * from public.preparer_reponse('${alice}')`)),
-    ).rejects.toThrow(/^candidature_inaccessible/)
+  const preparer = (uid: string) =>
+    enTant(uid, () =>
+      db.query<{ jeton: string }>(`select * from public.preparer_reponse('${alice}')`),
+    ).then((r) => r.rows)
+
+  it('préparer : données du modèle et jeton d’envoi pour un membre, refus sinon', async () => {
+    const [preparation] = await preparer(A)
+    expect(preparation).toEqual({
+      email: 'alice@x.fr',
+      nom: 'Alice',
+      offre_titre: null,
+      poste: null,
+      espace_nom: 'Agence RH',
+      envoyeur: 'a@x.fr',
+      jeton: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    })
+    await expect(preparer(B)).rejects.toThrow(/^candidature_inaccessible/)
     await db.exec(`update public.candidatures set email = null`)
-    await expect(
-      enTant(A, () => db.query(`select * from public.preparer_reponse('${alice}')`)),
-    ).rejects.toThrow(/^sans_email/)
+    await expect(preparer(A)).rejects.toThrow(/^sans_email/)
   })
 
-  it('noter : trace dans l’historique, au nom de l’utilisateur ; limite d’envois par heure', async () => {
-    await enTant(A, () =>
-      db.exec(
-        `select public.noter_reponse_envoyee('${alice}', 'Proposition d''entretien', 'Convocation à un entretien')`,
-      ),
+  it('noter : trace au nom de l’utilisateur, une seule fois, avec le jeton de l’envoi', async () => {
+    const [{ jeton }] = await preparer(A)
+    const noter = (uid: string, j: string) =>
+      enTant(uid, () =>
+        db.exec(
+          `select public.noter_reponse_envoyee('${alice}', '${j}', 'Proposition d''entretien', 'Convocation à un entretien')`,
+        ),
+      )
+    // Sans jeton valide (appel direct pour fabriquer une fausse trace) : refusé
+    await expect(noter(A, '00000000-0000-0000-0000-000000000000')).rejects.toThrow(
+      /^reservation_invalide/,
     )
+    // Jeton d'un autre utilisateur : refusé
+    await expect(noter(B, jeton)).rejects.toThrow(/^reservation_invalide/)
+    await noter(A, jeton)
+    // Le même jeton ne sert qu'une fois
+    await expect(noter(A, jeton)).rejects.toThrow(/^reservation_invalide/)
     const { rows } = await db.query(
       `select action, details, email from public.historique where action = 'reponse_envoyee'`,
     )
@@ -1710,17 +1719,17 @@ describe('modèles de réponse', () => {
         email: 'a@x.fr',
       },
     ])
-    await expect(
-      enTant(B, () => db.exec(`select public.noter_reponse_envoyee('${alice}', 'x')`)),
-    ).rejects.toThrow(/^candidature_inaccessible/)
+  })
 
+  it('limite d’envois : comptée à la préparation, envoyé ou non', async () => {
     await db.exec(`
-      insert into public.historique (candidature_id, espace_id, action)
-        select '${alice}', '${A}', 'reponse_envoyee' from generate_series(1, 99);
+      delete from prive.envois_reponses;
+      insert into prive.envois_reponses (espace_id, candidature_id, user_id)
+        select '${A}', '${alice}', '${A}' from generate_series(1, 99);
     `)
-    await expect(
-      enTant(A, () => db.query(`select * from public.preparer_reponse('${alice}')`)),
-    ).rejects.toThrow(/^trop_de_reponses/)
+    // La centième passe, la suivante non (même si la centième n'a jamais été notée)
+    await preparer(A)
+    await expect(preparer(A)).rejects.toThrow(/^trop_de_reponses/)
   })
 
   it('sans compte : rien', async () => {
@@ -1729,9 +1738,11 @@ describe('modèles de réponse', () => {
       await expect(db.query(`select * from public.preparer_reponse('${alice}')`)).rejects.toThrow(
         /permission denied/,
       )
-      await expect(db.exec(`select public.noter_reponse_envoyee('${alice}', 'x')`)).rejects.toThrow(
-        /permission denied/,
-      )
+      await expect(
+        db.exec(
+          `select public.noter_reponse_envoyee('${alice}', '00000000-0000-0000-0000-000000000000', 'x')`,
+        ),
+      ).rejects.toThrow(/permission denied/)
     } finally {
       await db.exec('reset role')
     }
@@ -1849,6 +1860,18 @@ describe('évaluations', () => {
     await enTant(A, () => db.exec(`delete from public.criteres where id = '${technique}'`))
     const { rows } = await db.query('select count(*)::int as n from public.evaluations')
     expect(rows).toEqual([{ n: 0 }])
+  })
+
+  it('les notes de comptes supprimés comptent pour un seul évaluateur', async () => {
+    const technique = await critere('Compétences techniques')
+    const communication = await critere('Communication')
+    await db.exec(`
+      insert into public.evaluations (candidature_id, critere_id, note, user_id) values
+        ('${alice}', '${technique}', 4, null), ('${alice}', '${communication}', 2, null);
+    `)
+    await enTant(B, () => noter(technique, 5))
+    const { rows } = await enTant(A, () => db.query('select * from public.moyennes_evaluations()'))
+    expect(rows).toEqual([{ candidature_id: alice, moyenne: '3.7', evaluateurs: 2 }])
   })
 
   it('sans compte : rien', async () => {

@@ -19,7 +19,17 @@ export function courrielsActives() {
 // L'API d'envoi groupé accepte 100 e-mails par appel
 const TAILLE_LOT = 100
 
-// Renvoie false si l'envoi est désactivé ; lève une erreur si Resend refuse
+// Échec d'envoi : envoyes indique combien d'e-mails étaient déjà partis (lots précédents)
+export class EnvoiInterrompu extends Error {
+  constructor(
+    message: string,
+    readonly envoyes: number,
+  ) {
+    super(message)
+  }
+}
+
+// Renvoie false si l'envoi est désactivé ; lève EnvoiInterrompu si Resend refuse ou ne répond pas
 export async function envoyerCourriels(courriels: Courriel[]): Promise<boolean> {
   const cle = Deno.env.get('RESEND_API_KEY')
   const expediteur = Deno.env.get('EMAIL_EXPEDITEUR')
@@ -33,8 +43,11 @@ export async function envoyerCourriels(courriels: Courriel[]): Promise<boolean> 
       body: JSON.stringify(
         courriels.slice(debut, debut + TAILLE_LOT).map((c) => ({ from: expediteur, ...c })),
       ),
+    }).catch((e) => {
+      throw new EnvoiInterrompu(`Resend injoignable : ${e instanceof Error ? e.message : e}`, debut)
     })
-    if (!reponse.ok) throw new Error(`Resend : ${reponse.status} ${await reponse.text()}`)
+    if (!reponse.ok)
+      throw new EnvoiInterrompu(`Resend : ${reponse.status} ${await reponse.text()}`, debut)
   }
   return true
 }

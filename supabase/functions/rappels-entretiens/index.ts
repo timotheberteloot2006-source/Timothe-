@@ -1,7 +1,7 @@
 // Envoie les rappels d'entretien de la veille. Appelée chaque jour par une tâche planifiée de la
 // base (npm run planifier:rappels, voir docs/MISE_EN_LIGNE.md), avec l'en-tête
 // x-rappels-secret ; à déployer sans vérification de jeton Supabase.
-import { envoyerCourriels } from '../_shared/courriel.ts'
+import { EnvoiInterrompu, envoyerCourriels } from '../_shared/courriel.ts'
 import { json, SITE_URL, supabaseAdmin } from '../_shared/http.ts'
 import { preparerRappels, type EntretienARappeler } from './rappels.ts'
 
@@ -24,19 +24,35 @@ Deno.serve(async (req) => {
   if (entretiens.length === 0) return json({ entretiens: 0, courriels: 0 })
 
   const courriels = preparerRappels(entretiens, SITE_URL, FUSEAU)
-  let envoyes: boolean
+  let partis = 0
   try {
-    envoyes = await envoyerCourriels(courriels)
+    if (await envoyerCourriels(courriels)) partis = courriels.length
   } catch (e) {
-    envoyes = false
+    partis = e instanceof EnvoiInterrompu ? e.envoyes : 0
     console.error('Rappels non envoyés :', e)
   }
-  if (!envoyes) {
-    // E-mails désactivés ou refusés : rien n'est marqué, les rappels repartiront la fois suivante
-    await admin.rpc('rendre_entretiens_a_rappeler', { ids: entretiens.map((e) => e.entretien) })
-    return json({ erreur: 'Rappels non envoyés (e-mails désactivés ou refusés).' }, 503)
+  if (partis === courriels.length) return json({ entretiens: entretiens.length, courriels: partis })
+
+  if (partis > 0) {
+    // Envoi interrompu en cours de route : les rappels restent marqués, pour ne pas renvoyer
+    // deux fois ceux qui sont partis (quelques destinataires n'auront pas le leur)
+    return json({ erreur: `Rappels envoyés en partie (${partis} sur ${courriels.length}).` }, 502)
   }
-  return json({ entretiens: entretiens.length, courriels: courriels.length })
+  // Rien n'est parti (e-mails désactivés ou refusés) : rappels rendus, retentés la fois suivante
+  const rendus = await admin.rpc('rendre_entretiens_a_rappeler', {
+    ids: entretiens.map((e) => e.entretien),
+  })
+  if (rendus.error) {
+    console.error('Rappels non rendus :', rendus.error.message)
+    return json(
+      {
+        erreur:
+          'Rappels non envoyés, et restés marqués comme envoyés : ils ne seront pas retentés.',
+      },
+      500,
+    )
+  }
+  return json({ erreur: 'Rappels non envoyés (e-mails désactivés ou refusés).' }, 503)
 })
 
 // Comparaison en temps constant : la durée ne renseigne pas sur la longueur du préfixe juste

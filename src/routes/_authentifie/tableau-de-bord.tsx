@@ -94,7 +94,7 @@ function TableauDeBord() {
     filtrerCandidatures(candidatures, filtres),
     filtres.tri,
     etapes.map((e) => e.cle),
-    new Map([...moyennes].map(([id, m]) => [id, m.moyenne])),
+    moyennes,
   )
   const pagination = paginer(resultats, filtres.page)
   // Affichage changé : on oublie la sélection (mise à jour pendant le rendu, motif React

@@ -8,7 +8,8 @@ import { classeChamp } from './styles'
 interface Props {
   candidature: { id: string; nom: string; email: string | null; poste: string | null }
   offreTitre: string | null
-  espaceNom: string
+  // null : nom non chargé ; l'aperçu le signale au lieu de l'omettre (le serveur le remplit)
+  espaceNom: string | null
   modeles: Modele[]
   // Après l'envoi (rechargement de l'historique)
   onEnvoye: () => Promise<void>
@@ -30,7 +31,7 @@ export function CarteReponse({ candidature, offreTitre, espaceNom, modeles, onEn
     nom: candidature.nom,
     offre_titre: offreTitre,
     poste: candidature.poste,
-    espace_nom: espaceNom,
+    espace_nom: espaceNom ?? '[nom de l’espace]',
   })
 
   function choisir(id: string) {
@@ -116,11 +117,11 @@ export function CarteReponse({ candidature, offreTitre, espaceNom, modeles, onEn
               required
               maxLength={5000}
               rows={8}
-              aria-describedby="aide-variables"
+              aria-describedby={`${id}-aide`}
               className={classeChamp}
             />
           </div>
-          <p id="aide-variables" className="text-xs text-slate-600">
+          <p id={`${id}-aide`} className="text-xs text-slate-600">
             {'{nom}'}, {'{offre}'} et {'{espace}'} sont remplacés à l’envoi. Le candidat répondra à
             votre adresse e-mail. Modèles : page{' '}
             <Link to="/equipe" className="text-accent underline underline-offset-2">
