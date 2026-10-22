@@ -15,6 +15,7 @@ import {
   type Periode,
 } from '@/lib/indicateurs'
 import { listerOffres } from '@/lib/offres'
+import { rechargementALaDemande } from '@/lib/rechargement'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/statistiques')({
@@ -34,8 +35,7 @@ export const Route = createFileRoute('/_authentifie/statistiques')({
       ])
     return { candidatures, etapes, offres, etiquettes, attributions, datesRetenues }
   },
-  // Le calcul se fait dans le navigateur : ne pas recharger en changeant de période
-  shouldReload: false,
+  ...rechargementALaDemande,
   component: PageStatistiques,
   errorComponent: ({ error }) => (
     <section className="mx-auto max-w-5xl px-4 py-16">

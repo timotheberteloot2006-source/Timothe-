@@ -42,6 +42,7 @@ import { genererCsv, nomFichierExport, telechargerCsv } from '@/lib/exportCandid
 import { listerOffres, titresParId } from '@/lib/offres'
 import { listerEntretiensAVenir, prochainParCandidature } from '@/lib/entretiens'
 import { EntretiensAVenir } from '@/components/candidatures/EntretiensAVenir'
+import { rechargementALaDemande } from '@/lib/rechargement'
 import { titrePage } from '@/lib/titre'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
@@ -64,8 +65,7 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
       ])
     return { candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions }
   },
-  // Le filtrage se fait dans le navigateur : ne pas recharger à chaque changement de filtre
-  shouldReload: false,
+  ...rechargementALaDemande,
   component: TableauDeBord,
   errorComponent: ({ error }) => (
     <section className="mx-auto max-w-6xl px-4 py-16">

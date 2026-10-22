@@ -69,6 +69,13 @@ le propriétaire règle depuis la page **Équipe**. Sur la fiche, chaque membre 
 modifier ou effacer que ses propres notes. La liste affiche la note moyenne et se trie par
 « Mieux notées ».
 
+**Données à jour** : les pages connectées se rafraîchissent seules toutes les minutes tant
+qu'elles sont affichées, et aussitôt en revenant sur un onglet resté caché plus de 30 secondes,
+pour montrer les modifications des autres membres ; le rechargement se fait en arrière-plan,
+sans toucher aux saisies en cours. Changer un filtre de la liste ou la période des statistiques ne
+recharge rien (le calcul se fait dans le navigateur), mais un filtre changé pendant un
+rechargement attend sa fin au lieu de garder les anciennes données (`src/lib/rechargement.ts`).
+
 **Statistiques** (page dédiée) : sur une période choisie (30 ou 90 derniers jours, 12 derniers
 mois ou depuis le début, gardée dans l'adresse), les candidatures reçues et la part arrivée par le
 formulaire en ligne, les parts retenues et écartées, le délai médian entre la réception et le
