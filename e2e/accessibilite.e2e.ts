@@ -127,6 +127,24 @@ for (const schema of ['light', 'dark'] as const) {
       expect(await auditer(page)).toEqual([])
     })
 
+    test('candidature partagée', async ({ page }) => {
+      const faux = new FauxSupabase()
+      await faux.installer(page)
+      donneesDeDemonstration(faux)
+      const alice = faux.candidature('Alice Martin')!
+      const technique = faux.criteres()[0]
+      faux.evaluations.push({
+        candidature_id: alice.id,
+        critere_id: technique.id,
+        user_id: 'lea',
+        note: 4,
+      })
+      const { jeton } = faux.ajouterPartage(alice.id, { avec_cv: true, avec_notes: true })
+      await page.goto(`/partage/${jeton}`)
+      await expect(page.locator('h1')).toHaveText('Alice Martin')
+      expect(await auditer(page)).toEqual([])
+    })
+
     test('page carrières publique', async ({ page }) => {
       const faux = new FauxSupabase()
       await faux.installer(page)

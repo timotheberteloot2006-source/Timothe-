@@ -106,6 +106,13 @@ export function decrireEvenement(evenement: Pick<Evenement, 'action' | 'details'
       return typeof details.nom === 'string'
         ? `Étiquette « ${details.nom} » retirée`
         : 'Étiquette retirée'
+    case 'partage_cree':
+      return typeof details.expire_le === 'string' &&
+        !Number.isNaN(new Date(details.expire_le).getTime())
+        ? `Lien de partage créé, valable jusqu’au ${new Date(details.expire_le).toLocaleDateString('fr-FR', { dateStyle: 'long' })}`
+        : 'Lien de partage créé'
+    case 'partage_revoque':
+      return 'Lien de partage révoqué'
     case 'entretien_planifie':
       return `Entretien planifié${dateEntretien(details.debut)}`
     case 'entretien_supprime':

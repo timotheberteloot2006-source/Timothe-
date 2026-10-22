@@ -55,6 +55,9 @@ echo "3/3 Fonctions (sans Docker)"
 "${SUPABASE[@]}" functions deploy webhook-stripe --no-verify-jwt --use-api
 # Formulaire public : le candidat n'a pas de compte (contrôles faits par la fonction et la base)
 "${SUPABASE[@]}" functions deploy postuler --no-verify-jwt --use-api
+# CV d'une candidature partagée : le visiteur du lien n'a pas de compte (le lien est vérifié par
+# la base)
+"${SUPABASE[@]}" functions deploy cv-partage --no-verify-jwt --use-api
 # Rappels d'entretien : appelée par la tâche planifiée avec son propre secret (x-rappels-secret)
 "${SUPABASE[@]}" functions deploy rappels-entretiens --no-verify-jwt --use-api
 

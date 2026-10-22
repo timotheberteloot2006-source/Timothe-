@@ -136,6 +136,7 @@ function supabaseComplet(methode, url) {
   if (url.endsWith('/auth/v1/settings')) return [200, { external: { email: true } }]
   if (url.endsWith('/webhook-stripe')) return [400, { erreur: 'Signature manquante.' }]
   if (url.endsWith('/postuler')) return [400, { erreur: 'Formulaire illisible.' }]
+  if (url.endsWith('/cv-partage')) return [400, { erreur: 'Lien de partage invalide.' }]
   if (url.endsWith('/rappels-entretiens')) return [401, { erreur: 'Accès refusé.' }]
   return undefined
 }
@@ -143,7 +144,7 @@ function supabaseComplet(methode, url) {
 describe('verifierSupabase', () => {
   it('projet prêt', async () => {
     const { fetch, appels } = fauxFetch(supabaseComplet)
-    expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual([...Array(8).fill('ok')])
+    expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual([...Array(9).fill('ok')])
     // Seulement des lectures, et des appels refusés : fonction de la migration 0017 sans droit
     // ni étape existante, webhook sans signature, formulaire vide
     expect(appels.filter((a) => !a.startsWith('GET ') && !a.startsWith('OPTIONS '))).toEqual([
@@ -152,6 +153,7 @@ describe('verifierSupabase', () => {
       `POST ${URL_PROJET}/functions/v1/webhook-stripe`,
       `POST ${URL_PROJET}/functions/v1/rappels-entretiens`,
       `POST ${URL_PROJET}/functions/v1/postuler`,
+      `POST ${URL_PROJET}/functions/v1/cv-partage`,
     ])
   })
 
@@ -183,6 +185,8 @@ describe('verifierSupabase', () => {
       if (url.endsWith('/portail-client')) return [404, {}]
       if (url.endsWith('/webhook-stripe')) return [401, { msg: 'Missing authorization header' }]
       if (url.endsWith('/postuler')) return [401, { msg: 'Missing authorization header' }]
+      if (url.endsWith('/cv-partage')) return [404, {}]
+      if (url.includes('/partages?select=jeton')) return [404, { code: 'PGRST205' }]
       if (url.endsWith('/auth/v1/settings'))
         return [200, { external: { email: true }, mailer_autoconfirm: true }]
       return undefined
@@ -190,11 +194,12 @@ describe('verifierSupabase', () => {
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
       expect.stringContaining(
-        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022 manquent',
+        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023 manquent',
       ),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
       expect.stringContaining('postuler refuse'),
+      'Fonction cv-partage non déployée.',
     ])
     expect(resultats.find((r) => r.niveau === 'attention')?.message).toContain('Confirm email')
   })
@@ -209,7 +214,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0022')
+    expect(MIGRATIONS.at(-1).numero).toBe('0023')
   })
 })
 

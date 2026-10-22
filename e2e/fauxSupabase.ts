@@ -114,6 +114,19 @@ export interface EtiquetteFaux {
   couleur: string
 }
 
+export interface PartageFaux {
+  id: string
+  jeton: string
+  candidature_id: string
+  avec_cv: boolean
+  avec_notes: boolean
+  expire_le: string
+  revoque_le: string | null
+  consultations: number
+  derniere_consultation: string | null
+  created_at: string
+}
+
 interface NoteFaux {
   id: string
   candidature_id: string
@@ -168,6 +181,8 @@ export class FauxSupabase {
   private criteresCrees = new Set<string>()
   criteresListe: CritereFaux[] = []
   evaluations: EvaluationFaux[] = []
+  // Liens de partage (supabase/migrations/0023_partages.sql)
+  partages: PartageFaux[] = []
   // Étiquettes et étiquettes posées (supabase/migrations/0022_etiquettes.sql)
   etiquettes: EtiquetteFaux[] = []
   attributions: { candidature_id: string; etiquette_id: string }[] = []
@@ -306,6 +321,25 @@ export class FauxSupabase {
     }
     this.etapesCreees.push(etape)
     return etape
+  }
+
+  // Lien de partage valable 7 jours (sauf autre précision)
+  ajouterPartage(candidatureId: string, champs: Partial<PartageFaux> = {}) {
+    const partage: PartageFaux = {
+      id: crypto.randomUUID(),
+      jeton: crypto.randomUUID(),
+      candidature_id: candidatureId,
+      avec_cv: false,
+      avec_notes: false,
+      expire_le: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      revoque_le: null,
+      consultations: 0,
+      derniere_consultation: null,
+      created_at: new Date().toISOString(),
+      ...Object.fromEntries(Object.entries(champs).filter(([, v]) => v !== undefined)),
+    }
+    this.partages.push(partage)
+    return partage
   }
 
   // Étiquette de l'espace actif, posée sur les candidatures nommées
@@ -572,6 +606,98 @@ export class FauxSupabase {
           .sort((a, b) => a.titre.localeCompare(b.titre, 'fr', { sensitivity: 'base' }))
           .map((o) => ({ titre: o.titre, description: o.description, jeton: o.jeton_public })),
       })
+    }
+
+    // Partages (supabase/migrations/0023_partages.sql)
+    if (chemin === '/rest/v1/partages') {
+      const filtre = url.searchParams.get('candidature_id')?.replace(/^eq[.]/, '')
+      if (methode === 'GET')
+        return json(
+          this.partages
+            .filter((p) => p.candidature_id === filtre)
+            .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        )
+      if (methode === 'POST') {
+        const champs = corps(requete) as Partial<PartageFaux>
+        const valables = this.partages.filter(
+          (p) =>
+            p.candidature_id === champs.candidature_id &&
+            !p.revoque_le &&
+            new Date(p.expire_le) > new Date(),
+        )
+        if (valables.length >= 10)
+          return json({ code: 'P0001', message: 'trop_de_partages: 10' }, 400)
+        const partage = this.ajouterPartage(champs.candidature_id!, {
+          avec_cv: champs.avec_cv,
+          avec_notes: champs.avec_notes,
+          expire_le: champs.expire_le,
+        })
+        this.journaliser(partage.candidature_id, 'partage_cree', { expire_le: partage.expire_le })
+        const objet = (requete.headers()['accept'] ?? '').includes('vnd.pgrst.object')
+        return json(objet ? partage : [partage], 201)
+      }
+    }
+    if (chemin === '/rest/v1/rpc/revoquer_partage') {
+      const { id_partage } = corps(requete) as { id_partage: string }
+      const partage = this.partages.find((p) => p.id === id_partage && !p.revoque_le)
+      if (!partage) return json(false)
+      partage.revoque_le = new Date().toISOString()
+      this.journaliser(partage.candidature_id, 'partage_revoque')
+      return json(true)
+    }
+    if (chemin === '/rest/v1/rpc/lire_partage') {
+      const { code } = corps(requete) as { code: string }
+      const p = this.partages.find(
+        (x) => x.jeton === code && !x.revoque_le && new Date(x.expire_le) > new Date(),
+      )
+      if (!p) return json(null)
+      p.consultations++
+      p.derniere_consultation = new Date().toISOString()
+      const c = this.candidatures.find((x) => x.id === p.candidature_id)!
+      const criteres = this.criteres(c.espace_id)
+      return json({
+        nom: c.nom,
+        poste: c.poste,
+        experience: c.experience,
+        competences: c.competences,
+        recue_le: c.created_at,
+        expire_le: p.expire_le,
+        espace: this.espaces.find((e) => e.id === c.espace_id)?.nom,
+        offre: this.offres.find((o) => o.id === c.offre_id)?.titre ?? null,
+        etape: this.etapes(c.espace_id).find((e) => e.cle === c.statut)?.nom ?? null,
+        etiquettes: this.etiquettesDe(c.nom),
+        evaluation: criteres
+          .map((critere) => {
+            const notes = this.evaluations.filter(
+              (e) => e.candidature_id === c.id && e.critere_id === critere.id,
+            )
+            return notes.length
+              ? {
+                  critere: critere.nom,
+                  moyenne:
+                    Math.round((notes.reduce((t, e) => t + e.note, 0) / notes.length) * 10) / 10,
+                }
+              : null
+          })
+          .filter(Boolean),
+        cv: p.avec_cv && !!c.cv_chemin,
+        notes: p.avec_notes
+          ? this.notes
+              .filter((n) => n.candidature_id === c.id)
+              .map((n) => ({ contenu: n.contenu, le: n.created_at }))
+          : null,
+      })
+    }
+    if (chemin === '/functions/v1/cv-partage' && methode === 'POST') {
+      const { jeton } = corps(requete) as { jeton: string }
+      const p = this.partages.find(
+        (x) =>
+          x.jeton === jeton && x.avec_cv && !x.revoque_le && new Date(x.expire_le) > new Date(),
+      )
+      const c = p && this.candidatures.find((x) => x.id === p.candidature_id)
+      if (!c?.cv_chemin)
+        return json({ erreur: 'Ce partage n’inclut pas de CV, ou il a expiré.' }, 404)
+      return json({ url: `${URL_SUPABASE}/storage/v1/object/sign/cv/${c.cv_chemin}?token=partage` })
     }
 
     // Étiquettes (supabase/migrations/0022_etiquettes.sql)

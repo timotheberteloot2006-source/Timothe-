@@ -2047,3 +2047,228 @@ describe('étiquettes', () => {
     }
   })
 })
+
+describe('partages', () => {
+  let alice: string
+
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated;
+      grant select, insert, update, delete on public.partages to authenticated;
+      grant select on public.historique to authenticated;
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+      update public.profils set espace_actif = '${A}' where user_id = '${B}';
+    `)
+    await db.exec(
+      `insert into public.candidatures (user_id, nom, email, poste, competences, experience, cv_chemin)
+       values ('${A}', 'Alice', 'alice@x.fr', 'Développeuse', '{React,SQL}', 5, '${A}/c/cv.pdf')`,
+    )
+    alice = (await db.query<{ id: string }>(`select id from public.candidatures`)).rows[0].id
+    await db.exec(
+      `insert into public.notes (candidature_id, contenu) values ('${alice}', 'Très bon entretien')`,
+    )
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  const creer = (uid: string, champs = `false, false, now() + interval '7 days'`) =>
+    enTant(
+      uid,
+      async () =>
+        (
+          await db.query<{ id: string; jeton: string }>(
+            `insert into public.partages (candidature_id, avec_cv, avec_notes, expire_le)
+           values ('${alice}', ${champs}) returning id, jeton`,
+          )
+        ).rows[0],
+    )
+
+  async function lire(jeton: string) {
+    await db.exec('set role anon')
+    try {
+      return (
+        await db.query<{ p: Record<string, unknown> | null }>(
+          `select public.lire_partage($1) as p`,
+          [jeton],
+        )
+      ).rows[0].p
+    } finally {
+      await db.exec('reset role')
+    }
+  }
+
+  it('sans compte, le lien montre le profil sans coordonnées et compte les consultations', async () => {
+    const { jeton } = await creer(B)
+    const partage = await lire(jeton)
+    expect(partage).toMatchObject({
+      nom: 'Alice',
+      poste: 'Développeuse',
+      experience: 5,
+      competences: ['React', 'SQL'],
+      etape: 'Nouveau',
+      espace: 'Mon espace',
+      cv: false,
+      notes: null,
+      etiquettes: [],
+      evaluation: [],
+    })
+    expect(JSON.stringify(partage)).not.toContain('alice@x.fr')
+    expect(JSON.stringify(partage)).not.toContain('cv.pdf')
+    await lire(jeton)
+    const { rows } = await db.query(`select user_id, consultations from public.partages`)
+    expect(rows).toEqual([{ user_id: B, consultations: 2 }])
+  })
+
+  it('notes et CV seulement s’ils sont inclus ; le chemin du CV réservé au serveur', async () => {
+    const sans = await creer(A)
+    const avec = await creer(A, `true, true, now() + interval '1 day'`)
+    expect(await lire(avec.jeton)).toMatchObject({
+      cv: true,
+      notes: [{ contenu: 'Très bon entretien' }],
+    })
+    const chemin = (code: string) =>
+      db.query<{ c: string | null }>(`select public.cv_du_partage($1) as c`, [code])
+    await db.exec('set role service_role')
+    try {
+      expect((await chemin(avec.jeton)).rows[0].c).toBe(`${A}/c/cv.pdf`)
+      expect((await chemin(sans.jeton)).rows[0].c).toBeNull()
+    } finally {
+      await db.exec('reset role')
+    }
+    await db.exec('set role anon')
+    try {
+      await expect(chemin(avec.jeton)).rejects.toThrow(/permission denied/)
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+
+  it('révoqué ou expiré : plus rien ; la révocation est inscrite dans l’historique', async () => {
+    const { id, jeton } = await creer(A)
+    expect(
+      await enTant(
+        B,
+        async () =>
+          (await db.query<{ r: boolean }>(`select public.revoquer_partage($1) as r`, [id])).rows[0]
+            .r,
+      ),
+    ).toBe(true)
+    expect(await lire(jeton)).toBeNull()
+    // Une seconde fois : rien à révoquer
+    expect(
+      await enTant(
+        A,
+        async () =>
+          (await db.query<{ r: boolean }>(`select public.revoquer_partage($1) as r`, [id])).rows[0]
+            .r,
+      ),
+    ).toBe(false)
+    const expire = await creer(A)
+    await db.exec(
+      `update public.partages set expire_le = now() - interval '1 minute' where id = '${expire.id}'`,
+    )
+    expect(await lire(expire.jeton)).toBeNull()
+    // Jeton inconnu
+    expect(await lire('00000000-0000-0000-0000-000000000000')).toBeNull()
+    const { rows } = await db.query(
+      `select action, user_id from public.historique where action like 'partage%' order by id`,
+    )
+    expect(rows).toEqual([
+      { action: 'partage_cree', user_id: A },
+      { action: 'partage_revoque', user_id: B },
+      { action: 'partage_cree', user_id: A },
+    ])
+  })
+
+  it('durée ramenée à 30 jours ; auteur, jeton et compteurs imposés ; 10 liens valables au plus', async () => {
+    const { id, jeton } = await creer(A, `false, false, now() + interval '1 year'`)
+    const { rows } = await db.query<{ jours: number }>(
+      `select round(extract(epoch from expire_le - created_at) / 86400)::int as jours
+       from public.partages where id = '${id}'`,
+    )
+    expect(rows).toEqual([{ jours: 30 }])
+    await expect(creer(A, `false, false, now() - interval '1 day'`)).rejects.toThrow(
+      /^duree_invalide/,
+    )
+    // Valeurs imposées par la base
+    const force = await enTant(
+      A,
+      async () =>
+        (
+          await db.query<{ jeton: string; consultations: number; user_id: string }>(
+            `insert into public.partages (candidature_id, expire_le, jeton, consultations, user_id)
+       values ('${alice}', now() + interval '1 day', '${jeton}', 99, '${B}')
+       returning jeton, consultations, user_id`,
+          )
+        ).rows[0],
+    )
+    expect(force.jeton).not.toBe(jeton)
+    expect(force).toMatchObject({ consultations: 0, user_id: A })
+    for (let i = 3; i <= 10; i++) await creer(A)
+    await expect(creer(A)).rejects.toThrow(/^trop_de_partages/)
+  })
+
+  it('ni modification ni suppression directes ; rien hors de l’espace actif', async () => {
+    const { id } = await creer(A)
+    await enTant(A, async () => {
+      await db.exec(
+        `update public.partages set expire_le = now() + interval '1 year', consultations = 0`,
+      )
+      await db.exec(`delete from public.partages`)
+    })
+    const { rows } = await db.query(
+      `select count(*)::int as n from public.partages where id = '${id}'`,
+    )
+    expect(rows).toEqual([{ n: 1 }])
+    // Candidature d'un autre espace : refusée
+    await db.exec(`insert into public.candidatures (user_id, nom) values ('${B}', 'Chez B')`)
+    const chezB = (
+      await db.query<{ id: string }>(`select id from public.candidatures where nom = 'Chez B'`)
+    ).rows[0].id
+    await expect(
+      enTant(A, () =>
+        db.exec(
+          `insert into public.partages (candidature_id, expire_le) values ('${chezB}', now() + interval '1 day')`,
+        ),
+      ),
+    ).rejects.toThrow(/row-level security/)
+    // Ni lire, ni révoquer depuis un autre espace actif
+    await db.exec(`update public.profils set espace_actif = '${B}' where user_id = '${B}'`)
+    await enTant(B, async () => {
+      expect((await db.query('select * from public.partages')).rows).toEqual([])
+      expect(
+        (await db.query<{ r: boolean }>(`select public.revoquer_partage($1) as r`, [id])).rows[0].r,
+      ).toBe(false)
+    })
+  })
+
+  it('sans compte : rien, même avec des droits trop larges sur la table', async () => {
+    const { id } = await creer(A)
+    await db.exec(`grant select, update on public.partages to anon`)
+    await db.exec('set role anon')
+    try {
+      expect((await db.query('select * from public.partages')).rows).toEqual([])
+      await db.exec(`update public.partages set expire_le = now() + interval '1 year'`)
+      await expect(db.query(`select public.revoquer_partage($1)`, [id])).rejects.toThrow(
+        /permission denied/,
+      )
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`revoke all on public.partages from anon`)
+    }
+    const { rows } = await db.query<{ ok: boolean }>(
+      `select expire_le < now() + interval '8 days' as ok from public.partages`,
+    )
+    expect(rows).toEqual([{ ok: true }])
+  })
+
+})

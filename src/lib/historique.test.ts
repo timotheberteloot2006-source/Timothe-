@@ -36,6 +36,10 @@ describe('decrireEvenement', () => {
     )
     expect(decrire('etiquette_ajoutee', { nom: 'Senior' })).toBe('Étiquette « Senior » ajoutée')
     expect(decrire('etiquette_retiree', { nom: 'Senior' })).toBe('Étiquette « Senior » retirée')
+    expect(decrire('partage_cree', { expire_le: '2026-03-12T10:00:00Z' })).toBe(
+      'Lien de partage créé, valable jusqu’au 12 mars 2026',
+    )
+    expect(decrire('partage_revoque')).toBe('Lien de partage révoqué')
   })
 
   it('indique la date des entretiens, à l’heure locale', () => {

@@ -83,6 +83,16 @@ premier passage à « Retenu » (lu dans l'historique), les réceptions par mois
 étape, par étiquette et par offre (avec le taux de sélection). Chaque étape, étiquette ou offre
 mène à la liste filtrée. Calculé dans le navigateur, sans migration.
 
+**Partage** (`supabase/migrations/0023_partages.sql`) : depuis la fiche, un membre crée un lien
+en lecture seule (`/partage/<lien secret>`), valable 24 heures, 7 jours ou 30 jours, pour montrer
+le profil à quelqu'un sans compte (un manager). Le lien montre le nom, le poste, l'expérience,
+les compétences, l'offre, l'étape, les étiquettes et la moyenne de l'équipe par critère, jamais
+l'e-mail ; le CV et les notes internes seulement si on les inclut. Le CV s'ouvre par un lien
+signé de 60 secondes que donne la fonction `supabase/functions/cv-partage` (déployée avec
+`--no-verify-jwt`). Chaque lien affiche son nombre de consultations et se révoque d'un clic ; 10
+liens valables au plus par candidature. La création et la révocation sont inscrites dans
+l'historique.
+
 **Étiquettes** (`supabase/migrations/0022_etiquettes.sql`) : libellés libres de l'espace
 (« Senior », « Télétravail »…, 30 au plus, cinq couleurs), que tous les membres créent,
 renomment et suppriment depuis la page **Équipe**. On les pose et les retire sur la fiche (où
@@ -213,6 +223,7 @@ Deux offres : **Gratuite** (50 candidatures au plus, limite imposée par la base
    supabase functions deploy portail-client
    supabase functions deploy webhook-stripe --no-verify-jwt
    supabase functions deploy postuler --no-verify-jwt
+   supabase functions deploy cv-partage --no-verify-jwt
    ```
    (ou simplement `npm run deployer:supabase`, voir [`docs/MISE_EN_LIGNE.md`](docs/MISE_EN_LIGNE.md))
 4. Dans Stripe, *Developers > Webhooks* : ajouter l'adresse

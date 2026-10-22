@@ -40,6 +40,7 @@ export const MIGRATIONS = [
     },
   },
   { numero: '0022', table: 'etiquettes', colonne: 'couleur' },
+  { numero: '0023', table: 'partages', colonne: 'jeton' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite
@@ -311,6 +312,21 @@ async function interrogerSupabase(url, entetes, fetch) {
   else if (postuler.status === 400 && corpsPostuler.erreur)
     resultats.push(ok('Fonction postuler déployée et ouverte aux candidats.'))
   else resultats.push(attention(`postuler : réponse inattendue (${postuler.status}).`))
+
+  // CV d'une candidature partagée : appelé sans compte (un appel sans lien est refusé par la
+  // fonction elle-même)
+  const cvPartage = await fetch(`${url}/functions/v1/cv-partage`, { method: 'POST', body: '{}' })
+  const corpsCvPartage = await cvPartage.json().catch(() => ({}))
+  if (cvPartage.status === 404) resultats.push(erreur('Fonction cv-partage non déployée.'))
+  else if (cvPartage.status === 401)
+    resultats.push(
+      erreur(
+        'cv-partage refuse les appels sans jeton : redéployez-la avec --no-verify-jwt, sinon les CV partagés ne s’ouvrent pas.',
+      ),
+    )
+  else if (cvPartage.status === 400 && corpsCvPartage.erreur)
+    resultats.push(ok('Fonction cv-partage déployée et ouverte aux liens de partage.'))
+  else resultats.push(attention(`cv-partage : réponse inattendue (${cvPartage.status}).`))
   return resultats
 }
 
