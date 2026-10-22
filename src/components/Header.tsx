@@ -18,7 +18,7 @@ export function Header() {
     <header className="border-b border-slate-200 bg-surface">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
         <Logo />
-        <nav className="flex items-center gap-6">
+        <nav className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <Link
             to="/tarifs"
             className={navLinkClass}
@@ -40,6 +40,15 @@ export function Header() {
               activeProps={{ className: activeNavLinkClass }}
             >
               Offres
+            </Link>
+          )}
+          {user && (
+            <Link
+              to="/statistiques"
+              className={navLinkClass}
+              activeProps={{ className: activeNavLinkClass }}
+            >
+              Statistiques
             </Link>
           )}
           {user && (

@@ -69,6 +69,13 @@ le propriétaire règle depuis la page **Équipe**. Sur la fiche, chaque membre 
 modifier ou effacer que ses propres notes. La liste affiche la note moyenne et se trie par
 « Mieux notées ».
 
+**Statistiques** (page dédiée) : sur une période choisie (30 ou 90 derniers jours, 12 derniers
+mois ou depuis le début, gardée dans l'adresse), les candidatures reçues et la part arrivée par le
+formulaire en ligne, les parts retenues et écartées, le délai médian entre la réception et le
+premier passage à « Retenu » (lu dans l'historique), les réceptions par mois et la répartition par
+étape, par étiquette et par offre (avec le taux de sélection). Chaque étape, étiquette ou offre
+mène à la liste filtrée. Calculé dans le navigateur, sans migration.
+
 **Étiquettes** (`supabase/migrations/0022_etiquettes.sql`) : libellés libres de l'espace
 (« Senior », « Télétravail »…, 30 au plus, cinq couleurs), que tous les membres créent,
 renomment et suppriment depuis la page **Équipe**. On les pose et les retire sur la fiche (où

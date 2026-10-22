@@ -37,6 +37,7 @@ const PAGES_CONNECTE = [
   '/tableau-de-bord?vue=tableau',
   'fiche',
   '/offres',
+  '/statistiques',
   '/compte',
   '/equipe',
 ]

@@ -22,6 +22,7 @@ import { Route as TarifsRouteImport } from './routes/tarifs'
 import { Route as AuthentifieCompteRouteImport } from './routes/_authentifie/compte'
 import { Route as AuthentifieEquipeRouteImport } from './routes/_authentifie/equipe'
 import { Route as AuthentifieOffresRouteImport } from './routes/_authentifie/offres'
+import { Route as AuthentifieStatistiquesRouteImport } from './routes/_authentifie/statistiques'
 import { Route as AuthentifieTableauDeBordRouteImport } from './routes/_authentifie/tableau-de-bord'
 import { Route as CarrieresAdresseRouteImport } from './routes/carrieres.$adresse'
 import { Route as PostulerJetonRouteImport } from './routes/postuler.$jeton'
@@ -92,6 +93,11 @@ const AuthentifieOffresRoute = AuthentifieOffresRouteImport.update({
   path: '/offres',
   getParentRoute: () => AuthentifieRoute,
 } as any)
+const AuthentifieStatistiquesRoute = AuthentifieStatistiquesRouteImport.update({
+  id: '/statistiques',
+  path: '/statistiques',
+  getParentRoute: () => AuthentifieRoute,
+} as any)
 const AuthentifieTableauDeBordRoute =
   AuthentifieTableauDeBordRouteImport.update({
     id: '/tableau-de-bord',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/compte': typeof AuthentifieCompteRoute
   '/equipe': typeof AuthentifieEquipeRoute
   '/offres': typeof AuthentifieOffresRoute
+  '/statistiques': typeof AuthentifieStatistiquesRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
   '/carrieres/$adresse': typeof CarrieresAdresseRoute
   '/postuler/$jeton': typeof PostulerJetonRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/compte': typeof AuthentifieCompteRoute
   '/equipe': typeof AuthentifieEquipeRoute
   '/offres': typeof AuthentifieOffresRoute
+  '/statistiques': typeof AuthentifieStatistiquesRoute
   '/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
   '/carrieres/$adresse': typeof CarrieresAdresseRoute
   '/postuler/$jeton': typeof PostulerJetonRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/_authentifie/compte': typeof AuthentifieCompteRoute
   '/_authentifie/equipe': typeof AuthentifieEquipeRoute
   '/_authentifie/offres': typeof AuthentifieOffresRoute
+  '/_authentifie/statistiques': typeof AuthentifieStatistiquesRoute
   '/_authentifie/tableau-de-bord': typeof AuthentifieTableauDeBordRoute
   '/carrieres/$adresse': typeof CarrieresAdresseRoute
   '/postuler/$jeton': typeof PostulerJetonRoute
@@ -195,6 +204,7 @@ export interface FileRouteTypes {
     | '/compte'
     | '/equipe'
     | '/offres'
+    | '/statistiques'
     | '/tableau-de-bord'
     | '/carrieres/$adresse'
     | '/postuler/$jeton'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/compte'
     | '/equipe'
     | '/offres'
+    | '/statistiques'
     | '/tableau-de-bord'
     | '/carrieres/$adresse'
     | '/postuler/$jeton'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/_authentifie/compte'
     | '/_authentifie/equipe'
     | '/_authentifie/offres'
+    | '/_authentifie/statistiques'
     | '/_authentifie/tableau-de-bord'
     | '/carrieres/$adresse'
     | '/postuler/$jeton'
@@ -349,6 +361,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthentifieOffresRouteImport
       parentRoute: typeof AuthentifieRoute
     }
+    '/_authentifie/statistiques': {
+      id: '/_authentifie/statistiques'
+      path: '/statistiques'
+      fullPath: '/statistiques'
+      preLoaderRoute: typeof AuthentifieStatistiquesRouteImport
+      parentRoute: typeof AuthentifieRoute
+    }
     '/_authentifie/tableau-de-bord': {
       id: '/_authentifie/tableau-de-bord'
       path: '/tableau-de-bord'
@@ -391,6 +410,7 @@ interface AuthentifieRouteChildren {
   AuthentifieCompteRoute: typeof AuthentifieCompteRoute
   AuthentifieEquipeRoute: typeof AuthentifieEquipeRoute
   AuthentifieOffresRoute: typeof AuthentifieOffresRoute
+  AuthentifieStatistiquesRoute: typeof AuthentifieStatistiquesRoute
   AuthentifieTableauDeBordRoute: typeof AuthentifieTableauDeBordRoute
   AuthentifieCandidaturesIdRoute: typeof AuthentifieCandidaturesIdRoute
   AuthentifieInvitationJetonRoute: typeof AuthentifieInvitationJetonRoute
@@ -400,6 +420,7 @@ const AuthentifieRouteChildren: AuthentifieRouteChildren = {
   AuthentifieCompteRoute: AuthentifieCompteRoute,
   AuthentifieEquipeRoute: AuthentifieEquipeRoute,
   AuthentifieOffresRoute: AuthentifieOffresRoute,
+  AuthentifieStatistiquesRoute: AuthentifieStatistiquesRoute,
   AuthentifieTableauDeBordRoute: AuthentifieTableauDeBordRoute,
   AuthentifieCandidaturesIdRoute: AuthentifieCandidaturesIdRoute,
   AuthentifieInvitationJetonRoute: AuthentifieInvitationJetonRoute,

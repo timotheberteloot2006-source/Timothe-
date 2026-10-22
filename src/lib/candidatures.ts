@@ -21,6 +21,8 @@ export interface Candidature {
   offre_id: string | null
   // Espace auquel appartient la candidature (supabase/migrations/0008_espaces.sql)
   espace_id: string
+  // « formulaire » : déposée par le candidat en ligne (supabase/migrations/0013_formulaire_public.sql)
+  source?: 'formulaire' | null
   // Rempli par listerCandidatures uniquement
   nb_notes?: number
 }

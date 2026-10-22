@@ -464,6 +464,23 @@ export class FauxSupabase {
     if (chemin === '/rest/v1/notes') return this.notesRest(route, url, json)
     if (chemin === '/rest/v1/offres') return this.offresRest(route, url, json)
     if (chemin === '/rest/v1/entretiens') return this.entretiensRest(route, url, json)
+    if (chemin === '/rest/v1/historique' && url.searchParams.has('action')) {
+      // Premiers passages à « Retenu » (page Statistiques), dans l'espace actif
+      const apres = url.searchParams.get('details->>apres')?.replace(/^eq[.]/, '')
+      return json(
+        this.historique
+          .filter(
+            (h) =>
+              h.action === url.searchParams.get('action')?.replace(/^eq[.]/, '') &&
+              h.details.apres === apres &&
+              this.candidatures.some(
+                (c) => c.id === h.candidature_id && c.espace_id === this.espaceActif,
+              ),
+          )
+          .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id - b.id)
+          .map((h) => ({ candidature_id: h.candidature_id, created_at: h.created_at })),
+      )
+    }
     if (chemin === '/rest/v1/historique') {
       const id = url.searchParams.get('candidature_id')?.replace(/^eq[.]/, '')
       return json(
