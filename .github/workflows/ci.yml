@@ -24,7 +24,8 @@ jobs:
 
   e2e:
     name: Parcours dans le navigateur (Playwright)
-    runs-on: ubuntu-latest
+    # Playwright 1.56 ne sait pas installer Chromium sur Ubuntu 26.04 (ubuntu-latest)
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
