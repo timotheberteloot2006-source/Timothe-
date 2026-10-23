@@ -2380,3 +2380,80 @@ describe('partages', () => {
     expect(rows).toEqual([{ ok: true }])
   })
 })
+
+describe('signature de l’espace', () => {
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated;
+      grant select, insert, update, delete on all tables in schema public to authenticated;
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+      update public.profils set espace_actif = '${A}' where user_id = '${B}';
+    `)
+  })
+
+  async function signature(uid = A) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return (await db.query<{ s: string }>('select public.signature_espace() as s')).rows[0].s
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  async function changeAvec(action: string) {
+    const avant = await signature()
+    await db.exec(action)
+    return (await signature()) !== avant
+  }
+
+  it('stable sans modification, identique pour tous les membres', async () => {
+    await ajouter(A, ['Alice'])
+    const s = await signature()
+    expect(await signature()).toBe(s)
+    expect(await signature(B)).toBe(s)
+  })
+
+  it('change à chaque modification de l’espace', async () => {
+    await ajouter(A, ['Alice'])
+    const alice = (await db.query<{ id: string }>(`select id from public.candidatures`)).rows[0].id
+    const critere = (
+      await db.query<{ id: string }>(
+        `select id from public.criteres where espace_id = '${A}' limit 1`,
+      )
+    ).rows[0].id
+    for (const action of [
+      `insert into public.candidatures (user_id, nom) values ('${A}', 'Bruno')`,
+      `update public.candidatures set statut = 'retenu' where id = '${alice}'`,
+      `update public.candidatures set poste = 'Dev' where id = '${alice}'`,
+      `insert into public.notes (candidature_id, contenu) values ('${alice}', 'Bien')`,
+      `insert into public.evaluations (candidature_id, critere_id, note, user_id) values ('${alice}', '${critere}', 4, '${A}')`,
+      `update public.evaluations set note = 5`,
+      `insert into public.etiquettes (espace_id, nom) values ('${A}', 'Senior')`,
+      `update public.etiquettes set couleur = 'vert'`,
+      `update public.espaces set nom = 'Cabinet' where id = '${A}'`,
+      `update public.criteres set nom = 'Technique' where id = '${critere}'`,
+      `delete from public.candidatures where nom = 'Bruno'`,
+    ])
+      expect(await changeAvec(action), action).toBe(true)
+  })
+
+  it('les modifications d’un autre espace ne la changent pas ; sans compte : refusée', async () => {
+    await ajouter(A, ['Alice'])
+    expect(
+      await changeAvec(`insert into public.candidatures (user_id, nom) values ('${B}', 'Chez B')`),
+    ).toBe(false)
+    expect(await changeAvec(`update public.espaces set nom = 'Autre' where id = '${B}'`)).toBe(
+      false,
+    )
+    await db.exec('set role anon')
+    try {
+      await expect(db.query('select public.signature_espace()')).rejects.toThrow(
+        /permission denied/,
+      )
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+})

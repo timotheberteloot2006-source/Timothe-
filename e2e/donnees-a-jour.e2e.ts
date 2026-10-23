@@ -130,3 +130,47 @@ test('arriver sur une page sans réseau affiche toujours l’erreur', async ({ p
   await page.getByRole('link', { name: '← Retour aux candidatures' }).click()
   await expect(page.getByText('Impossible de charger les candidatures')).toBeVisible()
 })
+
+test('rafraîchissement économe : rien n’est relu tant que l’espace ne change pas', async ({
+  page,
+}) => {
+  await page.clock.install()
+  faux.ajouter({ nom: 'Alice' })
+  await seConnecter(page, faux)
+  await expect(page.getByRole('link', { name: 'Alice' })).toBeVisible()
+  await page.waitForLoadState('networkidle')
+  const lectures = compterLectures(page)
+
+  // Premier contrôle : la signature n'est pas encore connue, la page est relue une fois
+  await page.clock.runFor(61_000)
+  await expect.poll(() => lectures.n).toBe(1)
+  // Ensuite, sans modification : seulement la signature
+  await page.clock.runFor(60_000)
+  await expect.poll(() => faux.signaturesLues).toBe(2)
+  await page.clock.runFor(60_000)
+  await expect.poll(() => faux.signaturesLues).toBe(3)
+  expect(lectures.n).toBe(1)
+
+  // Un collègue change une étape : relu au contrôle suivant
+  faux.candidature('Alice')!.statut = 'retenu'
+  await page.clock.runFor(60_000)
+  await expect.poll(() => lectures.n).toBe(2)
+  await expect(page.getByLabel('Statut de Alice')).toHaveValue('retenu')
+})
+
+test('base pas encore à jour (pas de signature) : relue chaque minute, comme avant', async ({
+  page,
+}) => {
+  await page.clock.install()
+  faux.signatureEnPanne = true
+  faux.ajouter({ nom: 'Alice' })
+  await seConnecter(page, faux)
+  await page.waitForLoadState('networkidle')
+  const lectures = compterLectures(page)
+  await page.clock.runFor(61_000)
+  await expect.poll(() => lectures.n).toBe(1)
+  await page.clock.runFor(60_000)
+  await expect.poll(() => lectures.n).toBe(2)
+  // Pas de message de panne : la page se recharge normalement
+  await expect(page.getByRole('status')).not.toContainText('Connexion perdue')
+})

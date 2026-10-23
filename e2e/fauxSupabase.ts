@@ -1,6 +1,7 @@
 // Faux Supabase pour les tests de bout en bout : intercepte les appels du navigateur vers
 // l'URL configurée au build (VITE_SUPABASE_URL) et répond depuis un état en mémoire.
 // Seules les requêtes réellement émises par le site sont simulées.
+import { createHash } from 'node:crypto'
 import { remplirModele, valeursModele } from '../supabase/functions/_shared/modeles.ts'
 import type { BrowserContext, Page, Request, Route } from '@playwright/test'
 
@@ -181,6 +182,9 @@ export class FauxSupabase {
   private criteresCrees = new Set<string>()
   criteresListe: CritereFaux[] = []
   evaluations: EvaluationFaux[] = []
+  // Appels à signature_espace, et panne simulée (fonction absente : base pas à jour)
+  signaturesLues = 0
+  signatureEnPanne = false
   // Liens de partage (supabase/migrations/0023_partages.sql)
   partages: PartageFaux[] = []
   // Étiquettes et étiquettes posées (supabase/migrations/0022_etiquettes.sql)
@@ -606,6 +610,40 @@ export class FauxSupabase {
           .sort((a, b) => a.titre.localeCompare(b.titre, 'fr', { sensitivity: 'base' }))
           .map((o) => ({ titre: o.titre, description: o.description, jeton: o.jeton_public })),
       })
+    }
+
+    // Signature de l'espace actif (supabase/migrations/0025_signature_espace.sql) : change avec
+    // ses données. signaturesLues compte les appels (rafraîchissement économe).
+    if (chemin === '/rest/v1/rpc/signature_espace') {
+      this.signaturesLues++
+      if (this.signatureEnPanne) return json({ code: 'PGRST202', message: 'introuvable' }, 404)
+      const espace = this.espaceActif
+      const ids = new Set(this.candidatures.filter((c) => c.espace_id === espace).map((c) => c.id))
+      const dans = <T extends { candidature_id: string }>(liste: T[]) =>
+        liste.filter((x) => ids.has(x.candidature_id))
+      return json(
+        createHash('md5')
+          .update(
+            JSON.stringify([
+              espace,
+              this.candidatures.filter((c) => c.espace_id === espace),
+              dans(this.notes),
+              dans(this.entretiens),
+              dans(this.evaluations),
+              dans(this.attributions),
+              dans(this.partages),
+              dans(this.historique).length,
+              this.espaces.find((e) => e.id === espace),
+              this.membres.filter((m) => m.espace_id === espace),
+              this.offres.filter((o) => o.espace_id === espace),
+              this.etiquettes.filter((e) => e.espace_id === espace),
+              this.criteresListe.filter((c) => c.espace_id === espace),
+              this.modelesListe.filter((m) => m.espace_id === espace),
+              this.etapes(espace),
+            ]),
+          )
+          .digest('hex'),
+      )
     }
 
     // Partages (supabase/migrations/0023_partages.sql)

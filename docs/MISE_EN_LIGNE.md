@@ -137,7 +137,7 @@ Le script affiche les migrations qu'il va appliquer et demande confirmation.
    ```bash
    npm run verifier:config -- --distant
    ```
-   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0024 »,
+   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0025 »,
    « webhook-stripe déployée et joignable par Stripe », « postuler déployée et ouverte aux
    candidats » et « cv-partage déployée et ouverte aux liens de partage », puis, si les e-mails sont configurés, « Domaine … vérifié chez Resend ». Si une
    fonction « refuse les appels sans jeton », elle a été déployée sans

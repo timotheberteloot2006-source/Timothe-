@@ -72,7 +72,10 @@ modifier ou effacer que ses propres notes. La liste affiche la note moyenne et s
 **Données à jour** : les pages connectées se rafraîchissent seules toutes les minutes tant
 qu'elles sont affichées, et aussitôt en revenant sur un onglet resté caché plus de 30 secondes,
 pour montrer les modifications des autres membres ; le rechargement se fait en arrière-plan,
-sans toucher aux saisies en cours. Changer un filtre de la liste ou la période des statistiques ne
+sans toucher aux saisies en cours. Pour ménager la base, le site demande d'abord la signature de
+l'espace (`signature_espace`, `supabase/migrations/0025_signature_espace.sql`), qui change dès
+que quelque chose y est modifié, et ne relit la page que si elle a changé. Une coupure réseau
+pendant un rechargement laisse la page et ses saisies en place, avec un message. Changer un filtre de la liste ou la période des statistiques ne
 recharge rien (le calcul se fait dans le navigateur), mais un filtre changé pendant un
 rechargement attend sa fin au lieu de garder les anciennes données (`src/lib/rechargement.ts`).
 

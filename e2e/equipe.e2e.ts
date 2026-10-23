@@ -21,6 +21,8 @@ test('le propriétaire renomme son espace et gère les liens d’invitation', as
 
   await page.getByRole('button', { name: 'Créer un lien d’invitation' }).click()
   const lien = page.getByRole('textbox', { name: /Lien valable jusqu’au/ })
+  // L'invitation doit être enregistrée avant d'en lire le jeton
+  await expect.poll(() => faux.invitations.length).toBe(1)
   await expect(lien).toHaveValue(new RegExp(`/invitation/${faux.invitations[0].jeton}$`))
 
   await page.getByRole('button', { name: 'Révoquer' }).click()
