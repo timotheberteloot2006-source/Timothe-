@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* Couleurs « sémantiques » : leur version sombre diffère selon l'usage (fond ou texte) */
+@theme {
+  /* Fond des cartes, champs et en-tête */
+  --color-surface: var(--color-white);
+  /* Liens et textes d'accent (les boutons gardent bg-indigo-600) */
+  --color-accent: var(--color-indigo-600);
+}
+
+/* Focus clavier bien visible sur tous les éléments (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--color-indigo-500);
+  outline-offset: 2px;
+}
+
+html {
+  color-scheme: light;
+  background-color: var(--color-slate-50);
+}
+
+/*
+ * Mode sombre, selon le réglage de l'appareil : l'échelle de gris est inversée et les fonds
+ * pâles (alertes, badges) deviennent foncés avec un texte clair. Les classes Tailwind du site
+ * restent inchangées (bg-slate-50, text-slate-600, bg-red-50…).
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: oklch(20.8% 0.042 265.755); /* slate-900 */
+    --color-accent: oklch(67.3% 0.182 276.935); /* indigo-400 */
+
+    --color-slate-50: oklch(12.9% 0.042 264.695); /* 950 */
+    --color-slate-100: oklch(27.9% 0.041 260.031); /* 800 */
+    --color-slate-200: oklch(37.2% 0.044 257.287); /* 700 */
+    --color-slate-300: oklch(44.6% 0.043 257.281); /* 600 */
+    --color-slate-400: oklch(55.4% 0.046 257.417); /* 500 */
+    --color-slate-500: oklch(70.4% 0.04 256.788); /* 400 */
+    --color-slate-600: oklch(86.9% 0.022 252.894); /* 300 */
+    --color-slate-700: oklch(92.9% 0.013 255.508); /* 200 */
+    --color-slate-900: oklch(98.4% 0.003 247.858); /* 50 */
+
+    --color-red-50: oklch(25.8% 0.092 26.042); /* 950 */
+    --color-red-100: oklch(39.6% 0.141 25.723); /* 900 */
+    --color-red-200: oklch(39.6% 0.141 25.723); /* 900 */
+    --color-red-700: oklch(80.8% 0.114 19.571); /* 300 */
+    --color-red-800: oklch(88.5% 0.062 18.334); /* 200 */
+
+    --color-green-50: oklch(26.6% 0.065 152.934); /* 950 */
+    --color-green-100: oklch(39.3% 0.095 152.535); /* 900 */
+    --color-green-800: oklch(92.5% 0.084 155.995); /* 200 */
+
+    --color-amber-50: oklch(27.9% 0.077 45.635); /* 950 */
+    --color-amber-100: oklch(41.4% 0.112 45.904); /* 900 */
+    --color-amber-800: oklch(92.4% 0.12 95.746); /* 200 */
+    --color-amber-900: oklch(96.2% 0.059 95.617); /* 100 */
+
+    --color-indigo-50: oklch(25.7% 0.09 281.288); /* 950 */
+    --color-indigo-300: oklch(45.7% 0.24 277.023); /* 700 */
+    --color-indigo-700: oklch(78.5% 0.115 274.713); /* 300 */
+  }
+
+  html {
+    color-scheme: dark;
+  }
+}

@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Clés secrètes : ne jamais envoyer sur GitHub
+.env
+.env.*
+!.env.example
+
+# Généré par deno check en local
+supabase/functions/deno.lock
+
+# Tests de bout en bout (Playwright)
+dist-e2e
+test-results
+playwright-report
+dist-budget
+
+# CLI Supabase (projet lié)
+supabase/.temp

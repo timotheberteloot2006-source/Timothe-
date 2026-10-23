@@ -1,0 +1,55 @@
+name: Vérifications
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  site:
+    name: Site (lint, tests, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      # Inclut les tests des migrations SQL (Postgres en mémoire via PGlite)
+      - run: npm test
+      - run: npm run build
+      # Poids du code chargé au démarrage (scripts/budget.mjs)
+      - run: npm run budget
+
+  e2e:
+    name: Parcours dans le navigateur (Playwright)
+    # Playwright 1.56 ne sait pas installer Chromium sur Ubuntu 26.04 (ubuntu-latest)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Le site est construit avec un faux Supabase (e2e/fauxSupabase.ts)
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: rapport-playwright
+          path: playwright-report
+          retention-days: 7
+
+  fonctions:
+    name: Fonctions Supabase (vérification des types)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check */index.ts
+        working-directory: supabase/functions
