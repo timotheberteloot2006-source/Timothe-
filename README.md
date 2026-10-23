@@ -312,6 +312,9 @@ public, en-têtes de sécurité et abonnement. En local, installer le navigateur
 
 ## Mise en production
 
+Avant de commencer, [`docs/BILAN.md`](docs/BILAN.md) fait le point : ce que fait le service, ce
+qui n'a jamais tourné contre de vrais services, les risques connus et les choix à valider.
+
 Le guide pas à pas est dans [`docs/MISE_EN_LIGNE.md`](docs/MISE_EN_LIGNE.md) : répétition avec
 Stripe en mode test, puis passage en réel. Il s'appuie sur deux commandes :
 
