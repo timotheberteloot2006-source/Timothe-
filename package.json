@@ -25,6 +25,7 @@
     "@supabase/storage-js": "^2.118.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.45",
+    "fflate": "0.8.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.3"

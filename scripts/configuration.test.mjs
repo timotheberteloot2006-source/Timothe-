@@ -191,6 +191,7 @@ describe('verifierSupabase', () => {
       if (url.includes('/partages?select=jeton')) return [404, { code: 'PGRST205' }]
       if (url.endsWith('/rpc/version_schema')) return [404, { code: 'PGRST202' }]
       if (url.endsWith('/rpc/signature_espace')) return [404, { code: 'PGRST202' }]
+      if (url.includes('/demandes_rgpd?select=action')) return [404, { code: 'PGRST205' }]
       if (url.endsWith('/auth/v1/settings'))
         return [200, { external: { email: true }, mailer_autoconfirm: true }]
       return undefined
@@ -198,7 +199,7 @@ describe('verifierSupabase', () => {
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
       expect.stringContaining(
-        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025 manquent',
+        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026 manquent',
       ),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
@@ -218,7 +219,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0025')
+    expect(MIGRATIONS.at(-1).numero).toBe('0026')
   })
 })
 

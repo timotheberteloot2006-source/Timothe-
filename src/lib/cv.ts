@@ -97,3 +97,11 @@ export async function supprimerTousLesCv() {
   if (error) throw new Error(error.message)
   await supprimerFichiersCv((data as string[] | null) ?? [])
 }
+
+// Contenu du CV (export des données d'un candidat)
+export async function lireCv(chemin: string): Promise<Uint8Array> {
+  const { data, error } = await (await bucket()).download(chemin)
+  if (error || !data)
+    throw new Error(`Lecture du CV impossible : ${error?.message ?? 'fichier vide'}`)
+  return new Uint8Array(await data.arrayBuffer())
+}

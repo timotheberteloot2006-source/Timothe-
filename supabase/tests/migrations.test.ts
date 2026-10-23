@@ -2457,3 +2457,126 @@ describe('signature de l’espace', () => {
     }
   })
 })
+
+describe('RGPD', () => {
+  let alice: string
+
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated;
+      grant select, insert, update, delete on all tables in schema public to authenticated;
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+      update public.profils set espace_actif = '${A}' where user_id = '${B}';
+    `)
+    await db.exec(
+      `insert into public.candidatures (user_id, nom, email, competences, experience)
+       values ('${A}', 'Alice', 'alice@x.fr', '{SQL}', 3)`,
+    )
+    alice = (await db.query<{ id: string }>(`select id from public.candidatures`)).rows[0].id
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  const exporter = (uid: string) =>
+    enTant(
+      uid,
+      async () =>
+        (
+          await db.query<{ e: Record<string, unknown> | null }>(
+            'select public.exporter_candidature($1) as e',
+            [alice],
+          )
+        ).rows[0].e,
+    )
+
+  it('export : toutes les données du candidat, sans les membres de l’équipe', async () => {
+    const critere = (
+      await db.query<{ id: string }>(
+        `select id from public.criteres where espace_id = '${A}' order by position limit 1`,
+      )
+    ).rows[0].id
+    await enTant(B, async () => {
+      await db.exec(
+        `insert into public.notes (candidature_id, contenu) values ('${alice}', 'Solide')`,
+      )
+      await db.exec(
+        `insert into public.entretiens (candidature_id, debut, lieu) values ('${alice}', '2026-11-03T14:00:00Z', 'Visio')`,
+      )
+      await db.exec(
+        `insert into public.evaluations (candidature_id, critere_id, note) values ('${alice}', '${critere}', 4)`,
+      )
+      await db.exec(`update public.candidatures set statut = 'retenu' where id = '${alice}'`)
+    })
+    const e = await exporter(A)
+    expect(e).toMatchObject({
+      candidature: {
+        nom: 'Alice',
+        email: 'alice@x.fr',
+        competences: ['SQL'],
+        experience: 3,
+        etape: 'Retenu',
+        source: 'saisie par l’équipe',
+        cv: false,
+      },
+      responsable: 'Mon espace',
+      notes: [{ contenu: 'Solide' }],
+      entretiens: [{ lieu: 'Visio', duree_minutes: 60 }],
+      evaluations: [{ critere: 'Compétences techniques', note: 4 }],
+    })
+    expect((e!.historique as { action: string }[]).map((h) => h.action)).toEqual([
+      'creation',
+      'note_ajoutee',
+      'entretien_planifie',
+      'statut',
+    ])
+    // Ni l'e-mail ni l'identifiant des membres
+    expect(JSON.stringify(e)).not.toContain('b@x.fr')
+    expect(JSON.stringify(e)).not.toContain(B)
+  })
+
+  it('export : rien hors de l’espace actif ni sans compte', async () => {
+    await db.exec(`update public.profils set espace_actif = '${B}' where user_id = '${B}'`)
+    expect(await exporter(B)).toBeNull()
+    await db.exec('set role anon')
+    try {
+      await expect(db.query('select public.exporter_candidature($1)', [alice])).rejects.toThrow(
+        /permission denied/,
+      )
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+
+  it('registre : écrit seulement par la fonction, sans donnée du candidat ; e-mail oublié avec le compte', async () => {
+    await enTant(B, () => db.exec(`select public.noter_demande_rgpd('acces')`))
+    await enTant(A, () => db.exec(`select public.noter_demande_rgpd('effacement')`))
+    await expect(
+      enTant(A, () => db.exec(`select public.noter_demande_rgpd('autre')`)),
+    ).rejects.toThrow(/demandes_rgpd_action_check/)
+    // Écriture directe refusée
+    await expect(
+      enTant(A, () =>
+        db.exec(`insert into public.demandes_rgpd (espace_id, action) values ('${A}', 'acces')`),
+      ),
+    ).rejects.toThrow(/row-level security/)
+    const { rows } = await enTant(A, () =>
+      db.query(`select email, action from public.demandes_rgpd order by id`),
+    )
+    expect(rows).toEqual([
+      { email: 'b@x.fr', action: 'acces' },
+      { email: 'a@x.fr', action: 'effacement' },
+    ])
+    await db.exec(`delete from auth.users where id = '${B}'`)
+    const apres = await db.query(`select email, user_id from public.demandes_rgpd order by id`)
+    expect(apres.rows[0]).toEqual({ email: null, user_id: null })
+  })
+})

@@ -86,6 +86,13 @@ premier passage à « Retenu » (lu dans l'historique), les réceptions par mois
 étape, par étiquette et par offre (avec le taux de sélection). Chaque étape, étiquette ou offre
 mène à la liste filtrée. Calculé dans le navigateur, sans migration.
 
+**Données personnelles** (`supabase/migrations/0026_rgpd.sql`) : depuis la fiche, pour répondre
+à une demande d'un candidat, « Exporter ses données » télécharge une archive ZIP (toutes les
+informations enregistrées sur lui en JSON — fiche, offre, étape, étiquettes, notes, entretiens,
+évaluations, historique, liens de partage —, son CV et un fichier explicatif, sans nommer les
+membres de l'équipe), et « Effacer définitivement » supprime tout. Chaque demande traitée est
+inscrite au registre de la page **Équipe** (date, type, membre), sans aucune donnée du candidat.
+
 **Partage** (`supabase/migrations/0023_partages.sql`) : depuis la fiche, un membre crée un lien
 en lecture seule (`/partage/<lien secret>`), valable 24 heures, 7 jours ou 30 jours, pour montrer
 le profil à quelqu'un sans compte (un manager). Le lien montre le nom, le poste, l'expérience,

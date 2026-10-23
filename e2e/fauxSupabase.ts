@@ -182,6 +182,14 @@ export class FauxSupabase {
   private criteresCrees = new Set<string>()
   criteresListe: CritereFaux[] = []
   evaluations: EvaluationFaux[] = []
+  // Registre des demandes RGPD (supabase/migrations/0026_rgpd.sql)
+  demandesRgpd: {
+    id: number
+    espace_id: string
+    email: string | null
+    action: 'acces' | 'effacement'
+    created_at: string
+  }[] = []
   // Appels à signature_espace, et panne simulée (fonction absente : base pas à jour)
   signaturesLues = 0
   signatureEnPanne = false
@@ -591,6 +599,14 @@ export class FauxSupabase {
       prefixes.forEach((p) => this.fichiers.delete(p))
       return json(prefixes.map((name) => ({ name })))
     }
+    // Lecture d'un CV par le site (export RGPD)
+    if (chemin.startsWith(prefixeCv) && methode === 'GET') {
+      return route.fulfill({
+        status: this.fichiers.has(chemin.slice(prefixeCv.length)) ? 200 : 404,
+        headers: { ...ENTETES, 'content-type': 'application/pdf' },
+        body: '%PDF-1.4 CV de test',
+      })
+    }
     if (chemin.startsWith('/storage/v1/object/sign/')) {
       return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4' })
     }
@@ -643,6 +659,61 @@ export class FauxSupabase {
             ]),
           )
           .digest('hex'),
+      )
+    }
+
+    // RGPD (supabase/migrations/0026_rgpd.sql)
+    if (chemin === '/rest/v1/rpc/exporter_candidature') {
+      const { id_candidature } = corps(requete) as { id_candidature: string }
+      const c = this.candidatures.find(
+        (x) => x.id === id_candidature && x.espace_id === this.espaceActif,
+      )
+      if (!c) return json(null)
+      return json({
+        candidature: {
+          nom: c.nom,
+          email: c.email,
+          poste: c.poste,
+          competences: c.competences,
+          experience: c.experience,
+          recue_le: c.created_at,
+          source: c.source ?? 'saisie par l’équipe',
+          offre: this.offres.find((o) => o.id === c.offre_id)?.titre ?? null,
+          etape: this.etapes(c.espace_id).find((e) => e.cle === c.statut)?.nom ?? null,
+          cv: !!c.cv_chemin,
+        },
+        responsable: this.espaces.find((e) => e.id === c.espace_id)?.nom,
+        etiquettes: this.etiquettesDe(c.nom),
+        notes: this.notes
+          .filter((n) => n.candidature_id === c.id)
+          .map((n) => ({ le: n.created_at, contenu: n.contenu })),
+        entretiens: this.entretiens
+          .filter((e) => e.candidature_id === c.id)
+          .map((e) => ({ debut: e.debut, duree_minutes: e.duree_minutes, lieu: e.lieu })),
+        evaluations: [],
+        historique: this.historique
+          .filter((h) => h.candidature_id === c.id)
+          .map((h) => ({ le: h.created_at, action: h.action, details: h.details })),
+        partages: [],
+      })
+    }
+    if (chemin === '/rest/v1/rpc/noter_demande_rgpd') {
+      const { type_demande } = corps(requete) as { type_demande: 'acces' | 'effacement' }
+      this.demandesRgpd.push({
+        id: this.demandesRgpd.length + 1,
+        espace_id: this.espaceActif,
+        email: this.utilisateur.email,
+        action: type_demande,
+        created_at: new Date().toISOString(),
+      })
+      return json(undefined, 204)
+    }
+    if (chemin === '/rest/v1/demandes_rgpd') {
+      return json(
+        this.demandesRgpd
+          .filter((d) => d.espace_id === this.espaceActif)
+          .reverse()
+          .map(({ espace_id: _e, ...d }) => d),
       )
     }
 

@@ -45,6 +45,7 @@ export const MIGRATIONS = [
   { numero: '0024', fonction: 'version_schema', arguments: {} },
   // Réservée aux comptes connectés : sans compte, refus d'accès si elle existe
   { numero: '0025', fonction: 'signature_espace', arguments: {} },
+  { numero: '0026', table: 'demandes_rgpd', colonne: 'action' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite

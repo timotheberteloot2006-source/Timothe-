@@ -5,6 +5,7 @@ import { CarteEvaluation } from '@/components/candidatures/CarteEvaluation'
 import { CarteHistorique } from '@/components/candidatures/CarteHistorique'
 import { CarteReponse } from '@/components/candidatures/CarteReponse'
 import { CartePartage } from '@/components/candidatures/CartePartage'
+import { CarteRgpd } from '@/components/candidatures/CarteRgpd'
 import { EtiquettesFiche } from '@/components/candidatures/EtiquettesFiche'
 import { FormulaireCandidature } from '@/components/candidatures/FormulaireCandidature'
 import { classeChamp } from '@/components/candidatures/styles'
@@ -302,6 +303,7 @@ function FicheCandidature() {
         />
       )}
       <CarteHistorique historique={historique} userId={user?.id} />
+      <CarteRgpd key={`rgpd-${c.id}`} candidature={c} />
     </section>
   )
 }

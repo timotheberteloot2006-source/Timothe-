@@ -24,6 +24,7 @@ import { GestionModeles } from '@/components/GestionModeles'
 import { listerCriteres } from '@/lib/evaluations'
 import { GestionEtiquettes } from '@/components/GestionEtiquettes'
 import { listerEtiquettes } from '@/lib/etiquettes'
+import { listerDemandes } from '@/lib/rgpd'
 import { ReglagesPageCarrieres } from '@/components/ReglagesPageCarrieres'
 import { listerModeles } from '@/lib/modeles'
 import { lireReglagesCarrieres } from '@/lib/carrieres'
@@ -47,6 +48,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
         modeles,
         criteres,
         etiquettes,
+        demandesRgpd,
       ] = await Promise.all([
         listerMembres(espace.id),
         // Seul le propriétaire voit et gère les invitations
@@ -65,6 +67,8 @@ export const Route = createFileRoute('/_authentifie/equipe')({
         listerCriteres().catch(() => null),
         // null : base pas encore à jour (migration 0022), la rubrique est masquée
         listerEtiquettes().catch(() => null),
+        // null : base pas encore à jour (migration 0026), la rubrique est masquée
+        listerDemandes().catch(() => null),
       ])
       return {
         espace,
@@ -78,6 +82,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
         modeles,
         criteres,
         etiquettes,
+        demandesRgpd,
       }
     }),
   component: Equipe,
@@ -103,6 +108,7 @@ function Equipe() {
     modeles,
     criteres,
     etiquettes,
+    demandesRgpd,
   } = Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
@@ -246,6 +252,53 @@ function Equipe() {
           executer={executer}
         />
       </Carte>
+
+      {demandesRgpd && (
+        <Carte titre="Registre des demandes RGPD">
+          <p className="text-sm text-slate-600">
+            Demandes d’accès (export) et d’effacement traitées depuis la fiche des candidats. Le
+            registre garde la date et le membre, jamais les données du candidat.
+          </p>
+          {demandesRgpd.length === 0 ? (
+            <p className="text-sm text-slate-500">Aucune demande traitée pour le moment.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-600">
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Date
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Demande
+                  </th>
+                  <th scope="col" className="py-2 font-medium">
+                    Traitée par
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {demandesRgpd.map((demande) => (
+                  <tr key={demande.id}>
+                    <td className="py-2 pr-4">
+                      {new Date(demande.created_at).toLocaleDateString('fr-FR', {
+                        dateStyle: 'long',
+                      })}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {demande.action === 'acces' ? 'Accès (export)' : 'Effacement'}
+                    </td>
+                    <td className="py-2">
+                      {demande.email === user?.email
+                        ? 'vous'
+                        : (demande.email ?? 'compte supprimé')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Carte>
+      )}
 
       {notifications && (
         <Carte titre="Notifications">
