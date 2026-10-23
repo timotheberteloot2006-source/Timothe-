@@ -138,13 +138,14 @@ function supabaseComplet(methode, url) {
   if (url.endsWith('/postuler')) return [400, { erreur: 'Formulaire illisible.' }]
   if (url.endsWith('/cv-partage')) return [400, { erreur: 'Lien de partage invalide.' }]
   if (url.endsWith('/rappels-entretiens')) return [401, { erreur: 'Accès refusé.' }]
+  if (url.endsWith('/conservation')) return [401, { erreur: 'Accès refusé.' }]
   return undefined
 }
 
 describe('verifierSupabase', () => {
   it('projet prêt', async () => {
     const { fetch, appels } = fauxFetch(supabaseComplet)
-    expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual([...Array(9).fill('ok')])
+    expect(niveaux(await verifierSupabase(SITE, fetch))).toEqual([...Array(10).fill('ok')])
     // Seulement des lectures, et des appels refusés : fonction de la migration 0017 sans droit
     // ni étape existante, webhook sans signature, formulaire vide
     expect(appels.filter((a) => !a.startsWith('GET ') && !a.startsWith('OPTIONS '))).toEqual([
@@ -154,6 +155,7 @@ describe('verifierSupabase', () => {
       `POST ${URL_PROJET}/rest/v1/rpc/signature_espace`,
       `POST ${URL_PROJET}/functions/v1/webhook-stripe`,
       `POST ${URL_PROJET}/functions/v1/rappels-entretiens`,
+      `POST ${URL_PROJET}/functions/v1/conservation`,
       `POST ${URL_PROJET}/functions/v1/postuler`,
       `POST ${URL_PROJET}/functions/v1/cv-partage`,
     ])
@@ -192,6 +194,7 @@ describe('verifierSupabase', () => {
       if (url.endsWith('/rpc/version_schema')) return [404, { code: 'PGRST202' }]
       if (url.endsWith('/rpc/signature_espace')) return [404, { code: 'PGRST202' }]
       if (url.includes('/demandes_rgpd?select=action')) return [404, { code: 'PGRST205' }]
+      if (url.includes('/espaces?select=conservation_mois')) return [400, { code: '42703' }]
       if (url.endsWith('/auth/v1/settings'))
         return [200, { external: { email: true }, mailer_autoconfirm: true }]
       return undefined
@@ -199,7 +202,7 @@ describe('verifierSupabase', () => {
     const resultats = await verifierSupabase(SITE, fetch)
     expect(erreurs(resultats)).toEqual([
       expect.stringContaining(
-        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026 manquent',
+        'à partir de 0011 : 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026, 0027 manquent',
       ),
       'Fonction portail-client non déployée.',
       expect.stringContaining('webhook-stripe refuse'),
@@ -219,7 +222,7 @@ describe('verifierSupabase', () => {
   })
 
   it('une table est testée pour chaque migration la plus récente', () => {
-    expect(MIGRATIONS.at(-1).numero).toBe('0026')
+    expect(MIGRATIONS.at(-1).numero).toBe('0027')
   })
 })
 

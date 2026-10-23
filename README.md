@@ -86,6 +86,14 @@ premier passage à « Retenu » (lu dans l'historique), les réceptions par mois
 étape, par étiquette et par offre (avec le taux de sélection). Chaque étape, étiquette ou offre
 mène à la liste filtrée. Calculé dans le navigateur, sans migration.
 
+**Durée de conservation** (`supabase/migrations/0027_conservation.sql`) : le propriétaire de
+l'espace peut régler, page **Équipe**, une durée (6 à 60 mois) au-delà de laquelle une
+candidature sans aucune activité est supprimée automatiquement, CV compris ; c'est désactivé par
+défaut. Les candidatures concernées sont signalées dans la liste 30 jours avant, et toute activité
+(modification, note, entretien, changement d'étape…) les garde. Chaque nuit, la fonction
+`supabase/functions/conservation`, lancée par la même tâche planifiée que les rappels, fait la
+suppression et la note au registre RGPD.
+
 **Données personnelles** (`supabase/migrations/0026_rgpd.sql`) : depuis la fiche, pour répondre
 à une demande d'un candidat, « Exporter ses données » télécharge une archive ZIP (toutes les
 informations enregistrées sur lui en JSON — fiche, offre, étape, étiquettes, notes, entretiens,

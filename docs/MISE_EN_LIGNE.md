@@ -12,7 +12,7 @@ Deux commandes accompagnent le guide :
 |---|---|
 | `npm run verifier:config` | Contrôle les fichiers `.env` et `supabase/functions/.env` : valeurs manquantes, clé secrète publiée par erreur, clé d'un autre projet… |
 | `npm run verifier:config -- --distant` | Interroge aussi Supabase et Stripe, en lecture seule : migrations appliquées, fonctions déployées, webhook, prix, portail client |
-| `npm run deployer:supabase` | Applique les migrations manquantes, envoie les secrets et déploie les sept fonctions (paiement, webhook, formulaire public, réponses aux candidats, rappels d'entretien, CV partagés). Peut être relancée sans risque |
+| `npm run deployer:supabase` | Applique les migrations manquantes, envoie les secrets et déploie les huit fonctions (paiement, webhook, formulaire public, réponses aux candidats, rappels d'entretien, CV partagés, durée de conservation). Peut être relancée sans risque |
 | `npm run planifier:rappels` | Affiche la requête qui planifie les rappels d'entretien, à exécuter une fois dans le *SQL Editor* |
 
 Elles s'utilisent depuis le dossier du projet, avec Node 22 (`npm install` fait une fois).
@@ -137,13 +137,18 @@ Le script affiche les migrations qu'il va appliquer et demande confirmation.
    ```bash
    npm run verifier:config -- --distant
    ```
-   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0026 »,
+   Tout doit être coché, en particulier « Migrations appliquées jusqu'à 0027 »,
    « webhook-stripe déployée et joignable par Stripe », « postuler déployée et ouverte aux
    candidats » et « cv-partage déployée et ouverte aux liens de partage », puis, si les e-mails sont configurés, « Domaine … vérifié chez Resend ». Si une
    fonction « refuse les appels sans jeton », elle a été déployée sans
    `--no-verify-jwt` : relancer le script.
 
-### 4b. Rappels d'entretien (facultatif)
+### 4b. Tâches planifiées : rappels d'entretien et durée de conservation (facultatif)
+
+Une même requête planifie les deux tâches de la base, avec le même secret (`RAPPELS_SECRET`) :
+les rappels d'entretien chaque jour, et chaque nuit à 3 h UTC la suppression des candidatures
+arrivées au terme de la durée de conservation de leur espace (sans effet tant qu'aucun
+propriétaire ne l'a réglée, page *Équipe > Durée de conservation*).
 
 La veille de chaque entretien, les membres de l'espace qui le souhaitent reçoivent un e-mail de
 rappel (un seul par personne, qui reprend tous ses entretiens). Il faut les e-mails de
@@ -154,10 +159,12 @@ l'étape 3b, puis :
    `Europe/Paris` par défaut), puis `npm run deployer:supabase`.
 2. Relancer `npm run planifier:rappels` : la commande affiche une requête SQL. L'exécuter une
    fois dans le *SQL Editor* de Supabase. Elle active les extensions `pg_cron` et `pg_net` et
-   planifie l'appel de la fonction chaque jour à 16 h UTC (17 h à Paris en hiver, 18 h en été ;
-   autre heure : `npm run planifier:rappels -- --heure 6`).
+   planifie les rappels chaque jour à 16 h UTC (17 h à Paris en hiver, 18 h en été ; autre
+   heure : `npm run planifier:rappels -- --heure 6`) et la durée de conservation chaque nuit à
+   3 h UTC.
 3. `npm run verifier:config -- --distant` : « rappels-entretiens déployée, protégée par son
-   secret ». Le lendemain, `select * from cron.job_run_details order by start_time desc limit 5;`
+   secret » et « conservation déployée, protégée par son secret ». Le lendemain,
+   `select * from cron.job_run_details order by start_time desc limit 5;`
    montre les passages.
 
 Un entretien n'est rappelé qu'une fois ; déplacé, il l'est de nouveau. Si l'envoi échoue, il

@@ -2580,3 +2580,138 @@ describe('RGPD', () => {
     expect(apres.rows[0]).toEqual({ email: null, user_id: null })
   })
 })
+
+describe('durée de conservation', () => {
+  beforeEach(async () => {
+    await db.exec(`
+      grant usage on schema public to anon, authenticated;
+      grant select, insert, update, delete on all tables in schema public to authenticated;
+      insert into public.membres (espace_id, user_id, email, role) values ('${A}', '${B}', 'b@x.fr', 'membre');
+      update public.profils set espace_actif = '${A}' where user_id = '${B}';
+    `)
+  })
+
+  async function enTant<T>(uid: string, action: () => Promise<T>) {
+    await enTantQue(uid)
+    await db.exec('set role authenticated')
+    try {
+      return await action()
+    } finally {
+      await db.exec('reset role')
+      await db.exec(`select set_config('test.uid', '', false)`)
+    }
+  }
+
+  // Candidature reçue il y a « mois » mois, sans autre activité
+  async function ancienne(nom: string, mois: number, espace = A) {
+    await db.exec(`insert into public.candidatures (user_id, nom) values ('${espace}', '${nom}')`)
+    await db.exec(`
+      update public.candidatures set created_at = now() - interval '${mois} months' where nom = '${nom}';
+      update public.historique set created_at = now() - interval '${mois} months'
+        where candidature_id = (select id from public.candidatures where nom = '${nom}');
+    `)
+  }
+
+  const supprimer = async () => {
+    await db.exec('set role service_role')
+    try {
+      return (
+        await db.query<{ cv_chemin: string }>(
+          'select * from public.supprimer_candidatures_expirees()',
+        )
+      ).rows
+    } finally {
+      await db.exec('reset role')
+    }
+  }
+
+  const noms = async () =>
+    (await db.query<{ nom: string }>('select nom from public.candidatures order by nom')).rows.map(
+      (r) => r.nom,
+    )
+
+  it('réglée par le propriétaire seul, entre 6 et 60 mois', async () => {
+    await enTant(B, () =>
+      db.exec(`update public.espaces set conservation_mois = 12 where id = '${A}'`),
+    )
+    expect(
+      (await db.query(`select conservation_mois from public.espaces where id = '${A}'`)).rows,
+    ).toEqual([{ conservation_mois: null }])
+    await enTant(A, () =>
+      db.exec(`update public.espaces set conservation_mois = 24 where id = '${A}'`),
+    )
+    await expect(
+      db.exec(`update public.espaces set conservation_mois = 3 where id = '${A}'`),
+    ).rejects.toThrow(/espaces_conservation_mois_check/)
+  })
+
+  it('sans durée réglée, rien n’expire', async () => {
+    await ancienne('Très ancienne', 100)
+    expect(await supprimer()).toEqual([])
+    expect(await noms()).toEqual(['Très ancienne'])
+  })
+
+  it('signale 30 jours avant, supprime au terme, CV compris, et note au registre', async () => {
+    await db.exec(`update public.espaces set conservation_mois = 12 where id = '${A}'`)
+    await ancienne('Expirée', 13)
+    await ancienne('Bientôt', 12)
+    await db.exec(`update public.candidatures set created_at = created_at + interval '10 days',
+      cv_chemin = null where nom = 'Bientôt'`)
+    await db.exec(`update public.historique set created_at = created_at + interval '10 days'
+      where candidature_id = (select id from public.candidatures where nom = 'Bientôt')`)
+    await ancienne('Récente', 2)
+    // Un CV sur la candidature expirée
+    await db.exec(`update public.candidatures set cv_chemin = espace_id || '/' || id || '/cv.pdf'
+      where nom = 'Expirée'`)
+    await db.exec(`update public.historique set created_at = now() - interval '13 months'
+      where candidature_id = (select id from public.candidatures where nom = 'Expirée')`)
+    const expire = (
+      await db.query<{ id: string }>(`select id from public.candidatures where nom = 'Expirée'`)
+    ).rows[0].id
+
+    const signalees = await enTant(
+      B,
+      async () =>
+        (await db.query<{ nom: string }>('select nom from public.candidatures_a_expirer()')).rows,
+    )
+    expect(signalees.map((s) => s.nom)).toEqual(['Expirée', 'Bientôt'])
+
+    expect(await supprimer()).toEqual([{ cv_chemin: `${A}/${expire}/cv.pdf` }])
+    // Sans CV : une ligne aussi, chemin vide
+    await ancienne('Sans CV', 14)
+    expect(await supprimer()).toEqual([{ cv_chemin: null }])
+    expect(await noms()).toEqual(['Bientôt', 'Récente'])
+    const { rows } = await db.query(
+      `select espace_id, action, user_id, email from public.demandes_rgpd`,
+    )
+    expect(rows).toEqual([
+      { espace_id: A, action: 'expiration', user_id: null, email: null },
+      { espace_id: A, action: 'expiration', user_id: null, email: null },
+    ])
+  })
+
+  it('toute activité repart de zéro ; chaque espace a sa propre durée', async () => {
+    await db.exec(`update public.espaces set conservation_mois = 12 where id = '${A}'`)
+    await ancienne('Relancée', 13)
+    await ancienne('Chez B', 13, B)
+    // Une note aujourd'hui : activité récente
+    await db.exec(`insert into public.notes (candidature_id, contenu)
+      select id, 'Relancée par téléphone' from public.candidatures where nom = 'Relancée'`)
+    expect(await supprimer()).toEqual([])
+    expect(await noms()).toEqual(['Chez B', 'Relancée'])
+  })
+
+  it('suppression réservée au serveur ; liste réservée aux comptes connectés', async () => {
+    await expect(
+      enTant(A, () => db.query('select * from public.supprimer_candidatures_expirees()')),
+    ).rejects.toThrow(/permission denied/)
+    await db.exec('set role anon')
+    try {
+      await expect(db.query('select * from public.candidatures_a_expirer()')).rejects.toThrow(
+        /permission denied/,
+      )
+    } finally {
+      await db.exec('reset role')
+    }
+  })
+})

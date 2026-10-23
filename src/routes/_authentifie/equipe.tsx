@@ -24,7 +24,8 @@ import { GestionModeles } from '@/components/GestionModeles'
 import { listerCriteres } from '@/lib/evaluations'
 import { GestionEtiquettes } from '@/components/GestionEtiquettes'
 import { listerEtiquettes } from '@/lib/etiquettes'
-import { listerDemandes } from '@/lib/rgpd'
+import { libelleDemande, lireConservation, listerDemandes } from '@/lib/rgpd'
+import { ReglageConservation } from '@/components/ReglageConservation'
 import { ReglagesPageCarrieres } from '@/components/ReglagesPageCarrieres'
 import { listerModeles } from '@/lib/modeles'
 import { lireReglagesCarrieres } from '@/lib/carrieres'
@@ -49,6 +50,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
         criteres,
         etiquettes,
         demandesRgpd,
+        conservation,
       ] = await Promise.all([
         listerMembres(espace.id),
         // Seul le propriétaire voit et gère les invitations
@@ -69,6 +71,10 @@ export const Route = createFileRoute('/_authentifie/equipe')({
         listerEtiquettes().catch(() => null),
         // null : base pas encore à jour (migration 0026), la rubrique est masquée
         listerDemandes().catch(() => null),
+        // null : base pas encore à jour (migration 0027), la rubrique est masquée
+        lireConservation(espace.id)
+          .then((mois) => ({ mois }))
+          .catch(() => null),
       ])
       return {
         espace,
@@ -83,6 +89,7 @@ export const Route = createFileRoute('/_authentifie/equipe')({
         criteres,
         etiquettes,
         demandesRgpd,
+        conservation,
       }
     }),
   component: Equipe,
@@ -109,6 +116,7 @@ function Equipe() {
     criteres,
     etiquettes,
     demandesRgpd,
+    conservation,
   } = Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
@@ -253,11 +261,23 @@ function Equipe() {
         />
       </Carte>
 
+      {conservation && (
+        <Carte titre="Durée de conservation">
+          <ReglageConservation
+            espaceId={espace.id}
+            mois={conservation.mois}
+            proprietaire={proprietaire}
+            executer={executer}
+          />
+        </Carte>
+      )}
+
       {demandesRgpd && (
         <Carte titre="Registre des demandes RGPD">
           <p className="text-sm text-slate-600">
-            Demandes d’accès (export) et d’effacement traitées depuis la fiche des candidats. Le
-            registre garde la date et le membre, jamais les données du candidat.
+            Demandes d’accès (export) et d’effacement traitées depuis la fiche des candidats, et
+            suppressions automatiques au terme de la durée de conservation. Le registre garde la
+            date et le membre, jamais les données du candidat.
           </p>
           {demandesRgpd.length === 0 ? (
             <p className="text-sm text-slate-500">Aucune demande traitée pour le moment.</p>
@@ -284,13 +304,13 @@ function Equipe() {
                         dateStyle: 'long',
                       })}
                     </td>
-                    <td className="py-2 pr-4">
-                      {demande.action === 'acces' ? 'Accès (export)' : 'Effacement'}
-                    </td>
+                    <td className="py-2 pr-4">{libelleDemande(demande.action)}</td>
                     <td className="py-2">
-                      {demande.email === user?.email
-                        ? 'vous'
-                        : (demande.email ?? 'compte supprimé')}
+                      {demande.action === 'expiration'
+                        ? 'automatique'
+                        : demande.email === user?.email
+                          ? 'vous'
+                          : (demande.email ?? 'compte supprimé')}
                     </td>
                   </tr>
                 ))}

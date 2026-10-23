@@ -37,6 +37,8 @@ interface EspaceFaux {
   slug?: string | null
   carrieres_publiques?: boolean
   presentation?: string | null
+  // Durée de conservation en mois (supabase/migrations/0027_conservation.sql)
+  conservation_mois?: number | null
 }
 
 interface MembreFaux {
@@ -187,7 +189,7 @@ export class FauxSupabase {
     id: number
     espace_id: string
     email: string | null
-    action: 'acces' | 'effacement'
+    action: 'acces' | 'effacement' | 'expiration'
     created_at: string
   }[] = []
   // Appels à signature_espace, et panne simulée (fonction absente : base pas à jour)
@@ -659,6 +661,30 @@ export class FauxSupabase {
             ]),
           )
           .digest('hex'),
+      )
+    }
+
+    // Durée de conservation (supabase/migrations/0027_conservation.sql)
+    if (chemin === '/rest/v1/rpc/candidatures_a_expirer') {
+      const mois = this.espaces.find((e) => e.id === this.espaceActif)?.conservation_mois
+      if (!mois) return json([])
+      const dans30Jours = Date.now() + 30 * 24 * 3600 * 1000
+      return json(
+        this.candidatures
+          .filter((c) => c.espace_id === this.espaceActif)
+          .map((c) => {
+            const activite = [
+              c.created_at,
+              ...this.historique.filter((h) => h.candidature_id === c.id).map((h) => h.created_at),
+            ]
+              .sort()
+              .at(-1)!
+            const expire = new Date(activite)
+            expire.setMonth(expire.getMonth() + mois)
+            return { id: c.id, nom: c.nom, expire_le: expire.toISOString() }
+          })
+          .filter((c) => new Date(c.expire_le).getTime() < dans30Jours)
+          .sort((a, b) => a.expire_le.localeCompare(b.expire_le)),
       )
     }
 
@@ -1465,6 +1491,7 @@ export class FauxSupabase {
           slug: espace.slug ?? null,
           carrieres_publiques: espace.carrieres_publiques ?? false,
           presentation: espace.presentation ?? null,
+          conservation_mois: espace.conservation_mois ?? null,
         },
         status: 200,
       }
@@ -1483,7 +1510,16 @@ export class FauxSupabase {
         (champs.carrieres_publiques && !champs.slug)
       )
         return { corps: { code: '23514', message: 'violates check constraint' }, status: 400 }
-      if (espace) Object.assign(espace, champs)
+      // Règle d'accès : seul le propriétaire modifie l'espace (aucune ligne sinon)
+      const proprietaire = this.membres.some(
+        (m) =>
+          m.espace_id === espace?.id &&
+          m.user_id === this.utilisateur.id &&
+          m.role === 'proprietaire',
+      )
+      if (espace && proprietaire) Object.assign(espace, champs)
+      if (url.searchParams.get('select'))
+        return { corps: espace && proprietaire ? [{ id: espace.id }] : [], status: 200 }
       return { corps: undefined, status: 204 }
     }
     if (chemin === '/rest/v1/invitations') {

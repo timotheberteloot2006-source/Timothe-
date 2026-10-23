@@ -10,7 +10,8 @@ export interface DemandeRgpd {
   id: number
   // null : compte du membre supprimé
   email: string | null
-  action: 'acces' | 'effacement'
+  // expiration : suppression automatique au terme de la durée de conservation (sans membre)
+  action: 'acces' | 'effacement' | 'expiration'
   created_at: string
 }
 
@@ -21,7 +22,7 @@ function client() {
   return supabase
 }
 
-async function noter(action: DemandeRgpd['action']) {
+async function noter(action: 'acces' | 'effacement') {
   const { error } = await client().rpc('noter_demande_rgpd', { type_demande: action })
   if (error) throw new Error(error.message)
 }
@@ -115,4 +116,49 @@ export async function listerDemandes(): Promise<DemandeRgpd[]> {
     .limit(LIMITE_REGISTRE)
   if (error) throw new Error(error.message)
   return data as DemandeRgpd[]
+}
+
+// Durée de conservation (supabase/migrations/0027_conservation.sql) : null = pas de suppression
+// automatique
+export const DUREES_CONSERVATION = [6, 12, 24, 36, 60] as const
+
+export interface CandidatureAExpirer {
+  id: string
+  nom: string
+  expire_le: string
+}
+
+export async function lireConservation(espaceId: string): Promise<number | null> {
+  const { data, error } = await client()
+    .from('espaces')
+    .select('conservation_mois')
+    .eq('id', espaceId)
+    .single()
+  if (error) throw new Error(error.message)
+  return (data as { conservation_mois: number | null }).conservation_mois
+}
+
+// Réservé au propriétaire (règle d'accès de la table espaces)
+export async function reglerConservation(espaceId: string, mois: number | null) {
+  const { data, error } = await client()
+    .from('espaces')
+    .update({ conservation_mois: mois })
+    .eq('id', espaceId)
+    .select('id')
+  if (error) throw new Error(error.message)
+  if (data?.length !== 1)
+    throw new Error('Seul le propriétaire de l’espace peut régler la durée de conservation.')
+}
+
+// Candidatures de l'espace actif supprimées dans les 30 jours, la plus proche d'abord
+export async function listerAExpirer(): Promise<CandidatureAExpirer[]> {
+  const { data, error } = await client().rpc('candidatures_a_expirer')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as CandidatureAExpirer[]
+}
+
+export function libelleDemande(action: DemandeRgpd['action']) {
+  if (action === 'acces') return 'Accès (export)'
+  if (action === 'effacement') return 'Effacement'
+  return 'Suppression automatique (durée de conservation)'
 }

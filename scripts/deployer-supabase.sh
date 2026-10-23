@@ -58,6 +58,8 @@ echo "3/3 Fonctions (sans Docker)"
 # CV d'une candidature partagée : le visiteur du lien n'a pas de compte (le lien est vérifié par
 # la base)
 "${SUPABASE[@]}" functions deploy cv-partage --no-verify-jwt --use-api
+# Durée de conservation : appelée chaque nuit par la tâche planifiée, avec le même secret
+"${SUPABASE[@]}" functions deploy conservation --no-verify-jwt --use-api
 # Rappels d'entretien : appelée par la tâche planifiée avec son propre secret (x-rappels-secret)
 "${SUPABASE[@]}" functions deploy rappels-entretiens --no-verify-jwt --use-api
 

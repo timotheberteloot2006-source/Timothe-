@@ -13,6 +13,12 @@ describe('sqlPlanification', () => {
     expect(sql).toContain("cron.schedule(\n  'rappels-entretiens'")
   })
 
+  it('planifie aussi la durée de conservation chaque nuit', () => {
+    const sql = sqlPlanification(URL_PROJET, SECRET)
+    expect(sql).toContain("cron.schedule(\n  'conservation',\n  '0 3 * * *'")
+    expect(sql).toContain("url := 'https://abcdef.supabase.co/functions/v1/conservation'")
+  })
+
   it('refuse ce qui casserait la requête', () => {
     expect(() => sqlPlanification(URL_PROJET, "court'")).toThrow('RAPPELS_SECRET invalide.')
     expect(() => sqlPlanification(URL_PROJET, `${SECRET}$$`)).toThrow('RAPPELS_SECRET invalide.')

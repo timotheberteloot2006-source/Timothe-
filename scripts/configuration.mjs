@@ -46,6 +46,7 @@ export const MIGRATIONS = [
   // Réservée aux comptes connectés : sans compte, refus d'accès si elle existe
   { numero: '0025', fonction: 'signature_espace', arguments: {} },
   { numero: '0026', table: 'demandes_rgpd', colonne: 'action' },
+  { numero: '0027', table: 'espaces', colonne: 'conservation_mois' },
 ]
 
 // Événements que supabase/functions/webhook-stripe traite
@@ -281,28 +282,29 @@ async function interrogerSupabase(url, entetes, fetch) {
     resultats.push(ok('Fonction webhook-stripe déployée et joignable par Stripe.'))
   else resultats.push(attention(`webhook-stripe : réponse inattendue (${webhook.status}).`))
 
-  // Rappels d'entretien : appelés par la tâche planifiée, avec leur secret (ici sans : refus attendu)
-  const rappels = await fetch(`${url}/functions/v1/rappels-entretiens`, {
-    method: 'POST',
-    body: '{}',
-  })
-  const corpsRappels = await rappels.json().catch(() => ({}))
-  if (rappels.status === 404) resultats.push(erreur('Fonction rappels-entretiens non déployée.'))
-  else if (rappels.status === 401 && corpsRappels.erreur === 'Accès refusé.')
-    resultats.push(ok('Fonction rappels-entretiens déployée, protégée par son secret.'))
-  else if (rappels.status === 401)
-    resultats.push(
-      erreur(
-        'rappels-entretiens refuse les appels sans jeton : redéployez-la avec --no-verify-jwt, sinon la tâche planifiée ne peut pas la lancer.',
-      ),
-    )
-  else if (rappels.status === 500 && corpsRappels.erreur?.includes('RAPPELS_SECRET'))
-    resultats.push(
-      attention(
-        'Rappels d’entretien désactivés : RAPPELS_SECRET absent des secrets des fonctions.',
-      ),
-    )
-  else resultats.push(attention(`rappels-entretiens : réponse inattendue (${rappels.status}).`))
+  // Tâches planifiées (rappels d'entretien, durée de conservation) : appelées par la base, avec
+  // leur secret (ici sans : refus attendu)
+  for (const [nom, tache] of [
+    ['rappels-entretiens', 'Rappels d’entretien'],
+    ['conservation', 'Durée de conservation'],
+  ]) {
+    const reponse = await fetch(`${url}/functions/v1/${nom}`, { method: 'POST', body: '{}' })
+    const corps = await reponse.json().catch(() => ({}))
+    if (reponse.status === 404) resultats.push(erreur(`Fonction ${nom} non déployée.`))
+    else if (reponse.status === 401 && corps.erreur === 'Accès refusé.')
+      resultats.push(ok(`Fonction ${nom} déployée, protégée par son secret.`))
+    else if (reponse.status === 401)
+      resultats.push(
+        erreur(
+          `${nom} refuse les appels sans jeton : redéployez-la avec --no-verify-jwt, sinon la tâche planifiée ne peut pas la lancer.`,
+        ),
+      )
+    else if (reponse.status === 500 && corps.erreur?.includes('RAPPELS_SECRET'))
+      resultats.push(
+        attention(`${tache} désactivée : RAPPELS_SECRET absent des secrets des fonctions.`),
+      )
+    else resultats.push(attention(`${nom} : réponse inattendue (${reponse.status}).`))
+  }
 
   // Formulaire public : appelé sans compte (un envoi vide est refusé par la fonction elle-même)
   const postuler = await fetch(`${url}/functions/v1/postuler`, { method: 'POST', body: '{}' })

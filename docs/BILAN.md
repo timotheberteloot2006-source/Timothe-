@@ -10,7 +10,7 @@ la pull request.
 
 - **Le code est complet pour un lancement**, et toute la vérification automatique est au vert :
   254 tests unitaires et de base de données, 122 tests dans le navigateur, contrôle des types
-  des 7 fonctions serveur, budget de poids respecté.
+  des 8 fonctions serveur, budget de poids respecté.
 - **Rien n'a encore tourné contre de vrais services** (projet Supabase, compte Stripe, compte
   Resend). C'est le principal risque restant : la répétition générale du guide de mise en ligne
   sert à le lever.
@@ -36,12 +36,13 @@ la pull request.
   (Vercel ou Netlify), avec des en-têtes de sécurité stricts. Chaque page et le chargement de
   ses données sont téléchargés à la visite : 129,8 Ko compressés au démarrage, pour un budget de
   135 Ko vérifié à chaque modification.
-- **Base** : Supabase (Postgres), 26 migrations. La sécurité repose sur la base elle-même :
+- **Base** : Supabase (Postgres), 27 migrations. La sécurité repose sur la base elle-même :
   règles d'accès (RLS) par espace, auteurs et limites imposés par des déclencheurs, fonctions
   sensibles réservées au serveur.
-- **Fonctions serveur** (7) : paiement (`creer-checkout`, `portail-client`, `webhook-stripe`),
+- **Fonctions serveur** (8) : paiement (`creer-checkout`, `portail-client`, `webhook-stripe`),
   formulaire public (`postuler`), réponses aux candidats (`envoyer-reponse`), rappels d'entretien
-  (`rappels-entretiens`, tâche planifiée), CV partagé (`cv-partage`).
+  (`rappels-entretiens`, tâche planifiée), CV partagé (`cv-partage`), durée de conservation
+  (`conservation`, tâche planifiée).
 - **Services externes** : Supabase (base, authentification, stockage des CV, fonctions), Stripe
   (paiement), Resend (e-mails, facultatif).
 
@@ -49,7 +50,7 @@ la pull request.
 
 - **Vérification GitHub à chaque modification** : lint, tests unitaires, construction, budget de
   poids, tests dans le navigateur, contrôle des types des fonctions serveur.
-- **Base de données** : les 26 migrations sont appliquées sur un vrai Postgres en mémoire (PGlite)
+- **Base de données** : les 27 migrations sont appliquées sur un vrai Postgres en mémoire (PGlite)
   et chaque règle de sécurité est testée, y compris les tentatives d'accès à un autre espace ou
   sans compte.
 - **Parcours dans le navigateur** : tous les parcours importants, sur un faux Supabase, sous la
@@ -66,11 +67,12 @@ C'est la liste à lever pendant la répétition générale (étape 6 du guide de
 | Élément | Vérifié jusqu'ici par | À vérifier en vrai |
 |---|---|---|
 | Migrations 0001 à 0012 | Un vrai Postgres 16 (`supabase db push`) | — |
-| Migrations 0013 à 0026 | PGlite seulement | Application sur le projet Supabase |
+| Migrations 0013 à 0027 | PGlite seulement | Application sur le projet Supabase |
 | Paiement Stripe et webhook | Tests sur des réponses simulées | Abonnement, échec de paiement, résiliation en mode test |
 | E-mails (notifications, accusés, réponses, rappels) | Fonctions lancées face à un faux Supabase | Réception réelle, domaine vérifié chez Resend, indésirables |
 | Rappels d'entretien (`pg_cron`, `pg_net`) | Requête générée, jamais exécutée | Tâche planifiée créée et rappel reçu |
 | `cv-partage` | Contrôle des types et faux Supabase | Ouverture d'un vrai CV par un lien de partage |
+| `conservation` (suppression automatique) | Base testée sur PGlite, fonction par contrôle des types | Une candidature de test vieillie, supprimée la nuit avec son CV |
 | Authentification (confirmation, SMTP) | Faux Supabase | E-mails de confirmation et de mot de passe reçus |
 | Rafraîchissement entre deux comptes | Horloge simulée | Deux navigateurs, deux membres d'un même espace |
 
@@ -115,6 +117,7 @@ Ces réglages ont été fixés pendant le développement ; ils se changent facil
 | Formulaire public | 5 envois par heure et par connexion, 60 par heure et par espace | migrations 0013 et 0017 |
 | Réponses aux candidats | 100 envois par heure et par espace | migration 0019 |
 | Effacement RGPD | Immédiat et définitif, sans corbeille | `src/lib/rgpd.ts` |
+| Durée de conservation | Désactivée par défaut ; 6, 12, 24, 36 ou 60 mois sans activité, au choix du propriétaire ; signalée 30 jours avant | `src/lib/rgpd.ts`, migration 0027 |
 
 ## Avant le lancement
 
@@ -129,9 +132,9 @@ Ces réglages ont été fixés pendant le développement ; ils se changent facil
      du RGPD) ;
    - **Confidentialité** : y mentionner le partage de profils par lien, l'export et
      l'effacement, et la façon dont un candidat exerce ses droits ;
-   - **Durée de conservation** : aucune suppression automatique n'existe aujourd'hui ; chaque
-     client doit définir et appliquer la sienne (une suppression automatique des candidatures
-     anciennes pourrait faire l'objet d'une prochaine étape).
+   - **Durée de conservation** : chaque espace peut régler une suppression automatique des
+     candidatures inactives (étape 52, page Équipe) ; elle est désactivée par défaut, et la
+     politique de confidentialité doit indiquer la durée appliquée.
 4. **Fixer le prix** de l'offre Pro, passer Stripe en mode réel, puis lancer
    `npm run verifier:config -- --distant --production`.
 

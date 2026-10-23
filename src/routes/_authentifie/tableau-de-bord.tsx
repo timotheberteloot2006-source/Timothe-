@@ -39,26 +39,38 @@ import { listerEntretiensAVenir, prochainParCandidature } from '@/lib/entretiens
 import { EntretiensAVenir } from '@/components/candidatures/EntretiensAVenir'
 import { rechargementALaDemande, sansInterruption } from '@/lib/rechargement'
 import { titrePage } from '@/lib/titre'
+import { listerAExpirer, type CandidatureAExpirer } from '@/lib/rgpd'
 
 export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
   head: () => titrePage('Candidatures'),
   validateSearch: lireFiltres,
   loader: (contexte) =>
     sansInterruption('tableau-de-bord', contexte, async () => {
-      const [candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions] =
-        await Promise.all([
-          listerCandidatures(),
-          lireEspace(),
-          listerOffres(),
-          listerEntretiensAVenir(),
-          // Base pas encore à jour (migration 0015) : les trois étapes habituelles
-          listerEtapes().catch(() => ETAPES_DE_BASE),
-          // Base pas encore à jour (migration 0020) : aucune note
-          listerMoyennes().catch(() => new Map()),
-          // Base pas encore à jour (migration 0022) : aucune étiquette
-          listerEtiquettes().catch(() => []),
-          listerAttributions().catch(() => new Map<string, string[]>()),
-        ])
+      const [
+        candidatures,
+        espace,
+        offres,
+        entretiens,
+        etapes,
+        moyennes,
+        etiquettes,
+        attributions,
+        aExpirer,
+      ] = await Promise.all([
+        listerCandidatures(),
+        lireEspace(),
+        listerOffres(),
+        listerEntretiensAVenir(),
+        // Base pas encore à jour (migration 0015) : les trois étapes habituelles
+        listerEtapes().catch(() => ETAPES_DE_BASE),
+        // Base pas encore à jour (migration 0020) : aucune note
+        listerMoyennes().catch(() => new Map()),
+        // Base pas encore à jour (migration 0022) : aucune étiquette
+        listerEtiquettes().catch(() => []),
+        listerAttributions().catch(() => new Map<string, string[]>()),
+        // Base pas encore à jour (migration 0027) : rien à signaler
+        listerAExpirer().catch(() => []),
+      ])
       return {
         candidatures,
         espace,
@@ -68,6 +80,7 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
         moyennes,
         etiquettes,
         attributions,
+        aExpirer,
       }
     }),
   ...rechargementALaDemande,
@@ -84,8 +97,17 @@ export const Route = createFileRoute('/_authentifie/tableau-de-bord')({
 })
 
 function TableauDeBord() {
-  const { candidatures, espace, offres, entretiens, etapes, moyennes, etiquettes, attributions } =
-    Route.useLoaderData()
+  const {
+    candidatures,
+    espace,
+    offres,
+    entretiens,
+    etapes,
+    moyennes,
+    etiquettes,
+    attributions,
+    aExpirer,
+  } = Route.useLoaderData()
   const prochainsEntretiens = prochainParCandidature(entretiens)
   const places = placesRestantes(espace.est_pro, candidatures.length)
   const recherche = Route.useSearch()
@@ -257,6 +279,8 @@ function TableauDeBord() {
         <BandeauQuota nombre={candidatures.length} proprietaire={espace.role === 'proprietaire'} />
       )}
 
+      {aExpirer.length > 0 && <BandeauConservation candidatures={aExpirer} />}
+
       {panneau === 'ajout' && (
         <FormulaireCandidature
           offres={offres}
@@ -416,6 +440,45 @@ function TableauDeBord() {
         </>
       )}
     </section>
+  )
+}
+
+// Candidatures supprimées dans les 30 jours au terme de la durée de conservation (page Équipe)
+const NOMS_AFFICHES = 5
+
+function BandeauConservation({ candidatures }: { candidatures: CandidatureAExpirer[] }) {
+  const n = candidatures.length
+  return (
+    <div className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <p>
+        {n} candidature{n > 1 ? 's' : ''} sans activité{' '}
+        {n > 1 ? 'seront supprimées' : 'sera supprimée'} dans les 30 jours (
+        <Link to="/equipe" className="underline underline-offset-2 hover:no-underline">
+          durée de conservation
+        </Link>
+        ). Une modification, une note ou un changement d’étape {n > 1 ? 'les' : 'la'} garde.
+      </p>
+      <ul className="mt-1 flex flex-wrap gap-x-3">
+        {candidatures.slice(0, NOMS_AFFICHES).map((c) => (
+          <li key={c.id}>
+            <Link
+              to="/candidatures/$id"
+              params={{ id: c.id }}
+              className="font-medium underline underline-offset-2 hover:no-underline"
+            >
+              {c.nom}
+            </Link>{' '}
+            (le{' '}
+            {new Date(c.expire_le).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })})
+          </li>
+        ))}
+        {n > NOMS_AFFICHES && (
+          <li>
+            et {n - NOMS_AFFICHES} autre{n - NOMS_AFFICHES > 1 ? 's' : ''}
+          </li>
+        )}
+      </ul>
+    </div>
   )
 }
 

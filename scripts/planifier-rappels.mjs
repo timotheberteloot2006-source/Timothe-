@@ -1,4 +1,5 @@
-// Affiche la requête SQL qui planifie les rappels d'entretien (à coller dans le SQL Editor).
+// Affiche la requête SQL qui planifie les tâches de la base : rappels d'entretien et durée de
+// conservation (à coller dans le SQL Editor).
 // Usage : npm run planifier:rappels [-- --heure 16]   (heure UTC, 16 par défaut)
 import { existsSync, readFileSync } from 'node:fs'
 import { lireEnv } from './configuration.mjs'
